@@ -18,17 +18,17 @@ Deno.serve(async (req) => {
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
 
-    const { email, password, full_name, role } = await req.json()
+    const { email, full_name, role } = await req.json()
 
-    const { data, error } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
-      user_metadata: { full_name, role },
-      email_confirm: true,
+    // Invite the user — Supabase sends them an email with a magic link
+    const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+      data: { full_name, role, must_change_password: true },
+      redirectTo: 'https://c4-lab.vercel.app/change-password',
     })
 
     if (error) throw error
 
+    // Pre-create profile so role is set correctly before they accept
     await supabaseAdmin.from('profiles').upsert({
       id: data.user.id,
       full_name,

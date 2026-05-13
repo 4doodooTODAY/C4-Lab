@@ -53,7 +53,7 @@ export function AuthProvider({ children }) {
 
   const signOut = () => supabase.auth.signOut()
 
-  const createUser = async ({ email, password, full_name, role }) => {
+  const createUser = async ({ email, full_name, role }) => {
     const { data: { session } } = await supabase.auth.getSession()
     const res = await fetch(
       `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-user`,
@@ -64,7 +64,7 @@ export function AuthProvider({ children }) {
           Authorization: `Bearer ${session.access_token}`,
           apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
         },
-        body: JSON.stringify({ email, password, full_name, role }),
+        body: JSON.stringify({ email, full_name, role }),
       }
     )
     const data = await res.json()

@@ -21,35 +21,40 @@ function CreateUserModal({ onClose, onCreated }) {
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [role, setRole] = useState('creative')
-  const [password, setPassword] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [copied, setCopied] = useState(false)
-
-  const generatePassword = () => {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#'
-    setPassword(Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join(''))
-  }
-
-  const copyPassword = () => {
-    navigator.clipboard.writeText(password)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
+  const [sent, setSent] = useState(false)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!password) { setError('Please set a temporary password'); return }
     setSaving(true)
     setError('')
     try {
-      await createUser({ email: email.trim(), password, full_name: fullName.trim(), role })
+      await createUser({ email: email.trim(), full_name: fullName.trim(), role })
+      setSent(true)
       onCreated()
-      onClose()
     } catch (err) {
       setError(err.message)
       setSaving(false)
     }
+  }
+
+  if (sent) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+        <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 z-10 text-center">
+          <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+            <Check size={22} className="text-green-600" />
+          </div>
+          <h2 className="text-base font-semibold text-text-primary mb-1">Invite sent!</h2>
+          <p className="text-sm text-text-secondary mb-5">
+            {email} will receive an email with a link to set their password and access C4 Lab.
+          </p>
+          <button onClick={onClose} className="btn-primary w-full">Done</button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -57,7 +62,7 @@ function CreateUserModal({ onClose, onCreated }) {
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 z-10">
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-base font-semibold text-text-primary">Create Account</h2>
+          <h2 className="text-base font-semibold text-text-primary">Invite User</h2>
           <button onClick={onClose} className="btn-ghost p-1.5"><X size={16} /></button>
         </div>
 
@@ -88,23 +93,9 @@ function CreateUserModal({ onClose, onCreated }) {
             </div>
           </div>
 
-          <div>
-            <label className="label">Temporary Password</label>
-            <div className="flex gap-2">
-              <input type="text" value={password} onChange={(e) => setPassword(e.target.value)}
-                placeholder="Set or generate a password" className="input flex-1 font-mono text-sm" required />
-              <button type="button" onClick={copyPassword}
-                className="btn-secondary px-3 shrink-0" title="Copy password">
-                {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
-              </button>
-              <button type="button" onClick={generatePassword} className="btn-secondary shrink-0 text-xs px-3">
-                Generate
-              </button>
-            </div>
-            <p className="text-xs text-text-muted mt-1">
-              Share this with the user. They'll be forced to change it on first login.
-            </p>
-          </div>
+          <p className="text-xs text-text-muted bg-surface-2 rounded-lg px-3 py-2">
+            They'll receive an email invite with a link to set their own password.
+          </p>
 
           {error && <p className="text-xs text-red-500 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p>}
 
@@ -112,7 +103,7 @@ function CreateUserModal({ onClose, onCreated }) {
             <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
             <button type="submit" disabled={saving} className="btn-primary disabled:opacity-50 flex items-center gap-1.5">
               {saving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-              Create Account
+              Send Invite
             </button>
           </div>
         </form>
