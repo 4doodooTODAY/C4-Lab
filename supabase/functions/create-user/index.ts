@@ -18,28 +18,67 @@ Deno.serve(async (req) => {
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
 
-    const { email, full_name, role } = await req.json()
+    const body = await req.json()
+    const { action } = body
 
-    // Invite the user — Supabase sends them an email with a magic link
-    const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-      data: { full_name, role, must_change_password: true },
-      redirectTo: 'https://c4-lab.vercel.app/change-password',
-    })
+    // --- INVITE USER ---
+    if (!action || action === 'invite') {
+      const { email, full_name, role } = body
 
-    if (error) throw error
+      const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+        data: { full_name, role, must_change_password: true },
+        redirectTo: 'https://c4-lab.vercel.app/change-password',
+      })
+      if (error) throw error
 
-    // Pre-create profile so role is set correctly before they accept
-    await supabaseAdmin.from('profiles').upsert({
-      id: data.user.id,
-      full_name,
-      role,
-      must_change_password: true,
-    })
+      await supabaseAdmin.from('profiles').upsert({
+        id: data.user.id,
+        full_name,
+        role,
+        must_change_password: true,
+      })
 
-    return new Response(JSON.stringify({ user: data.user }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
-    })
+      return new Response(JSON.stringify({ user: data.user }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      })
+    }
+
+    // --- RESEND INVITE ---
+    if (action === 'resend_invite') {
+      const { email, full_name, role } = body
+
+      const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+        data: { full_name, role, must_change_password: true },
+        redirectTo: 'https://c4-lab.vercel.app/change-password',
+      })
+      if (error) throw error
+
+      return new Response(JSON.stringify({ user: data.user }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      })
+    }
+
+    // --- DELETE USER ---
+    if (action === 'delete_user') {
+      const { user_id } = body
+
+      // Delete from auth (cascades to profiles via RLS/trigger)
+      const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(user_id)
+      if (authError) throw authError
+
+      // Also delete profile manually to be safe
+      await supabaseAdmin.from('profiles').delete().eq('id', user_id)
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      })
+    }
+
+    throw new Error('Unknown action')
+
   } catch (err) {
     return new Response(JSON.stringify({ error: err.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
