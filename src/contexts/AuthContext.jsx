@@ -18,10 +18,20 @@ export function AuthProvider({ children }) {
   }
 
   useEffect(() => {
+    // Safety timeout — never stay stuck on loading screen
+    const timeout = setTimeout(() => setLoading(false), 5000)
+
     supabase.auth.getSession().then(({ data: { session } }) => {
+      clearTimeout(timeout)
       setUser(session?.user ?? null)
-      if (session?.user) fetchProfile(session.user.id).finally(() => setLoading(false))
-      else setLoading(false)
+      if (session?.user) {
+        fetchProfile(session.user.id).finally(() => setLoading(false))
+      } else {
+        setLoading(false)
+      }
+    }).catch(() => {
+      clearTimeout(timeout)
+      setLoading(false)
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
@@ -30,7 +40,10 @@ export function AuthProvider({ children }) {
       else setProfile(null)
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      clearTimeout(timeout)
+      subscription.unsubscribe()
+    }
   }, [])
 
   const signIn = async (email, password) => {
@@ -40,7 +53,6 @@ export function AuthProvider({ children }) {
 
   const signOut = () => supabase.auth.signOut()
 
-  // Admin creates a new user via Edge Function
   const createUser = async ({ email, password, full_name, role }) => {
     const { data: { session } } = await supabase.auth.getSession()
     const res = await fetch(
