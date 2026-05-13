@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 
 const AuthContext = createContext(null)
@@ -7,6 +7,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  const initialized = useRef(false)
 
   const fetchProfile = async (userId) => {
     const { data } = await supabase
@@ -15,34 +16,41 @@ export function AuthProvider({ children }) {
       .eq('id', userId)
       .single()
     setProfile(data ?? null)
+    return data
   }
 
   useEffect(() => {
-    // Safety timeout — never stay stuck on loading screen
-    const timeout = setTimeout(() => setLoading(false), 5000)
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      clearTimeout(timeout)
+    // Listen for auth changes first — this fires immediately with existing session
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       setUser(session?.user ?? null)
+
       if (session?.user) {
-        fetchProfile(session.user.id).finally(() => setLoading(false))
+        // Only fetch profile if we don't have one yet or user changed
+        if (!initialized.current || event === 'SIGNED_IN') {
+          await fetchProfile(session.user.id)
+        }
       } else {
+        setProfile(null)
+      }
+
+      // Mark as initialized after first event fires
+      if (!initialized.current) {
+        initialized.current = true
         setLoading(false)
       }
-    }).catch(() => {
-      clearTimeout(timeout)
-      setLoading(false)
     })
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setUser(session?.user ?? null)
-      if (session?.user) await fetchProfile(session.user.id)
-      else setProfile(null)
-    })
+    // Fallback: if onAuthStateChange never fires (rare edge case), stop loading after 4s
+    const fallback = setTimeout(() => {
+      if (!initialized.current) {
+        initialized.current = true
+        setLoading(false)
+      }
+    }, 4000)
 
     return () => {
-      clearTimeout(timeout)
       subscription.unsubscribe()
+      clearTimeout(fallback)
     }
   }, [])
 
@@ -51,7 +59,11 @@ export function AuthProvider({ children }) {
     if (error) throw error
   }
 
-  const signOut = () => supabase.auth.signOut()
+  const signOut = async () => {
+    await supabase.auth.signOut()
+    setUser(null)
+    setProfile(null)
+  }
 
   const createUser = async ({ email, full_name, role }) => {
     const { data: { session } } = await supabase.auth.getSession()
