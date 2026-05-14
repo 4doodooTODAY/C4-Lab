@@ -244,7 +244,13 @@ export default function UserDetail() {
             <div className="flex justify-between text-sm">
               <span className="text-text-muted">Status</span>
               <span className={`font-medium ${isLocked ? 'text-red-600' : profile?.must_change_password ? 'text-amber-600' : 'text-green-600'}`}>
-                {isLocked ? 'Locked' : profile?.must_change_password ? 'Invite pending' : 'Active'}
+                {isLocked
+                  ? 'Locked'
+                  : profile?.must_change_password
+                  ? 'Invite pending'
+                  : lastSeen
+                  ? `Active ${formatDistanceToNow(new Date(lastSeen), { addSuffix: true })}`
+                  : 'Active'}
               </span>
             </div>
             <div className="flex justify-between text-sm">
