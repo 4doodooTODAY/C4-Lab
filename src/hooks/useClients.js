@@ -12,7 +12,7 @@ export function useClients() {
     setLoading(true)
     const { data, error } = await supabase
       .from('clients')
-      .select('id, name, created_at, client_access(profile_id, profiles(id, full_name, role))')
+      .select('id, name, contact_name, email, phone, notes, profile_id, created_at, client_access(profile_id, profiles(id, full_name, role, avatar_url))')
       .order('created_at', { ascending: false })
     if (error) setError(error.message)
     else setClients(data || [])
@@ -66,7 +66,7 @@ export function useCreatives() {
   useEffect(() => {
     supabase
       .from('profiles')
-      .select('id, full_name, role')
+      .select('id, full_name, role, avatar_url, tags')
       .in('role', ['creative', 'admin'])
       .order('full_name')
       .then(({ data }) => setCreatives(data || []))

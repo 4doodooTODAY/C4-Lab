@@ -193,9 +193,8 @@ function DeleteModal({ user, onClose, onDeleted }) {
 
 // ── Section config ───────────────────────────────────────────────────────────
 const SECTIONS = [
-  { role: 'admin',    label: 'Admins',    icon: Shield,   color: 'text-purple-600', bg: 'bg-purple-50' },
-  { role: 'creative', label: 'Creatives', icon: Palette,  color: 'text-blue-600',   bg: 'bg-blue-50'   },
-  { role: 'client',   label: 'Clients',   icon: Briefcase, color: 'text-green-600', bg: 'bg-green-50'  },
+  { role: 'admin',    label: 'Admins',    icon: Shield,  color: 'text-purple-600', bg: 'bg-purple-50' },
+  { role: 'creative', label: 'Creatives', icon: Palette, color: 'text-blue-600',   bg: 'bg-blue-50'   },
 ]
 
 function UserRow({ u, onDelete, onNavigate, onResend, resending, resent }) {
