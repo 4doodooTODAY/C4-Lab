@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   ArrowLeft, Loader2, Check, Trash2, X, Plus, UserMinus,
-  CalendarDays, DollarSign, MessageSquare, Film, StickyNote,
+  CalendarDays, MessageSquare, Film, StickyNote,
   AlertCircle, Clock, MapPin, Upload, FileVideo, Eye,
   Camera, Scissors
 } from 'lucide-react'
@@ -219,7 +219,6 @@ function EditProjectModal({ project, onClose, onSaved }) {
     shoot_date:  project.shoot_date || '',
     start_date:  project.start_date || '',
     due_date:    project.due_date || '',
-    budget:      project.budget ?? '',
     creative_id: project.creative_id || '',
     editor_id:   project.editor_id || '',
   })
@@ -249,7 +248,6 @@ function EditProjectModal({ project, onClose, onSaved }) {
         shoot_date:  form.shoot_date || null,
         start_date:  form.start_date || null,
         due_date:    form.due_date || null,
-        budget:      form.budget !== '' ? Number(form.budget) : null,
         creative_id: form.creative_id || null,
         editor_id:   form.editor_id || null,
       })
@@ -312,11 +310,6 @@ function EditProjectModal({ project, onClose, onSaved }) {
               <label className="label">Due Date</label>
               <input type="date" className="input" value={form.due_date} onChange={set('due_date')} />
             </div>
-          </div>
-
-          <div>
-            <label className="label">Budget ($)</label>
-            <input type="number" min="0" step="0.01" className="input" placeholder="0.00" value={form.budget} onChange={set('budget')} />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -416,12 +409,6 @@ export default function ProjectDetail() {
   const [notesSaving, setNS]            = useState(false)
   const [notesSaved, setNSaved]         = useState(false)
 
-  // Payment
-  const [payStatus, setPayStatus]       = useState('')
-  const [paidAmount, setPaidAmount]     = useState('')
-  const [paymentSaving, setPaySaving]   = useState(false)
-  const [paymentSaved, setPaySaved]     = useState(false)
-
   // Status
   const [status, setStatus]             = useState('')
 
@@ -446,11 +433,18 @@ export default function ProjectDetail() {
   const [creativeProfile, setCreativeProfile] = useState(null)
   const [editorProfile, setEditorProfile]     = useState(null)
 
+  // Inline assign state
+  const [assignProfiles, setAssignProfiles]         = useState([])
+  const [selectedCreative, setSelectedCreative]     = useState('')
+  const [selectedEditor, setSelectedEditor]         = useState('')
+  const [assigningCreative, setAssigningCreative]   = useState(false)
+  const [assigningEditor, setAssigningEditor]       = useState(false)
+  const [showCreativeSelect, setShowCreativeSelect] = useState(false)
+  const [showEditorSelect, setShowEditorSelect]     = useState(false)
+
   useEffect(() => {
     if (project) {
       setNotes(project.notes || '')
-      setPayStatus(project.payment_status || 'unpaid')
-      setPaidAmount(project.paid_amount ?? '')
       setStatus(project.status || 'active')
     }
   }, [project])
@@ -486,6 +480,42 @@ export default function ProjectDetail() {
     }
   }, [project])
 
+  useEffect(() => {
+    if (!isAdmin) return
+    supabase.from('profiles').select('id, full_name, role').in('role', ['admin', 'creative']).order('full_name')
+      .then(({ data }) => setAssignProfiles(data || []))
+  }, [isAdmin])
+
+  const handleAssignCreative = async () => {
+    if (!selectedCreative) return
+    setAssigningCreative(true)
+    try {
+      await updateProject(id, { creative_id: selectedCreative })
+      setShowCreativeSelect(false)
+      setSelectedCreative('')
+      refetch()
+    } catch (err) {
+      setActionError(err.message)
+    } finally {
+      setAssigningCreative(false)
+    }
+  }
+
+  const handleAssignEditor = async () => {
+    if (!selectedEditor) return
+    setAssigningEditor(true)
+    try {
+      await updateProject(id, { editor_id: selectedEditor })
+      setShowEditorSelect(false)
+      setSelectedEditor('')
+      refetch()
+    } catch (err) {
+      setActionError(err.message)
+    } finally {
+      setAssigningEditor(false)
+    }
+  }
+
   const handleStageClick = async (stage) => {
     if (!isAdmin) return
     await updateProject(id, { stage })
@@ -509,23 +539,6 @@ export default function ProjectDetail() {
       setActionError(err.message)
     } finally {
       setNS(false)
-    }
-  }
-
-  const handleSavePayment = async () => {
-    setPaySaving(true)
-    try {
-      await updateProject(id, {
-        payment_status: payStatus,
-        paid_amount: paidAmount !== '' ? Number(paidAmount) : 0,
-      })
-      refetch()
-      setPaySaved(true)
-      setTimeout(() => setPaySaved(false), 2500)
-    } catch (err) {
-      setActionError(err.message)
-    } finally {
-      setPaySaving(false)
     }
   }
 
@@ -582,9 +595,6 @@ export default function ProjectDetail() {
   const shootDate = project.shoot_date ? parseISO(project.shoot_date) : null
   const isOD      = dueDate && isBefore(dueDate, today)
   const daysLeft  = dueDate ? differenceInDays(dueDate, today) : null
-  const budget    = project.budget ?? null
-  const paid      = Number(paidAmount) || 0
-  const remaining = budget != null ? budget - paid : null
 
   return (
     <div className="p-8 max-w-5xl">
@@ -638,7 +648,7 @@ export default function ProjectDetail() {
       <StageBar currentStage={project.stage} isAdmin={isAdmin} onStageClick={handleStageClick} />
 
       {/* Project info grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div className="bg-white rounded-2xl border border-border p-4">
           <p className="text-xs text-text-muted mb-1 flex items-center gap-1"><CalendarDays size={11} /> Shoot Date</p>
           <p className="text-sm font-semibold text-text-primary">
@@ -659,10 +669,6 @@ export default function ProjectDetail() {
             {dueDate ? format(dueDate, 'MMM d, yyyy') : '—'}
           </p>
         </div>
-        <div className="bg-white rounded-2xl border border-border p-4">
-          <p className="text-xs text-text-muted mb-1 flex items-center gap-1"><DollarSign size={11} /> Budget</p>
-          <p className="text-sm font-semibold text-text-primary">{fmt$(budget)}</p>
-        </div>
       </div>
 
       {/* Assigned creative + editor */}
@@ -672,13 +678,48 @@ export default function ProjectDetail() {
           {creativeProfile ? (
             <div className="flex items-center gap-3">
               <Avatar name={creativeProfile.full_name} url={creativeProfile.avatar_url} size={9} />
-              <div>
+              <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-text-primary">{creativeProfile.full_name}</p>
                 <p className="text-xs text-text-muted">Photographer / Videographer</p>
               </div>
+              {isAdmin && !showCreativeSelect && (
+                <button
+                  onClick={() => { setShowCreativeSelect(true); setSelectedCreative('') }}
+                  className="text-xs text-accent hover:text-accent/80 font-medium shrink-0"
+                >
+                  Change
+                </button>
+              )}
             </div>
           ) : (
             <p className="text-sm text-text-muted">Not assigned</p>
+          )}
+          {isAdmin && (showCreativeSelect || !creativeProfile) && (
+            <div className={`flex items-center gap-2 ${creativeProfile ? 'mt-3' : ''}`}>
+              <select
+                className="input flex-1 text-sm"
+                value={selectedCreative}
+                onChange={(e) => setSelectedCreative(e.target.value)}
+              >
+                <option value="">— Select creative —</option>
+                {assignProfiles.map((p) => (
+                  <option key={p.id} value={p.id}>{p.full_name}</option>
+                ))}
+              </select>
+              <button
+                onClick={handleAssignCreative}
+                disabled={!selectedCreative || assigningCreative}
+                className="btn-primary text-xs px-3 py-1.5 flex items-center gap-1 disabled:opacity-50 shrink-0"
+              >
+                {assigningCreative ? <Loader2 size={12} className="animate-spin" /> : null}
+                Assign
+              </button>
+              {showCreativeSelect && (
+                <button onClick={() => setShowCreativeSelect(false)} className="btn-ghost p-1.5 shrink-0">
+                  <X size={14} />
+                </button>
+              )}
+            </div>
           )}
         </div>
         <div className="bg-white rounded-2xl border border-border p-4">
@@ -686,13 +727,48 @@ export default function ProjectDetail() {
           {editorProfile ? (
             <div className="flex items-center gap-3">
               <Avatar name={editorProfile.full_name} url={editorProfile.avatar_url} size={9} />
-              <div>
+              <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-text-primary">{editorProfile.full_name}</p>
                 <p className="text-xs text-text-muted">Editor</p>
               </div>
+              {isAdmin && !showEditorSelect && (
+                <button
+                  onClick={() => { setShowEditorSelect(true); setSelectedEditor('') }}
+                  className="text-xs text-accent hover:text-accent/80 font-medium shrink-0"
+                >
+                  Change
+                </button>
+              )}
             </div>
           ) : (
             <p className="text-sm text-text-muted">Not assigned</p>
+          )}
+          {isAdmin && (showEditorSelect || !editorProfile) && (
+            <div className={`flex items-center gap-2 ${editorProfile ? 'mt-3' : ''}`}>
+              <select
+                className="input flex-1 text-sm"
+                value={selectedEditor}
+                onChange={(e) => setSelectedEditor(e.target.value)}
+              >
+                <option value="">— Select editor —</option>
+                {assignProfiles.map((p) => (
+                  <option key={p.id} value={p.id}>{p.full_name}</option>
+                ))}
+              </select>
+              <button
+                onClick={handleAssignEditor}
+                disabled={!selectedEditor || assigningEditor}
+                className="btn-primary text-xs px-3 py-1.5 flex items-center gap-1 disabled:opacity-50 shrink-0"
+              >
+                {assigningEditor ? <Loader2 size={12} className="animate-spin" /> : null}
+                Assign
+              </button>
+              {showEditorSelect && (
+                <button onClick={() => setShowEditorSelect(false)} className="btn-ghost p-1.5 shrink-0">
+                  <X size={14} />
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -860,56 +936,6 @@ export default function ProjectDetail() {
 
         {/* Right column */}
         <div className="space-y-5">
-          {/* Payment card */}
-          {isAdmin && (
-            <div className="bg-white rounded-2xl border border-border p-5">
-              <h2 className="text-sm font-semibold text-text-primary mb-4">Payment</h2>
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-text-muted">Budget</span>
-                  <span className="font-semibold text-text-primary">{fmt$(budget)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-text-muted">Paid</span>
-                  <span className="font-semibold text-green-600">{fmt$(paid)}</span>
-                </div>
-                <div className="flex justify-between text-sm border-t border-border pt-2">
-                  <span className="text-text-muted">Remaining</span>
-                  <span className={`font-semibold ${remaining != null && remaining > 0 ? 'text-red-600' : 'text-text-primary'}`}>
-                    {remaining != null ? fmt$(remaining) : '—'}
-                  </span>
-                </div>
-                <div>
-                  <label className="label">Payment Status</label>
-                  <select className="input" value={payStatus} onChange={(e) => setPayStatus(e.target.value)}>
-                    <option value="unpaid">Unpaid</option>
-                    <option value="deposit_paid">Deposit Paid</option>
-                    <option value="paid">Paid</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="label">Paid Amount ($)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    className="input"
-                    value={paidAmount}
-                    onChange={(e) => setPaidAmount(e.target.value)}
-                  />
-                </div>
-                <button
-                  onClick={handleSavePayment}
-                  disabled={paymentSaving}
-                  className="btn-primary w-full flex items-center justify-center gap-1.5 disabled:opacity-50"
-                >
-                  {paymentSaving ? <Loader2 size={13} className="animate-spin" /> : paymentSaved ? <Check size={13} /> : null}
-                  {paymentSaved ? 'Saved!' : 'Update Payment'}
-                </button>
-              </div>
-            </div>
-          )}
-
           {/* Timeline card */}
           <div className="bg-white rounded-2xl border border-border p-5">
             <h2 className="text-sm font-semibold text-text-primary mb-4 flex items-center gap-1.5">
