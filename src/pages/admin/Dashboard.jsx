@@ -1,61 +1,291 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { FolderOpen, Users, Film, ChevronRight, Loader2 } from 'lucide-react'
+import { Users2, Inbox, Building2, Loader2, Upload, MessageSquare, FileText, Camera, Film } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
-import { format } from 'date-fns'
+import { format, formatDistanceToNow, startOfWeek, addWeeks, isWithinInterval } from 'date-fns'
 
+// ─── Weekly bar chart (pure SVG, no deps) ─────────────────────────────────────
+function WeeklyChart({ weeks }) {
+  const [hovered, setHovered] = useState(null)
+  const maxCount = Math.max(...weeks.map((w) => w.count), 1)
+
+  // Layout constants
+  const VB_W = 560
+  const VB_H = 200
+  const PAD_L = 36
+  const PAD_R = 8
+  const PAD_T = 12
+  const PAD_B = 38
+  const chartW = VB_W - PAD_L - PAD_R   // 516
+  const chartH = VB_H - PAD_T - PAD_B   // 150
+  const BAR_W = 34
+  const GAP = (chartW - BAR_W * 10) / 11 // ~17.6
+
+  const barX = (i) => PAD_L + GAP + i * (BAR_W + GAP)
+  const barY = (count) => PAD_T + chartH - Math.max((count / maxCount) * chartH, count > 0 ? 3 : 0)
+  const barH = (count) => Math.max((count / maxCount) * chartH, count > 0 ? 3 : 0)
+
+  // Y-axis ticks: 0, half (rounded), max
+  const ticks = maxCount <= 2
+    ? [0, 1, 2]
+    : [0, Math.round(maxCount / 2), maxCount]
+
+  const ACCENT = '#6C63FF'
+  const ACCENT_LIGHT = '#c4c1f7'
+  const GRID = '#f1f0fe'
+  const AXIS = '#e5e7eb'
+
+  return (
+    <svg
+      viewBox={`0 0 ${VB_W} ${VB_H}`}
+      className="w-full"
+      style={{ overflow: 'visible' }}
+    >
+      {/* Horizontal grid lines */}
+      {ticks.map((val) => {
+        const y = PAD_T + chartH - (val / Math.max(maxCount, 1)) * chartH
+        return (
+          <g key={val}>
+            <line x1={PAD_L} y1={y} x2={VB_W - PAD_R} y2={y} stroke={val === 0 ? AXIS : GRID} strokeWidth="1" />
+            <text x={PAD_L - 6} y={y + 4} textAnchor="end" fontSize="10" fill="#9ca3af">{val}</text>
+          </g>
+        )
+      })}
+
+      {/* Bars */}
+      {weeks.map((week, i) => {
+        const x = barX(i)
+        const y = barY(week.count)
+        const h = barH(week.count)
+        const isCurrent = i === weeks.length - 1
+        const isHov = hovered === i
+        const fill = isCurrent ? ACCENT : isHov ? '#9c9af5' : ACCENT_LIGHT
+
+        return (
+          <g key={i}
+            onMouseEnter={() => setHovered(i)}
+            onMouseLeave={() => setHovered(null)}
+            style={{ cursor: 'default' }}
+          >
+            {/* Hover area (full column height) */}
+            <rect x={x} y={PAD_T} width={BAR_W} height={chartH} fill="transparent" />
+
+            {/* Bar */}
+            <rect x={x} y={y} width={BAR_W} height={h} rx="4" fill={fill}
+              style={{ transition: 'fill 0.15s' }} />
+
+            {/* Tooltip on hover */}
+            {isHov && (
+              <g>
+                <rect x={x + BAR_W / 2 - 20} y={y - 28} width={40} height={20} rx="4" fill="#1f2937" />
+                <text x={x + BAR_W / 2} y={y - 14} textAnchor="middle" fontSize="11" fill="white" fontWeight="600">
+                  {week.count}
+                </text>
+              </g>
+            )}
+
+            {/* X-axis label */}
+            <text
+              x={x + BAR_W / 2}
+              y={PAD_T + chartH + 18}
+              textAnchor="middle"
+              fontSize="9"
+              fill={isCurrent ? ACCENT : '#9ca3af'}
+              fontWeight={isCurrent ? '600' : '400'}
+            >
+              {week.label}
+            </text>
+          </g>
+        )
+      })}
+
+      {/* "This week" label */}
+      <text
+        x={barX(9) + BAR_W / 2}
+        y={PAD_T + chartH + 30}
+        textAnchor="middle"
+        fontSize="8"
+        fill={ACCENT}
+      >
+        now
+      </text>
+    </svg>
+  )
+}
+
+// ─── Activity feed item ────────────────────────────────────────────────────────
+const ACTIVITY_META = {
+  media:    { icon: Film,          color: '#6C63FF', bg: '#ede9fe' },
+  comment:  { icon: MessageSquare, color: '#10b981', bg: '#d1fae5' },
+  request:  { icon: FileText,      color: '#f59e0b', bg: '#fef3c7' },
+  footage:  { icon: Camera,        color: '#ef4444', bg: '#fee2e2' },
+}
+
+function ActivityItem({ item }) {
+  const meta = ACTIVITY_META[item.kind] || ACTIVITY_META.media
+  const Icon = meta.icon
+  return (
+    <div className="flex items-start gap-3 py-3">
+      <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
+        style={{ backgroundColor: meta.bg }}>
+        <Icon size={14} style={{ color: meta.color }} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm text-text-primary leading-snug">
+          <span className="font-medium">{item.actor || 'Someone'}</span>
+          {' '}{item.description}
+        </p>
+        <p className="text-xs text-text-muted mt-0.5">
+          {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ─── Main dashboard ────────────────────────────────────────────────────────────
 export default function AdminDashboard() {
   const { profile } = useAuth()
-  const [stats, setStats] = useState(null)
-  const [projects, setProjects] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [stats, setStats]       = useState(null)
+  const [weeks, setWeeks]       = useState([])
+  const [activity, setActivity] = useState([])
+  const [loading, setLoading]   = useState(true)
 
   useEffect(() => {
     async function load() {
+      // ── Stat counts ──────────────────────────────────────────────────────
       const [
-        { count: userCount },
-        { count: projectCount },
-        { count: mediaCount },
-        { data: recentProjects },
+        { count: clientCount },
+        { count: openCount },
+        { count: teamCount },
       ] = await Promise.all([
+        supabase.from('clients').select('*', { count: 'exact', head: true }),
+        supabase.from('content_requests').select('*', { count: 'exact', head: true })
+          .in('status', ['new', 'in_progress']),
         supabase.from('profiles').select('*', { count: 'exact', head: true }),
-        supabase.from('projects').select('*', { count: 'exact', head: true }),
-        supabase.from('media').select('*', { count: 'exact', head: true }),
-        supabase.from('projects').select('id, title, status, created_at, clients(name)').order('created_at', { ascending: false }).limit(5),
       ])
-      setStats({ userCount, projectCount, mediaCount })
-      setProjects(recentProjects || [])
+      setStats({ clientCount, openCount, teamCount })
+
+      // ── Weekly shoots chart ──────────────────────────────────────────────
+      // Build 10 week buckets, weeks starting Monday
+      const thisWeekStart = startOfWeek(new Date(), { weekStartsOn: 1 })
+      const buckets = Array.from({ length: 10 }, (_, i) => {
+        const start = addWeeks(thisWeekStart, i - 9)
+        const end   = addWeeks(start, 1)
+        return { start, end, label: format(start, 'MMM d'), count: 0 }
+      })
+      const rangeStart = buckets[0].start
+
+      const { data: mediaRows } = await supabase
+        .from('media')
+        .select('created_at')
+        .gte('created_at', rangeStart.toISOString())
+        .order('created_at', { ascending: true })
+
+      ;(mediaRows || []).forEach(({ created_at }) => {
+        const d = new Date(created_at)
+        const bucket = buckets.find((b) => isWithinInterval(d, { start: b.start, end: b.end }))
+        if (bucket) bucket.count++
+      })
+      setWeeks(buckets)
+
+      // ── Activity feed ────────────────────────────────────────────────────
+      const [mediaRes, commentsRes, requestsRes] = await Promise.all([
+        supabase
+          .from('media')
+          .select('id, title, created_at')
+          .order('created_at', { ascending: false })
+          .limit(25),
+
+        supabase
+          .from('media_comments')
+          .select('id, content, created_at, profiles:user_id(full_name), media:media_id(title)')
+          .order('created_at', { ascending: false })
+          .limit(25),
+
+        supabase
+          .from('content_requests')
+          .select('id, type, idea, file_name, created_at, profiles(full_name)')
+          .order('created_at', { ascending: false })
+          .limit(25),
+      ])
+
+      const events = []
+
+      ;(mediaRes.data || []).forEach((m) => {
+        events.push({
+          id: `media-${m.id}`,
+          kind: 'media',
+          actor: null,
+          description: `added a video — "${m.title || 'Untitled'}"`,
+          created_at: m.created_at,
+        })
+      })
+
+      ;(commentsRes.data || []).forEach((c) => {
+        events.push({
+          id: `comment-${c.id}`,
+          kind: 'comment',
+          actor: c.profiles?.full_name || null,
+          description: `commented on "${c.media?.title || 'a video'}"`,
+          created_at: c.created_at,
+        })
+      })
+
+      ;(requestsRes.data || []).forEach((r) => {
+        const isFootage = r.type === 'footage'
+        events.push({
+          id: `req-${r.id}`,
+          kind: isFootage ? 'footage' : 'request',
+          actor: r.profiles?.full_name || null,
+          description: isFootage
+            ? `uploaded footage${r.file_name ? ` — "${r.file_name}"` : ''}`
+            : `submitted a post request${r.idea ? ` — "${r.idea.slice(0, 60)}${r.idea.length > 60 ? '…' : ''}"` : ''}`,
+          created_at: r.created_at,
+        })
+      })
+
+      // Sort all events newest first, cap at 40
+      events.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      setActivity(events.slice(0, 40))
+
       setLoading(false)
     }
     load()
   }, [])
 
+  const hour = new Date().getHours()
+  const greeting = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening'
+
   const statCards = [
-    { label: 'Users', value: stats?.userCount ?? '—', icon: Users, color: '#6C63FF', to: '/admin/users' },
-    { label: 'Projects', value: stats?.projectCount ?? '—', icon: FolderOpen, color: '#10b981', to: '/videos' },
-    { label: 'Media Files', value: stats?.mediaCount ?? '—', icon: Film, color: '#f59e0b', to: '/videos' },
+    { label: 'Active Clients', value: stats?.clientCount ?? '—', icon: Building2, color: '#10b981', to: '/admin/clients' },
+    { label: 'Open Requests',  value: stats?.openCount   ?? '—', icon: Inbox,     color: '#f59e0b', to: '/admin/inbox'   },
+    { label: 'Team Members',   value: stats?.teamCount   ?? '—', icon: Users2,    color: '#6C63FF', to: '/admin/users'   },
   ]
 
   return (
-    <div className="p-8">
+    <div className="p-8 max-w-5xl">
+      {/* Header */}
       <div className="mb-8">
         <p className="text-sm text-text-muted">{format(new Date(), 'EEEE, MMMM d')}</p>
         <h1 className="text-2xl font-bold text-text-primary">
-          Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'},{' '}
-          {profile?.full_name?.split(' ')[0] || 'Admin'}
+          Good {greeting}, {profile?.full_name?.split(' ')[0] || 'Admin'}
         </h1>
         <p className="text-text-secondary mt-1">Here's what's happening across C4 Lab.</p>
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-16"><Loader2 size={22} className="animate-spin text-text-muted" /></div>
+        <div className="flex justify-center py-16">
+          <Loader2 size={22} className="animate-spin text-text-muted" />
+        </div>
       ) : (
-        <>
+        <div className="space-y-6">
           {/* Stat cards */}
-          <div className="grid grid-cols-3 gap-4 mb-8">
+          <div className="grid grid-cols-3 gap-4">
             {statCards.map(({ label, value, icon: Icon, color, to }) => (
-              <Link key={label} to={to} className="card p-5 hover:shadow-md transition-shadow flex items-center gap-4">
+              <Link key={label} to={to}
+                className="card p-5 hover:shadow-md transition-shadow flex items-center gap-4">
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
                   style={{ backgroundColor: color + '18' }}>
                   <Icon size={20} style={{ color }} />
@@ -68,35 +298,38 @@ export default function AdminDashboard() {
             ))}
           </div>
 
-          {/* Recent projects */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold text-text-primary">Recent Projects</h2>
-              <Link to="/videos" className="text-xs text-accent hover:underline">View all</Link>
+          {/* Growth chart */}
+          <div className="card p-6">
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-sm font-semibold text-text-primary">Shoots per Week</h2>
+              <span className="text-xs text-text-muted">Last 10 weeks</span>
             </div>
-            {projects.length === 0 ? (
-              <div className="card p-8 text-center text-sm text-text-muted">No projects yet</div>
+            <p className="text-xs text-text-muted mb-4">Each bar = one week starting Monday</p>
+            {weeks.every((w) => w.count === 0) ? (
+              <div className="flex flex-col items-center justify-center py-10 text-center">
+                <Film size={28} className="text-surface-3 mb-2" />
+                <p className="text-sm text-text-muted">No media uploaded yet — this will fill in as you add content.</p>
+              </div>
             ) : (
-              <div className="card divide-y divide-border overflow-hidden">
-                {projects.map((p) => (
-                  <Link key={p.id} to="/videos"
-                    className="flex items-center gap-3 px-4 py-3 hover:bg-surface-2 transition-colors">
-                    <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
-                      <FolderOpen size={15} className="text-accent" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-text-primary truncate">{p.title}</p>
-                      {p.clients?.name && (
-                        <p className="text-xs text-text-muted truncate">{p.clients.name}</p>
-                      )}
-                    </div>
-                    <ChevronRight size={15} className="text-text-muted shrink-0" />
-                  </Link>
+              <WeeklyChart weeks={weeks} />
+            )}
+          </div>
+
+          {/* Activity feed */}
+          <div className="card p-6">
+            <h2 className="text-sm font-semibold text-text-primary mb-1">All Activity</h2>
+            <p className="text-xs text-text-muted mb-4">Every action across the platform, newest first.</p>
+            {activity.length === 0 ? (
+              <div className="text-center py-8 text-sm text-text-muted">No activity yet.</div>
+            ) : (
+              <div className="divide-y divide-border -my-1">
+                {activity.map((item) => (
+                  <ActivityItem key={item.id} item={item} />
                 ))}
               </div>
             )}
           </div>
-        </>
+        </div>
       )}
     </div>
   )
