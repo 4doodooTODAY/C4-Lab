@@ -9,6 +9,7 @@ const Login           = lazy(() => import('./pages/Login'))
 const ChangePassword  = lazy(() => import('./pages/ChangePassword'))
 const AdminDashboard  = lazy(() => import('./pages/admin/Dashboard'))
 const UserManagement  = lazy(() => import('./pages/admin/UserManagement'))
+const UserDetail      = lazy(() => import('./pages/admin/UserDetail'))
 const AdminClients    = lazy(() => import('./pages/admin/Clients'))
 const AdminInbox      = lazy(() => import('./pages/admin/Inbox'))
 const CreativeDashboard = lazy(() => import('./pages/creative/Dashboard'))
@@ -89,6 +90,9 @@ function AppRoutes() {
           } />
           <Route path="/admin/users" element={
             <ProtectedRoute roles={['admin']}><UserManagement /></ProtectedRoute>
+          } />
+          <Route path="/admin/users/:id" element={
+            <ProtectedRoute roles={['admin']}><UserDetail /></ProtectedRoute>
           } />
           <Route path="/admin/clients" element={
             <ProtectedRoute roles={['admin']}><AdminClients /></ProtectedRoute>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Plus, X, Loader2, Users, Check, Trash2, AlertTriangle, Mail } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Plus, X, Loader2, Users, Check, Trash2, AlertTriangle, Mail, ChevronRight } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { formatDistanceToNow } from 'date-fns'
@@ -221,6 +222,7 @@ function DeleteModal({ user, onClose, onDeleted }) {
 }
 
 export default function UserManagement() {
+  const navigate = useNavigate()
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [showInvite, setShowInvite] = useState(false)
@@ -294,7 +296,7 @@ export default function UserManagement() {
               {users.map((u) => {
                 const isPending = u.must_change_password
                 return (
-                  <tr key={u.id} className="hover:bg-surface-2 transition-colors">
+                  <tr key={u.id} className="hover:bg-surface-2 transition-colors cursor-pointer" onClick={() => navigate(`/admin/users/${u.id}`)}>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center text-accent text-xs font-semibold shrink-0">
@@ -322,7 +324,7 @@ export default function UserManagement() {
                     <td className="px-4 py-3 text-xs text-text-muted">
                       {formatDistanceToNow(new Date(u.created_at), { addSuffix: true })}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-2 justify-end">
                         {isPending && (
                           <button
@@ -347,6 +349,7 @@ export default function UserManagement() {
                         >
                           <Trash2 size={14} />
                         </button>
+                        <ChevronRight size={14} className="text-text-muted" />
                       </div>
                     </td>
                   </tr>
