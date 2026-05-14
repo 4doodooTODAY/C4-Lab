@@ -34,8 +34,9 @@ function ProtectedRoute({ children, roles }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-sidebar flex items-center justify-center">
-        <Loader2 size={24} className="animate-spin text-white/30" />
+      <div className="min-h-screen bg-sidebar flex flex-col items-center justify-center gap-3">
+        <Loader2 size={24} className="animate-spin text-white/40" />
+        <p className="text-white/30 text-xs">Loading C4 Lab...</p>
       </div>
     )
   }

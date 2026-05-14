@@ -12,6 +12,11 @@ export function AuthProvider({ children }) {
     let mounted = true
 
     const init = async () => {
+      // Hard timeout — never spin forever
+      const timeout = setTimeout(() => {
+        if (mounted) setLoading(false)
+      }, 6000)
+
       try {
         const { data: { session } } = await supabase.auth.getSession()
 
@@ -29,6 +34,7 @@ export function AuthProvider({ children }) {
       } catch (e) {
         console.error('Auth init error', e)
       } finally {
+        clearTimeout(timeout)
         if (mounted) setLoading(false)
       }
     }
