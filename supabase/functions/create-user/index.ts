@@ -138,6 +138,65 @@ Deno.serve(async (req) => {
       })
     }
 
+    // --- INVITE CLIENT ---
+    if (action === 'invite_client') {
+      const { contact_name, business, email, phone, created_by } = body
+
+      // 1. Create auth user via invite email
+      const { data, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+        data: { full_name: contact_name, role: 'client', must_change_password: true },
+        redirectTo: 'https://c4-lab.vercel.app/change-password',
+      })
+      if (inviteError) throw inviteError
+
+      const profileId = data.user.id
+
+      // 2. Upsert profile record
+      const { error: profileError } = await supabaseAdmin.from('profiles').upsert({
+        id: profileId,
+        full_name: contact_name,
+        role: 'client',
+        must_change_password: true,
+        phone,
+      })
+      if (profileError) throw profileError
+
+      // 3. Insert clients record
+      const { data: clientData, error: clientError } = await supabaseAdmin
+        .from('clients')
+        .insert([{
+          name: business,
+          contact_name,
+          email,
+          phone,
+          profile_id: profileId,
+          created_by: created_by || null,
+        }])
+        .select()
+        .single()
+      if (clientError) throw clientError
+
+      return new Response(JSON.stringify({ user: data.user, client: clientData }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200,
+      })
+    }
+
+    // --- UPDATE CLIENT ---
+    if (action === 'update_client') {
+      const { client_id, contact_name, business, email, phone, notes } = body
+      const updates: Record<string, string> = {}
+      if (contact_name !== undefined) updates.contact_name = contact_name
+      if (business     !== undefined) updates.name          = business
+      if (email        !== undefined) updates.email         = email
+      if (phone        !== undefined) updates.phone         = phone
+      if (notes        !== undefined) updates.notes         = notes
+      const { error } = await supabaseAdmin.from('clients').update(updates).eq('id', client_id)
+      if (error) throw error
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200,
+      })
+    }
+
     throw new Error('Unknown action')
   } catch (err) {
     return new Response(JSON.stringify({ error: err.message }), {

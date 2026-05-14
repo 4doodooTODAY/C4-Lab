@@ -1,9 +1,10 @@
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Film, CalendarDays, Settings,
-  LogOut, Users, Building2, Inbox, Home, PenLine, Upload, MessageSquare
+  LogOut, Users, Building2, Inbox, Home, PenLine, Upload, MessageSquare, Bell
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
+import { useNotifications } from '../../contexts/NotificationContext'
 import Avatar from '../ui/Avatar'
 
 const NAV = {
@@ -35,6 +36,7 @@ const ROLE_LABELS = { admin: 'Admin', creative: 'Creative', client: 'Client' }
 
 export default function Sidebar() {
   const { profile, user, signOut } = useAuth()
+  const { unreadCount, setPanelOpen } = useNotifications()
   const role = profile?.role || 'creative'
   const navItems = NAV[role] || NAV.creative
   const displayName = profile?.full_name || user?.email || 'You'
@@ -77,6 +79,25 @@ export default function Sidebar() {
 
       {/* Footer */}
       <div className="px-3 py-4 border-t border-white/5 space-y-0.5">
+        {/* Notifications bell */}
+        <button
+          onClick={() => setPanelOpen((v) => !v)}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-white/40 hover:text-white hover:bg-sidebar-hover transition-colors duration-100"
+        >
+          <div className="relative">
+            <Bell size={16} strokeWidth={1.75} />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 min-w-[14px] h-3.5 px-0.5 flex items-center justify-center rounded-full bg-accent text-white text-[9px] font-bold leading-none">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+          </div>
+          Notifications
+          {unreadCount > 0 && (
+            <span className="ml-auto text-xs font-bold text-accent">{unreadCount}</span>
+          )}
+        </button>
+
         <NavLink
           to="/settings"
           className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-white/40 hover:text-white hover:bg-sidebar-hover transition-colors duration-100"
