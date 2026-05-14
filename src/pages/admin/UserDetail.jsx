@@ -1,21 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, Loader2, Check, Lock, Unlock, Trash2, Mail, Key, AlertTriangle, Shield } from 'lucide-react'
+import { ArrowLeft, Loader2, Check, Lock, Unlock, Trash2, Mail, Key, AlertTriangle } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { format, formatDistanceToNow } from 'date-fns'
+import Avatar, { TagBadge, ALL_TAGS } from '../../components/ui/Avatar'
 
 const ROLES = ['creative', 'client', 'admin']
-const ROLE_COLORS = {
-  admin:    'text-purple-700 bg-purple-50 border-purple-200',
-  creative: 'text-blue-700 bg-blue-50 border-blue-200',
-  client:   'text-green-700 bg-green-50 border-green-200',
-}
-
-function getInitials(name) {
-  if (!name) return '?'
-  return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
-}
 
 async function callAction(body, session) {
   const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-user`, {
@@ -47,6 +38,9 @@ export default function UserDetail() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
+  const [profileTags, setProfileTags] = useState([])
+  const [tagSaving, setTagSaving] = useState(false)
+
   const [newPassword, setNewPassword] = useState('')
   const [pwSaving, setPwSaving] = useState(false)
   const [pwSaved, setPwSaved] = useState(false)
@@ -69,6 +63,7 @@ export default function UserDetail() {
         setProfile(profileRes.data)
         setEditName(profileRes.data.full_name || '')
         setEditRole(profileRes.data.role || 'creative')
+        setProfileTags(profileRes.data.tags || [])
       }
       if (authRes.user) {
         setAuthUser(authRes.user)
@@ -113,6 +108,16 @@ export default function UserDetail() {
     } finally {
       setPwSaving(false)
     }
+  }
+
+  const handleTagToggle = async (tag) => {
+    const next = profileTags.includes(tag)
+      ? profileTags.filter((t) => t !== tag)
+      : [...profileTags, tag]
+    setProfileTags(next)
+    setTagSaving(true)
+    await supabase.from('profiles').update({ tags: next }).eq('id', id)
+    setTagSaving(false)
   }
 
   const handleResetEmail = async () => {
@@ -168,17 +173,16 @@ export default function UserDetail() {
 
       {/* Header */}
       <div className="flex items-center gap-4 mb-8">
-        <div className="w-14 h-14 rounded-full bg-accent/20 flex items-center justify-center text-accent text-lg font-bold shrink-0">
-          {getInitials(profile?.full_name)}
-        </div>
+        <Avatar name={profile?.full_name} url={profile?.avatar_url} size={14} />
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-2xl font-bold text-text-primary">{profile?.full_name || '—'}</h1>
             {isLocked && (
               <span className="text-xs font-medium text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">
                 Locked
               </span>
             )}
+            {profileTags.map((tag) => <TagBadge key={tag} tag={tag} />)}
           </div>
           <p className="text-text-muted text-sm">{authUser?.email}</p>
           <div className="flex items-center gap-3 mt-1 text-xs text-text-muted">
@@ -223,6 +227,34 @@ export default function UserDetail() {
               {saved ? 'Saved!' : 'Save Changes'}
             </button>
           </form>
+        </div>
+
+        {/* Tags */}
+        <div className="card p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-text-primary">Tags</h2>
+            {tagSaving && <Loader2 size={13} className="animate-spin text-text-muted" />}
+          </div>
+          <p className="text-xs text-text-muted mb-3">Assign roles that appear next to this person's name throughout the app.</p>
+          <div className="flex gap-2 flex-wrap">
+            {ALL_TAGS.map((tag) => {
+              const active = profileTags.includes(tag)
+              return (
+                <button
+                  key={tag}
+                  onClick={() => handleTagToggle(tag)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                    active
+                      ? 'bg-accent text-white border-accent'
+                      : 'border-border text-text-secondary hover:border-accent hover:text-accent'
+                  }`}
+                >
+                  {active && <Check size={11} />}
+                  {tag}
+                </button>
+              )
+            })}
+          </div>
         </div>
 
         {/* Activity */}

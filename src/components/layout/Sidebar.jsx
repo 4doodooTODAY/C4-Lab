@@ -4,6 +4,7 @@ import {
   LogOut, Users, Building2, Inbox, Home, PenLine, Upload, MessageSquare
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
+import Avatar from '../ui/Avatar'
 
 const NAV = {
   admin: [
@@ -28,11 +29,6 @@ const NAV = {
     { to: '/client/upload',   icon: Upload,         label: 'Upload Footage' },
     { to: '/messages',        icon: MessageSquare,  label: 'Messages' },
   ],
-}
-
-function getInitials(name) {
-  if (!name) return '?'
-  return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
 }
 
 const ROLE_LABELS = { admin: 'Admin', creative: 'Creative', client: 'Client' }
@@ -90,9 +86,7 @@ export default function Sidebar() {
         </NavLink>
 
         <div className="flex items-center gap-2.5 px-3 py-2.5 mt-1">
-          <div className="w-7 h-7 rounded-full bg-accent/60 flex items-center justify-center shrink-0 text-white text-xs font-semibold">
-            {getInitials(displayName)}
-          </div>
+          <Avatar name={displayName} url={profile?.avatar_url} size={7} />
           <div className="flex-1 min-w-0">
             <p className="text-white/80 text-xs font-medium truncate">{displayName}</p>
             <p className="text-white/30 text-xs">{ROLE_LABELS[role] || role}</p>
