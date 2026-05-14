@@ -232,6 +232,7 @@ export default function Messages() {
   const [lightboxUrl, setLightboxUrl]     = useState(null)
   const [search, setSearch]               = useState('')
   const [dmError, setDmError]             = useState('')
+  const [dmLoading, setDmLoading]         = useState(null)
 
   const bottomRef    = useRef(null)
   const inputRef     = useRef(null)
@@ -507,26 +508,57 @@ export default function Messages() {
 
   const startDM = async (otherProfileId) => {
     setDmError('')
-    console.log('[DM] calling RPC with', otherProfileId)
-    const { data: convId, error } = await supabase.rpc('create_or_get_dm', { other_profile_id: otherProfileId })
-    console.log('[DM] result:', { convId, error })
-    if (error) {
-      console.error('[DM] error:', error)
-      setDmError(error.message)
-      return
-    }
-    if (!convId) {
-      setDmError('No conversation ID returned — check browser console')
-      return
-    }
-    setShowNewDM(false)
-    const updated = await loadConversations(true)
-    console.log('[DM] conversations after reload:', updated?.length, 'looking for:', convId)
-    setSelectedId(convId)
-    if (!updated?.some((c) => c.id === convId)) {
-      console.warn('[DM] conv not in list yet, reloading...')
-      await loadConversations(false)
-      setSelectedId(convId)
+    setDmLoading(otherProfileId)
+    try {
+      // Check if a DM already exists with this person
+      const { data: myMems } = await supabase
+        .from('conversation_members')
+        .select('conversation_id')
+        .eq('profile_id', user.id)
+
+      const myIds = (myMems || []).map((m) => m.conversation_id)
+
+      if (myIds.length > 0) {
+        const { data: shared } = await supabase
+          .from('conversation_members')
+          .select('conversation_id, conversations!inner(id, is_group)')
+          .eq('profile_id', otherProfileId)
+          .in('conversation_id', myIds)
+          .limit(10)
+
+        const existing = shared?.find((s) => s.conversations?.is_group === false)
+        if (existing) {
+          setShowNewDM(false)
+          await loadConversations(true)
+          setSelectedId(existing.conversation_id)
+          return
+        }
+      }
+
+      // Create new conversation
+      const { data: newConv, error: convErr } = await supabase
+        .from('conversations')
+        .insert([{ is_group: false }])
+        .select('id')
+        .single()
+      if (convErr) throw new Error(convErr.message)
+
+      // Add both members
+      const { error: memErr } = await supabase
+        .from('conversation_members')
+        .insert([
+          { conversation_id: newConv.id, profile_id: user.id },
+          { conversation_id: newConv.id, profile_id: otherProfileId },
+        ])
+      if (memErr) throw new Error(memErr.message)
+
+      setShowNewDM(false)
+      await loadConversations(true)
+      setSelectedId(newConv.id)
+    } catch (err) {
+      setDmError(err.message)
+    } finally {
+      setDmLoading(null)
     }
   }
 
@@ -889,13 +921,14 @@ export default function Messages() {
               {allProfiles.length === 0 ? (
                 <p className="text-sm text-text-muted text-center py-8">No other users yet.</p>
               ) : allProfiles.map((p) => (
-                <button key={p.id} onClick={() => startDM(p.id)}
-                  className="w-full flex items-center gap-3 px-5 py-3 hover:bg-surface-2 transition-colors text-left">
+                <button key={p.id} onClick={() => startDM(p.id)} disabled={!!dmLoading}
+                  className="w-full flex items-center gap-3 px-5 py-3 hover:bg-surface-2 transition-colors text-left disabled:opacity-60">
                   <Avatar name={p.full_name} url={p.avatar_url} size={10} />
-                  <div>
+                  <div className="flex-1">
                     <p className="text-sm font-semibold text-text-primary">{p.full_name}</p>
                     <p className="text-xs text-text-muted capitalize">{p.role}</p>
                   </div>
+                  {dmLoading === p.id && <Loader2 size={16} className="animate-spin text-accent shrink-0" />}
                 </button>
               ))}
             </div>
