@@ -85,8 +85,7 @@ function NewProjectModal({ onClose, onCreated }) {
   const [clients, setClients]     = useState([])
   const [clientsLoaded, setCL]    = useState(false)
   const [form, setForm]           = useState({
-    name: '', type: '', client_id: '',
-    start_date: '', due_date: '', budget: '', stage: 'briefing',
+    name: '', client_id: '',
   })
   const [saving, setSaving]       = useState(false)
   const [error, setError]         = useState('')
@@ -108,13 +107,9 @@ function NewProjectModal({ onClose, onCreated }) {
     setError('')
     try {
       const payload = {
-        name:       form.name.trim(),
-        type:       form.type || null,
-        client_id:  form.client_id || null,
-        start_date: form.start_date || null,
-        due_date:   form.due_date || null,
-        budget:     form.budget ? Number(form.budget) : null,
-        stage:      form.stage || 'briefing',
+        name:      form.name.trim(),
+        client_id: form.client_id || null,
+        stage:     'briefing',
         created_by: user?.id,
       }
       const row = await createProject(payload)
@@ -151,26 +146,6 @@ function NewProjectModal({ onClose, onCreated }) {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">Type</label>
-              <select className="input" value={form.type} onChange={set('type')}>
-                <option value="">— None —</option>
-                {Object.entries(TYPE_LABELS).map(([v, l]) => (
-                  <option key={v} value={v}>{l}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="label">Stage</label>
-              <select className="input" value={form.stage} onChange={set('stage')}>
-                {Object.entries(STAGE_LABELS).map(([v, l]) => (
-                  <option key={v} value={v}>{l}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
           <div>
             <label className="label">Client</label>
             <select className="input" value={form.client_id} onChange={set('client_id')}>
@@ -179,30 +154,6 @@ function NewProjectModal({ onClose, onCreated }) {
                 <option key={c.id} value={c.id}>{c.contact_name || c.name}</option>
               ))}
             </select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">Start Date</label>
-              <input type="date" className="input" value={form.start_date} onChange={set('start_date')} />
-            </div>
-            <div>
-              <label className="label">Due Date</label>
-              <input type="date" className="input" value={form.due_date} onChange={set('due_date')} />
-            </div>
-          </div>
-
-          <div>
-            <label className="label">Budget ($)</label>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              className="input"
-              placeholder="0.00"
-              value={form.budget}
-              onChange={set('budget')}
-            />
           </div>
 
           {error && (
