@@ -349,6 +349,12 @@ export default function ProjectDetail() {
 
   const [actionError, setActionError]   = useState('')
 
+  // Shoot dates
+  const [shoots, setShoots]             = useState([])
+  const [showAddShoot, setShowAddShoot] = useState(false)
+  const [newShootDate, setNewShootDate] = useState('')
+  const [addingShoot, setAddingShoot]   = useState(false)
+
   // Shoot uploads + notes + revisions
   const [shootUploads, setShootUploads] = useState([])
   const [shootNotes, setShootNotes]     = useState([])
@@ -389,6 +395,34 @@ export default function ProjectDetail() {
       setLoadingExtras(false)
     })
   }, [id])
+
+  const fetchShoots = () => {
+    supabase.from('project_shoots').select('*').eq('project_id', id).order('shoot_date')
+      .then(({ data }) => setShoots(data || []))
+  }
+
+  useEffect(() => {
+    if (!id) return
+    fetchShoots()
+  }, [id])
+
+  const handleAddShoot = async () => {
+    if (!newShootDate) return
+    setAddingShoot(true)
+    try {
+      await supabase.from('project_shoots').insert({ project_id: id, shoot_date: newShootDate })
+      setNewShootDate('')
+      setShowAddShoot(false)
+      fetchShoots()
+    } finally {
+      setAddingShoot(false)
+    }
+  }
+
+  const handleDeleteShoot = async (shootId) => {
+    await supabase.from('project_shoots').delete().eq('id', shootId)
+    fetchShoots()
+  }
 
   useEffect(() => {
     if (!project) return
@@ -566,24 +600,7 @@ export default function ProjectDetail() {
       {/* Project info — inline editable */}
       <div className="bg-white rounded-2xl border border-border p-5 mb-6">
         <p className="text-xs font-semibold text-text-muted mb-4 uppercase tracking-wide">Project Details</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          <InlineField
-            label="Shoot Date"
-            icon={CalendarDays}
-            type="date"
-            value={project.shoot_date || ''}
-            displayValue={project.shoot_date ? format(parseISO(project.shoot_date), 'MMM d, yyyy') : ''}
-            onSave={(v) => handleSaveField('shoot_date', v)}
-            readOnly={!isAdmin}
-          />
-          <InlineField
-            label="Location"
-            icon={MapPin}
-            value={project.location || ''}
-            displayValue={project.location || ''}
-            onSave={(v) => handleSaveField('location', v)}
-            readOnly={!isAdmin}
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-5">
           <InlineField
             label="Due Date"
             icon={CalendarDays}
@@ -599,6 +616,70 @@ export default function ProjectDetail() {
               {project.clients ? (project.clients.contact_name || project.clients.name) : <span className="text-text-muted/60 italic">— None —</span>}
             </p>
           </div>
+        </div>
+
+        {/* Shoot Dates */}
+        <div>
+          <p className="text-xs text-text-muted mb-2 flex items-center gap-1">
+            <CalendarDays size={11} /> Shoot Dates
+          </p>
+          {shoots.length === 0 ? (
+            <p className="text-sm text-text-muted/60 italic mb-2">No shoot dates added yet.</p>
+          ) : (
+            <div className="mb-2">
+              {shoots.map((s) => (
+                <div key={s.id} className="flex items-center gap-2 py-1.5 border-b border-border last:border-0">
+                  <CalendarDays size={13} className="text-text-muted shrink-0" />
+                  <span className="text-sm font-medium text-text-primary flex-1">
+                    {format(parseISO(s.shoot_date), 'MMM d, yyyy')}
+                  </span>
+                  {isAdmin && (
+                    <button
+                      onClick={() => handleDeleteShoot(s.id)}
+                      className="text-text-muted hover:text-red-500 transition-colors ml-auto"
+                      title="Remove shoot date"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          {isAdmin && (
+            showAddShoot ? (
+              <div className="flex items-center gap-2 mt-1">
+                <input
+                  type="date"
+                  className="input text-sm py-1 flex-1"
+                  value={newShootDate}
+                  onChange={(e) => setNewShootDate(e.target.value)}
+                  autoFocus
+                />
+                <button
+                  onClick={handleAddShoot}
+                  disabled={!newShootDate || addingShoot}
+                  className="btn-primary text-xs px-3 py-1.5 flex items-center gap-1 disabled:opacity-50 shrink-0"
+                >
+                  {addingShoot ? <Loader2 size={12} className="animate-spin" /> : null}
+                  Add
+                </button>
+                <button
+                  onClick={() => { setShowAddShoot(false); setNewShootDate('') }}
+                  className="btn-ghost p-1.5 shrink-0"
+                >
+                  <X size={13} />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowAddShoot(true)}
+                className="text-xs text-accent hover:text-accent/80 font-medium flex items-center gap-1 mt-1"
+              >
+                <Plus size={12} /> Add Shoot
+              </button>
+            )
+          )}
         </div>
       </div>
 
