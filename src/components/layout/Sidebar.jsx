@@ -27,6 +27,7 @@ const NAV = {
   ],
   client: [
     { to: '/client',          icon: Home,           label: 'Home',           end: true },
+    { to: '/my-projects',     icon: FolderKanban,   label: 'My Projects' },
     { to: '/client/calendar', icon: CalendarDays,   label: 'Calendar' },
     { to: '/client/request',  icon: PenLine,        label: 'Request a Post' },
     { to: '/client/upload',   icon: Upload,         label: 'Upload Footage' },

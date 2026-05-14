@@ -3,7 +3,8 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   ArrowLeft, Loader2, Check, Trash2, X, Plus, UserMinus,
   CalendarDays, DollarSign, MessageSquare, Film, StickyNote,
-  AlertCircle, Clock
+  AlertCircle, Clock, MapPin, Upload, FileVideo, Eye,
+  Camera, Scissors
 } from 'lucide-react'
 import { useProject, updateProject, addMember, removeMember } from '../../hooks/useProjects'
 import { useAuth } from '../../contexts/AuthContext'
@@ -15,12 +16,22 @@ import {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const STAGES = [
-  { key: 'briefing',        label: 'Briefing' },
-  { key: 'pre_production',  label: 'Pre-Production' },
-  { key: 'production',      label: 'Production' },
-  { key: 'post_production', label: 'Post-Production' },
-  { key: 'review',          label: 'Review' },
-  { key: 'revisions',       label: 'Revisions' },
+  { key: 'briefing',        label: 'Planning' },
+  { key: 'pre_production',  label: 'Planning' },
+  { key: 'production',      label: 'Shooting' },
+  { key: 'post_production', label: 'Editing' },
+  { key: 'review',          label: 'Rev 1 Review' },
+  { key: 'revisions',       label: 'Rev 2 Review' },
+  { key: 'delivered',       label: 'Delivered' },
+]
+
+// Deduplicated display stages for the progress bar
+const DISPLAY_STAGES = [
+  { key: 'briefing',        label: 'Planning' },
+  { key: 'production',      label: 'Shooting' },
+  { key: 'post_production', label: 'Editing' },
+  { key: 'review',          label: 'Rev 1 Review' },
+  { key: 'revisions',       label: 'Rev 2+ Review' },
   { key: 'delivered',       label: 'Delivered' },
 ]
 
@@ -82,20 +93,29 @@ const MEMBER_ROLE_COLORS = {
   assistant:    'bg-slate-100 text-slate-600',
 }
 
-// Who has control at each stage
-const IN_CONTROL_LABEL = {
-  briefing:        { label: 'Admin', role: 'admin' },
-  pre_production:  { label: 'Admin', role: 'admin' },
-  production:      { label: 'Photographer / Videographer', role: 'photographer' },
-  post_production: { label: 'Editor', role: 'editor' },
-  review:          { label: 'Client', role: null },
-  revisions:       { label: 'Client', role: null },
-  delivered:       { label: 'Admin', role: 'admin' },
+const REVISION_STATUS_LABELS = {
+  pending_creative_review: 'Creative Review',
+  pending_client_review:   'Client Review',
+  pending_editor:          'Back to Editor',
+  approved:                'Approved',
+}
+
+const REVISION_STATUS_COLORS = {
+  pending_creative_review: 'bg-amber-50 text-amber-700',
+  pending_client_review:   'bg-blue-50 text-blue-700',
+  pending_editor:          'bg-purple-50 text-purple-700',
+  approved:                'bg-green-50 text-green-700',
 }
 
 function fmt$(n) {
   if (n == null) return '—'
   return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+}
+
+function fmtBytes(bytes) {
+  if (!bytes) return '—'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
 }
 
 // ── Add Member Modal ──────────────────────────────────────────────────────────
@@ -187,20 +207,165 @@ function AddMemberModal({ projectId, existingIds, onClose, onAdded }) {
   )
 }
 
+// ── Edit Project Modal ────────────────────────────────────────────────────────
+function EditProjectModal({ project, onClose, onSaved }) {
+  const [clients, setClients]   = useState([])
+  const [creatives, setCreatives] = useState([])
+  const [form, setForm] = useState({
+    name:        project.name || '',
+    type:        project.type || '',
+    client_id:   project.client_id || '',
+    location:    project.location || '',
+    shoot_date:  project.shoot_date || '',
+    start_date:  project.start_date || '',
+    due_date:    project.due_date || '',
+    budget:      project.budget ?? '',
+    creative_id: project.creative_id || '',
+    editor_id:   project.editor_id || '',
+  })
+  const [saving, setSaving] = useState(false)
+  const [error, setError]   = useState('')
+
+  useEffect(() => {
+    supabase.from('clients').select('id, name, contact_name').order('name')
+      .then(({ data }) => setClients(data || []))
+    supabase.from('profiles').select('id, full_name, role').in('role', ['admin', 'creative']).order('full_name')
+      .then(({ data }) => setCreatives(data || []))
+  }, [])
+
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
+
+  const handleSave = async (e) => {
+    e.preventDefault()
+    if (!form.name.trim()) return
+    setSaving(true)
+    setError('')
+    try {
+      await updateProject(project.id, {
+        name:        form.name.trim(),
+        type:        form.type || null,
+        client_id:   form.client_id || null,
+        location:    form.location || null,
+        shoot_date:  form.shoot_date || null,
+        start_date:  form.start_date || null,
+        due_date:    form.due_date || null,
+        budget:      form.budget !== '' ? Number(form.budget) : null,
+        creative_id: form.creative_id || null,
+        editor_id:   form.editor_id || null,
+      })
+      onSaved()
+      onClose()
+    } catch (err) {
+      setError(err.message)
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 z-10 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-base font-semibold text-text-primary">Edit Project</h2>
+          <button onClick={onClose} className="btn-ghost p-1.5"><X size={16} /></button>
+        </div>
+
+        <form onSubmit={handleSave} className="space-y-3">
+          <div>
+            <label className="label">Project Name *</label>
+            <input type="text" className="input" value={form.name} onChange={set('name')} required />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">Type</label>
+              <select className="input" value={form.type} onChange={set('type')}>
+                <option value="">— None —</option>
+                {Object.entries(TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label">Client</label>
+              <select className="input" value={form.client_id} onChange={set('client_id')}>
+                <option value="">— No client —</option>
+                {clients.map((c) => <option key={c.id} value={c.id}>{c.contact_name || c.name}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="label">Location</label>
+            <input type="text" className="input" placeholder="e.g. Studio A, Downtown LA" value={form.location} onChange={set('location')} />
+          </div>
+
+          <div>
+            <label className="label">Shoot Date</label>
+            <input type="date" className="input" value={form.shoot_date} onChange={set('shoot_date')} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">Start Date</label>
+              <input type="date" className="input" value={form.start_date} onChange={set('start_date')} />
+            </div>
+            <div>
+              <label className="label">Due Date</label>
+              <input type="date" className="input" value={form.due_date} onChange={set('due_date')} />
+            </div>
+          </div>
+
+          <div>
+            <label className="label">Budget ($)</label>
+            <input type="number" min="0" step="0.01" className="input" placeholder="0.00" value={form.budget} onChange={set('budget')} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">Creative (Shooter)</label>
+              <select className="input" value={form.creative_id} onChange={set('creative_id')}>
+                <option value="">— Unassigned —</option>
+                {creatives.map((c) => <option key={c.id} value={c.id}>{c.full_name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label">Editor</label>
+              <select className="input" value={form.editor_id} onChange={set('editor_id')}>
+                <option value="">— Unassigned —</option>
+                {creatives.map((c) => <option key={c.id} value={c.id}>{c.full_name}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {error && <p className="text-xs text-red-500 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p>}
+
+          <div className="flex gap-2 justify-end pt-1">
+            <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
+            <button type="submit" disabled={saving} className="btn-primary disabled:opacity-50 flex items-center gap-1.5">
+              {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+              Save Changes
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 // ── Stage Progress Bar ────────────────────────────────────────────────────────
 function StageBar({ currentStage, isAdmin, onStageClick }) {
-  const currentIdx = STAGES.findIndex((s) => s.key === currentStage)
+  const currentIdx = DISPLAY_STAGES.findIndex((s) => s.key === currentStage)
+  // For planning stages (briefing, pre_production), map to index 0
+  const effectiveIdx = currentStage === 'pre_production' ? 0 : currentIdx
+
   return (
     <div className="bg-white rounded-2xl border border-border p-5 mb-6">
       <p className="text-xs font-semibold text-text-muted mb-3 uppercase tracking-wide">Stage Progress</p>
       <div className="flex items-center gap-0">
-        {STAGES.map((s, i) => {
-          const isCurrent = i === currentIdx
-          const isPast    = i < currentIdx
-          const isFuture  = i > currentIdx
+        {DISPLAY_STAGES.map((s, i) => {
+          const isCurrent = i === effectiveIdx
+          const isPast    = i < effectiveIdx
           return (
             <div key={s.key} className="flex-1 flex flex-col items-center gap-1.5">
-              {/* Connector line before */}
               <div className="flex items-center w-full">
                 {i > 0 && (
                   <div className={`h-0.5 flex-1 ${isPast || isCurrent ? 'bg-green-400' : 'bg-border'}`} />
@@ -217,7 +382,7 @@ function StageBar({ currentStage, isAdmin, onStageClick }) {
                       : 'border-border bg-white'
                   } ${isAdmin ? 'cursor-pointer hover:scale-110' : 'cursor-default'}`}
                 />
-                {i < STAGES.length - 1 && (
+                {i < DISPLAY_STAGES.length - 1 && (
                   <div className={`h-0.5 flex-1 ${isPast ? 'bg-green-400' : 'bg-border'}`} />
                 )}
               </div>
@@ -234,35 +399,6 @@ function StageBar({ currentStage, isAdmin, onStageClick }) {
   )
 }
 
-// ── In Control Banner ─────────────────────────────────────────────────────────
-function InControlBanner({ stage, members }) {
-  const ctrl   = IN_CONTROL_LABEL[stage] || { label: 'Admin', role: 'admin' }
-  const person = ctrl.role
-    ? members.find((m) => m.role === ctrl.role || m.profiles?.role === ctrl.role)
-    : null
-
-  return (
-    <div className="bg-accent/5 border border-accent/20 rounded-2xl p-4 mb-6 flex items-center gap-3">
-      {person ? (
-        <Avatar name={person.profiles?.full_name} url={person.profiles?.avatar_url} size={9} />
-      ) : (
-        <div className="w-9 h-9 rounded-full bg-accent/20 flex items-center justify-center">
-          <span className="text-accent font-bold text-sm">C4</span>
-        </div>
-      )}
-      <div>
-        <p className="text-xs text-text-muted">Currently in control</p>
-        <p className="text-sm font-semibold text-text-primary">
-          {person ? person.profiles?.full_name : ctrl.label}
-        </p>
-        {person && (
-          <p className="text-xs text-text-muted capitalize">{MEMBER_ROLE_LABELS[person.role] || person.role}</p>
-        )}
-      </div>
-    </div>
-  )
-}
-
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function ProjectDetail() {
   const { id } = useParams()
@@ -272,11 +408,8 @@ export default function ProjectDetail() {
 
   const { project, loading, error: loadError, refetch } = useProject(id)
 
-  // Inline edit state
-  const [editingName, setEditingName]   = useState(false)
-  const [nameDraft, setNameDraft]       = useState('')
-  const [saving, setSaving]             = useState(false)
-  const [saved, setSaved]               = useState(false)
+  // Edit modal
+  const [showEdit, setShowEdit] = useState(false)
 
   // Notes
   const [notes, setNotes]               = useState('')
@@ -303,9 +436,18 @@ export default function ProjectDetail() {
 
   const [actionError, setActionError]   = useState('')
 
+  // Shoot uploads + notes + revisions
+  const [shootUploads, setShootUploads] = useState([])
+  const [shootNotes, setShootNotes]     = useState([])
+  const [revisions, setRevisions]       = useState([])
+  const [loadingExtras, setLoadingExtras] = useState(false)
+
+  // Assigned creative/editor profiles
+  const [creativeProfile, setCreativeProfile] = useState(null)
+  const [editorProfile, setEditorProfile]     = useState(null)
+
   useEffect(() => {
     if (project) {
-      setNameDraft(project.name || '')
       setNotes(project.notes || '')
       setPayStatus(project.payment_status || 'unpaid')
       setPaidAmount(project.paid_amount ?? '')
@@ -313,26 +455,36 @@ export default function ProjectDetail() {
     }
   }, [project])
 
-  // ── Helpers ──
-  const save = async (data) => {
-    setSaving(true)
-    try {
-      await updateProject(id, data)
-      refetch()
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2500)
-    } catch (err) {
-      setActionError(err.message)
-    } finally {
-      setSaving(false)
-    }
-  }
+  useEffect(() => {
+    if (!id) return
+    setLoadingExtras(true)
+    Promise.all([
+      supabase.from('shoot_uploads').select('*').eq('project_id', id).order('created_at'),
+      supabase.from('shoot_notes').select('*, profiles(id, full_name, avatar_url)').eq('project_id', id).order('created_at'),
+      supabase.from('project_revisions').select('*, profiles(id, full_name)').eq('project_id', id).order('revision_number'),
+    ]).then(([uploads, notes, revs]) => {
+      setShootUploads(uploads.data || [])
+      setShootNotes(notes.data || [])
+      setRevisions(revs.data || [])
+      setLoadingExtras(false)
+    })
+  }, [id])
 
-  const handleNameSave = async () => {
-    if (!nameDraft.trim()) return
-    setEditingName(false)
-    await save({ name: nameDraft.trim() })
-  }
+  useEffect(() => {
+    if (!project) return
+    if (project.creative_id) {
+      supabase.from('profiles').select('id, full_name, avatar_url').eq('id', project.creative_id).single()
+        .then(({ data }) => setCreativeProfile(data))
+    } else {
+      setCreativeProfile(null)
+    }
+    if (project.editor_id) {
+      supabase.from('profiles').select('id, full_name, avatar_url').eq('id', project.editor_id).single()
+        .then(({ data }) => setEditorProfile(data))
+    } else {
+      setEditorProfile(null)
+    }
+  }, [project])
 
   const handleStageClick = async (stage) => {
     if (!isAdmin) return
@@ -408,7 +560,6 @@ export default function ProjectDetail() {
     }
   }
 
-  // ── Loading / error ──
   if (loading) return (
     <div className="flex justify-center py-24">
       <Loader2 size={22} className="animate-spin text-text-muted" />
@@ -428,6 +579,7 @@ export default function ProjectDetail() {
   const today     = startOfDay(new Date())
   const dueDate   = project.due_date ? parseISO(project.due_date) : null
   const startDate = project.start_date ? parseISO(project.start_date) : null
+  const shootDate = project.shoot_date ? parseISO(project.shoot_date) : null
   const isOD      = dueDate && isBefore(dueDate, today)
   const daysLeft  = dueDate ? differenceInDays(dueDate, today) : null
   const budget    = project.budget ?? null
@@ -443,58 +595,39 @@ export default function ProjectDetail() {
 
       {/* Header */}
       <div className="flex items-start justify-between gap-4 mb-6">
-        <div className="flex items-start gap-3 flex-1 min-w-0">
-          <div className="flex-1 min-w-0">
-            {editingName ? (
-              <div className="flex items-center gap-2">
-                <input
-                  className="input text-xl font-bold flex-1"
-                  value={nameDraft}
-                  onChange={(e) => setNameDraft(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') handleNameSave(); if (e.key === 'Escape') setEditingName(false) }}
-                  autoFocus
-                />
-                <button onClick={handleNameSave} className="btn-primary flex items-center gap-1">
-                  {saving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Save
-                </button>
-                <button onClick={() => setEditingName(false)} className="btn-secondary">Cancel</button>
-              </div>
-            ) : (
-              <button
-                onClick={() => isAdmin && setEditingName(true)}
-                className={`text-2xl font-bold text-text-primary text-left block ${isAdmin ? 'hover:text-accent transition-colors cursor-pointer' : 'cursor-default'}`}
-                title={isAdmin ? 'Click to edit' : undefined}
-              >
-                {project.name}
-              </button>
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl font-bold text-text-primary">{project.name}</h1>
+          <div className="flex items-center gap-2 flex-wrap mt-2">
+            {project.type && (
+              <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${TYPE_COLORS[project.type] || 'bg-surface-2 text-text-muted'}`}>
+                {TYPE_LABELS[project.type]}
+              </span>
             )}
-            <div className="flex items-center gap-2 flex-wrap mt-2">
-              {project.type && (
-                <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${TYPE_COLORS[project.type] || 'bg-surface-2 text-text-muted'}`}>
-                  {TYPE_LABELS[project.type]}
-                </span>
-              )}
-              {isAdmin ? (
-                <select
-                  className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border-0 outline-none cursor-pointer ${STATUS_COLORS[status] || 'bg-surface-2 text-text-muted'}`}
-                  value={status}
-                  onChange={handleStatusChange}
-                >
-                  {Object.entries(STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                </select>
-              ) : (
-                <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${STATUS_COLORS[status] || 'bg-surface-2 text-text-muted'}`}>
-                  {STATUS_LABELS[status] || status}
-                </span>
-              )}
-              {project.clients && (
-                <span className="text-xs text-text-muted">
-                  {project.clients.contact_name || project.clients.name}
-                </span>
-              )}
-            </div>
+            {isAdmin ? (
+              <select
+                className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border-0 outline-none cursor-pointer ${STATUS_COLORS[status] || 'bg-surface-2 text-text-muted'}`}
+                value={status}
+                onChange={handleStatusChange}
+              >
+                {Object.entries(STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              </select>
+            ) : (
+              <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${STATUS_COLORS[status] || 'bg-surface-2 text-text-muted'}`}>
+                {STATUS_LABELS[status] || status}
+              </span>
+            )}
+            {project.clients && (
+              <span className="text-xs text-text-muted">
+                {project.clients.contact_name || project.clients.name}
+              </span>
+            )}
           </div>
         </div>
+        {isAdmin && (
+          <button onClick={() => setShowEdit(true)} className="btn-secondary shrink-0">
+            Edit Project
+          </button>
+        )}
       </div>
 
       {actionError && (
@@ -502,21 +635,20 @@ export default function ProjectDetail() {
       )}
 
       {/* Stage progress */}
-      {isAdmin ? (
-        <StageBar currentStage={project.stage} isAdmin={true} onStageClick={handleStageClick} />
-      ) : (
-        <StageBar currentStage={project.stage} isAdmin={false} onStageClick={() => {}} />
-      )}
+      <StageBar currentStage={project.stage} isAdmin={isAdmin} onStageClick={handleStageClick} />
 
-      {/* In control banner */}
-      <InControlBanner stage={project.stage} members={members} />
-
-      {/* 4-col info grid */}
+      {/* Project info grid */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-2xl border border-border p-4">
-          <p className="text-xs text-text-muted mb-1 flex items-center gap-1"><CalendarDays size={11} /> Start Date</p>
+          <p className="text-xs text-text-muted mb-1 flex items-center gap-1"><CalendarDays size={11} /> Shoot Date</p>
           <p className="text-sm font-semibold text-text-primary">
-            {startDate ? format(startDate, 'MMM d, yyyy') : '—'}
+            {shootDate ? format(shootDate, 'MMM d, yyyy') : '—'}
+          </p>
+        </div>
+        <div className="bg-white rounded-2xl border border-border p-4">
+          <p className="text-xs text-text-muted mb-1 flex items-center gap-1"><MapPin size={11} /> Location</p>
+          <p className="text-sm font-semibold text-text-primary truncate" title={project.location}>
+            {project.location || '—'}
           </p>
         </div>
         <div className="bg-white rounded-2xl border border-border p-4">
@@ -531,14 +663,37 @@ export default function ProjectDetail() {
           <p className="text-xs text-text-muted mb-1 flex items-center gap-1"><DollarSign size={11} /> Budget</p>
           <p className="text-sm font-semibold text-text-primary">{fmt$(budget)}</p>
         </div>
+      </div>
+
+      {/* Assigned creative + editor */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <div className="bg-white rounded-2xl border border-border p-4">
-          <p className="text-xs text-text-muted mb-1 flex items-center gap-1"><DollarSign size={11} /> Paid</p>
-          <div className="flex items-center gap-2">
-            <p className="text-sm font-semibold text-text-primary">{fmt$(project.paid_amount)}</p>
-            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${PAYMENT_COLORS[project.payment_status] || ''}`}>
-              {PAYMENT_LABELS[project.payment_status]}
-            </span>
-          </div>
+          <p className="text-xs text-text-muted mb-3 flex items-center gap-1"><Camera size={11} /> Assigned Creative</p>
+          {creativeProfile ? (
+            <div className="flex items-center gap-3">
+              <Avatar name={creativeProfile.full_name} url={creativeProfile.avatar_url} size={9} />
+              <div>
+                <p className="text-sm font-semibold text-text-primary">{creativeProfile.full_name}</p>
+                <p className="text-xs text-text-muted">Photographer / Videographer</p>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-text-muted">Not assigned</p>
+          )}
+        </div>
+        <div className="bg-white rounded-2xl border border-border p-4">
+          <p className="text-xs text-text-muted mb-3 flex items-center gap-1"><Scissors size={11} /> Assigned Editor</p>
+          {editorProfile ? (
+            <div className="flex items-center gap-3">
+              <Avatar name={editorProfile.full_name} url={editorProfile.avatar_url} size={9} />
+              <div>
+                <p className="text-sm font-semibold text-text-primary">{editorProfile.full_name}</p>
+                <p className="text-xs text-text-muted">Editor</p>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-text-muted">Not assigned</p>
+          )}
         </div>
       </div>
 
@@ -546,6 +701,98 @@ export default function ProjectDetail() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Left (wider) */}
         <div className="lg:col-span-2 space-y-5">
+
+          {/* Shoot Uploads */}
+          <div className="bg-white rounded-2xl border border-border p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+                <Upload size={14} className="text-text-muted" /> Footage Uploads
+              </h2>
+              <span className="text-xs text-text-muted">{shootUploads.length} file{shootUploads.length !== 1 ? 's' : ''}</span>
+            </div>
+            {loadingExtras ? (
+              <Loader2 size={16} className="animate-spin text-text-muted" />
+            ) : shootUploads.length === 0 ? (
+              <p className="text-sm text-text-muted">No footage uploaded yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {shootUploads.map((f) => (
+                  <div key={f.id} className="flex items-center gap-3 py-2 border-b border-border last:border-0">
+                    <div className="w-8 h-8 rounded-lg bg-surface-2 flex items-center justify-center shrink-0">
+                      <Film size={14} className="text-text-muted" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-text-primary truncate">{f.file_name}</p>
+                      <p className="text-xs text-text-muted">{fmtBytes(f.file_size)} · {format(new Date(f.created_at), 'MMM d, yyyy')}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Shoot Notes */}
+          <div className="bg-white rounded-2xl border border-border p-5">
+            <h2 className="text-sm font-semibold text-text-primary mb-4 flex items-center gap-2">
+              <StickyNote size={14} className="text-text-muted" /> Shoot Notes
+            </h2>
+            {loadingExtras ? (
+              <Loader2 size={16} className="animate-spin text-text-muted" />
+            ) : shootNotes.length === 0 ? (
+              <p className="text-sm text-text-muted">No shoot notes yet.</p>
+            ) : (
+              <div className="space-y-4">
+                {shootNotes.map((n) => (
+                  <div key={n.id} className="bg-surface-2 rounded-xl p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Avatar name={n.profiles?.full_name} url={n.profiles?.avatar_url} size={6} />
+                      <p className="text-xs font-medium text-text-primary">{n.profiles?.full_name || 'Unknown'}</p>
+                      <span className="text-xs text-text-muted">{format(new Date(n.created_at), 'MMM d, yyyy')}</span>
+                    </div>
+                    <p className="text-sm text-text-primary whitespace-pre-wrap">{n.content}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Revisions */}
+          <div className="bg-white rounded-2xl border border-border p-5">
+            <h2 className="text-sm font-semibold text-text-primary mb-4 flex items-center gap-2">
+              <FileVideo size={14} className="text-text-muted" /> Revisions
+            </h2>
+            {loadingExtras ? (
+              <Loader2 size={16} className="animate-spin text-text-muted" />
+            ) : revisions.length === 0 ? (
+              <p className="text-sm text-text-muted">No revisions uploaded yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {revisions.map((r) => (
+                  <div key={r.id} className="flex items-center gap-3 p-3 rounded-xl border border-border">
+                    <div className="w-10 h-10 rounded-lg bg-surface-2 flex items-center justify-center shrink-0">
+                      <FileVideo size={16} className="text-text-muted" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-text-primary">Revision {r.revision_number}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${REVISION_STATUS_COLORS[r.status] || 'bg-surface-2 text-text-muted'}`}>
+                          {REVISION_STATUS_LABELS[r.status] || r.status}
+                        </span>
+                        <span className="text-xs text-text-muted">{format(new Date(r.created_at), 'MMM d, yyyy')}</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => navigate(`/projects/${id}/revision/${r.id}`)}
+                      className="btn-secondary flex items-center gap-1.5 text-xs shrink-0"
+                    >
+                      <Eye size={13} /> View
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Team card */}
           <div className="bg-white rounded-2xl border border-border p-5">
             <div className="flex items-center justify-between mb-4">
@@ -587,7 +834,7 @@ export default function ProjectDetail() {
             )}
           </div>
 
-          {/* Notes card */}
+          {/* Internal Notes card */}
           <div className="bg-white rounded-2xl border border-border p-5">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-semibold text-text-primary">Internal Notes</h2>
@@ -675,6 +922,12 @@ export default function ProjectDetail() {
                   {startDate ? format(startDate, 'MMM d, yyyy') : '—'}
                 </span>
               </div>
+              {shootDate && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-text-muted">Shoot</span>
+                  <span className="font-medium text-text-primary">{format(shootDate, 'MMM d, yyyy')}</span>
+                </div>
+              )}
               <div className="flex justify-between text-sm">
                 <span className="text-text-muted">Due</span>
                 <span className={`font-medium ${isOD ? 'text-red-600' : 'text-text-primary'}`}>
@@ -708,6 +961,12 @@ export default function ProjectDetail() {
               >
                 <Film size={14} /> Video Review
               </Link>
+              <Link
+                to={`/projects/${id}/creative`}
+                className="flex items-center gap-2 text-sm text-accent hover:underline"
+              >
+                <Camera size={14} /> Workflow View
+              </Link>
             </div>
           </div>
         </div>
@@ -718,7 +977,6 @@ export default function ProjectDetail() {
         <div className="mt-6 bg-white rounded-2xl border border-red-100 p-5">
           <h2 className="text-sm font-semibold text-red-600 mb-4">Danger Zone</h2>
           <div className="space-y-3">
-            {/* Archive */}
             {project.status !== 'archived' && (
               <div className="flex items-center justify-between">
                 <div>
@@ -736,7 +994,6 @@ export default function ProjectDetail() {
               </div>
             )}
 
-            {/* Delete */}
             <div className={project.status !== 'archived' ? 'border-t border-border pt-3' : ''}>
               {deleteStep === 0 && (
                 <div className="flex items-center justify-between">
@@ -789,6 +1046,14 @@ export default function ProjectDetail() {
           existingIds={members.map((m) => m.profiles?.id).filter(Boolean)}
           onClose={() => setShowAdd(false)}
           onAdded={refetch}
+        />
+      )}
+
+      {showEdit && (
+        <EditProjectModal
+          project={project}
+          onClose={() => setShowEdit(false)}
+          onSaved={refetch}
         />
       )}
     </div>

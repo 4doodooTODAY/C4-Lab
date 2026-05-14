@@ -20,11 +20,15 @@ const ClientDashboard = lazy(() => import('./pages/client/Dashboard'))
 const ClientCalendarView = lazy(() => import('./pages/client/CalendarView'))
 const RequestPost     = lazy(() => import('./pages/client/RequestPost'))
 const UploadFootage   = lazy(() => import('./pages/client/UploadFootage'))
-const VideoList       = lazy(() => import('./pages/VideoList'))
-const VideoReview     = lazy(() => import('./pages/VideoReview'))
-const CalendarPage    = lazy(() => import('./pages/CalendarPage'))
-const Settings        = lazy(() => import('./pages/Settings'))
-const Messages        = lazy(() => import('./pages/Messages'))
+const VideoList              = lazy(() => import('./pages/VideoList'))
+const VideoReview            = lazy(() => import('./pages/VideoReview'))
+const CalendarPage           = lazy(() => import('./pages/CalendarPage'))
+const Settings               = lazy(() => import('./pages/Settings'))
+const Messages               = lazy(() => import('./pages/Messages'))
+const CreativeProjectList    = lazy(() => import('./pages/creative/ProjectList'))
+const CreativeProjectWorkflow = lazy(() => import('./pages/creative/ProjectWorkflow'))
+const ClientMyProjects       = lazy(() => import('./pages/client/MyProjects'))
+const VideoRevisionReview    = lazy(() => import('./pages/VideoRevisionReview'))
 
 function PageLoader() {
   return (
@@ -41,6 +45,15 @@ function AppLoader() {
       <p className="text-white/30 text-xs">Loading C4 Lab...</p>
     </div>
   )
+}
+
+function RoleSwitch({ admin, creative, client }) {
+  const { profile } = useAuth()
+  const role = profile?.role
+  if (role === 'admin' && admin) return admin
+  if (role === 'creative' && creative) return creative
+  if (role === 'client' && client) return client
+  return admin || creative || client || null
 }
 
 function RoleRedirect() {
@@ -108,10 +121,21 @@ function AppRoutes() {
             <ProtectedRoute roles={['admin']}><AdminInbox /></ProtectedRoute>
           } />
           <Route path="/projects" element={
-            <ProtectedRoute roles={['admin', 'creative']}><AdminProjects /></ProtectedRoute>
+            <ProtectedRoute roles={['admin', 'creative']}>
+              <RoleSwitch
+                admin={<AdminProjects />}
+                creative={<CreativeProjectList />}
+              />
+            </ProtectedRoute>
           } />
           <Route path="/projects/:id" element={
             <ProtectedRoute roles={['admin', 'creative']}><ProjectDetail /></ProtectedRoute>
+          } />
+          <Route path="/projects/:id/creative" element={
+            <ProtectedRoute roles={['admin', 'creative']}><CreativeProjectWorkflow /></ProtectedRoute>
+          } />
+          <Route path="/projects/:id/revision/:revisionId" element={
+            <ProtectedRoute roles={['admin', 'creative', 'client']}><VideoRevisionReview /></ProtectedRoute>
           } />
 
           {/* Creative */}
@@ -120,6 +144,9 @@ function AppRoutes() {
           } />
 
           {/* Client */}
+          <Route path="/my-projects" element={
+            <ProtectedRoute roles={['client']}><ClientMyProjects /></ProtectedRoute>
+          } />
           <Route path="/client" element={
             <ProtectedRoute roles={['client']}><ClientDashboard /></ProtectedRoute>
           } />

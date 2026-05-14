@@ -1,0 +1,573 @@
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { useParams, useNavigate, Link } from 'react-router-dom'
+import {
+  ArrowLeft, Loader2, MessageSquare, Check, X, Plus,
+  Send, ThumbsUp
+} from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../lib/supabase'
+import Avatar from '../components/ui/Avatar'
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function fmtTime(s) {
+  if (s == null || isNaN(s)) return '0:00'
+  const m = Math.floor(s / 60)
+  const sec = Math.floor(s % 60)
+  return `${m}:${sec.toString().padStart(2, '0')}`
+}
+
+// ── Comment dot on timeline ───────────────────────────────────────────────────
+function TimelineDot({ comment, duration, isCreative, onClick }) {
+  const [hover, setHover] = useState(false)
+  const left = duration > 0 ? (comment.timestamp_seconds / duration) * 100 : 0
+  const color = isCreative ? '#a855f7' : '#3b82f6' // purple / blue
+
+  return (
+    <div
+      style={{ left: `${left}%` }}
+      className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 cursor-pointer z-10"
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      onClick={() => onClick(comment.timestamp_seconds)}
+    >
+      <div
+        style={{ backgroundColor: color }}
+        className="w-3 h-3 rounded-full border-2 border-white shadow"
+      />
+      {hover && (
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white text-xs rounded-lg p-2 shadow-xl z-20 pointer-events-none">
+          <p className="font-semibold mb-0.5">{fmtTime(comment.timestamp_seconds)}</p>
+          <p className="line-clamp-3">{comment.content}</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Add comment popover ───────────────────────────────────────────────────────
+function AddCommentPopover({ timestamp, onPost, onCancel }) {
+  const [text, setText] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const handlePost = async () => {
+    if (!text.trim()) return
+    setSaving(true)
+    await onPost(timestamp, text.trim())
+    setSaving(false)
+  }
+
+  return (
+    <div className="bg-gray-900 border border-white/10 rounded-xl p-3 shadow-2xl w-72">
+      <p className="text-xs text-white/50 mb-2">Comment at {fmtTime(timestamp)}</p>
+      <textarea
+        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 resize-none focus:outline-none focus:border-purple-500/50"
+        rows={3}
+        placeholder="Write your comment…"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        autoFocus
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handlePost()
+          if (e.key === 'Escape') onCancel()
+        }}
+      />
+      <div className="flex gap-2 mt-2">
+        <button
+          onClick={onCancel}
+          className="flex-1 px-3 py-1.5 rounded-lg text-xs text-white/50 hover:text-white border border-white/10 hover:border-white/20 transition-all"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handlePost}
+          disabled={!text.trim() || saving}
+          className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-purple-600 hover:bg-purple-500 text-white disabled:opacity-40 flex items-center justify-center gap-1 transition-all"
+        >
+          {saving ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+          Post
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── Comment item in sidebar ───────────────────────────────────────────────────
+function CommentItem({ comment, viewerRole, isClient, onAccept, onDecline, updating }) {
+  const isCreativeAuthor = comment.author_role === 'creative' || comment.author_role === 'admin'
+
+  const borderColor = comment.status === 'accepted'
+    ? 'border-green-500/40'
+    : comment.status === 'declined'
+    ? 'border-red-500/20 opacity-50'
+    : 'border-white/10'
+
+  return (
+    <div className={`border ${borderColor} rounded-xl p-3 transition-all`}>
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-white/10 text-white/70">
+          {fmtTime(comment.timestamp_seconds)}
+        </span>
+        <Avatar name={comment.profiles?.full_name} url={comment.profiles?.avatar_url} size={6} />
+        <span className="text-xs text-white/60 truncate flex-1">{comment.profiles?.full_name || 'Unknown'}</span>
+        {comment.status === 'accepted' && (
+          <span className="text-[10px] text-green-400 font-semibold">Accepted</span>
+        )}
+        {comment.status === 'declined' && (
+          <span className="text-[10px] text-red-400 font-semibold">Declined</span>
+        )}
+      </div>
+      <p className="text-sm text-white/80 leading-relaxed">{comment.content}</p>
+
+      {/* Client can accept/decline creative's pending comments */}
+      {isClient && isCreativeAuthor && comment.status === 'pending' && (
+        <div className="flex gap-1.5 mt-2">
+          <button
+            onClick={() => onAccept(comment.id)}
+            disabled={updating === comment.id}
+            className="flex-1 flex items-center justify-center gap-1 text-xs py-1 rounded-lg bg-green-600/20 hover:bg-green-600/40 text-green-300 border border-green-500/20 transition-all disabled:opacity-50"
+          >
+            {updating === comment.id ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />}
+            Accept
+          </button>
+          <button
+            onClick={() => onDecline(comment.id)}
+            disabled={updating === comment.id}
+            className="flex-1 flex items-center justify-center gap-1 text-xs py-1 rounded-lg bg-red-600/10 hover:bg-red-600/30 text-red-300 border border-red-500/10 transition-all disabled:opacity-50"
+          >
+            <X size={11} /> Decline
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Main Page ─────────────────────────────────────────────────────────────────
+export default function VideoRevisionReview() {
+  const { id, revisionId } = useParams()
+  const navigate           = useNavigate()
+  const { profile }        = useAuth()
+
+  const videoRef      = useRef(null)
+  const timelineRef   = useRef(null)
+
+  const [revision,  setRevision]  = useState(null)
+  const [project,   setProject]   = useState(null)
+  const [comments,  setComments]  = useState([])
+  const [loading,   setLoading]   = useState(true)
+  const [error,     setError]     = useState('')
+
+  const [duration,  setDuration]  = useState(0)
+  const [currentTime, setCurrentTime] = useState(0)
+
+  // Add comment popover
+  const [popover,   setPopover]   = useState(null) // { x, y, timestamp }
+  const [addingFromPanel, setAddingFromPanel] = useState(false)
+
+  // Action states
+  const [updatingComment, setUpdatingComment] = useState(null)
+  const [submittingAction, setSubmittingAction] = useState(false)
+  const [actionError, setActionError] = useState('')
+
+  const fetchAll = useCallback(async () => {
+    if (!revisionId) return
+    try {
+      const [revRes, commRes] = await Promise.all([
+        supabase
+          .from('project_revisions')
+          .select('*, projects(id, name, creative_id, editor_id, client_id, revision_count)')
+          .eq('id', revisionId)
+          .single(),
+        supabase
+          .from('revision_comments')
+          .select('*, profiles(id, full_name, avatar_url, role)')
+          .eq('revision_id', revisionId)
+          .order('timestamp_seconds'),
+      ])
+      if (revRes.error) throw revRes.error
+      setRevision(revRes.data)
+      setProject(revRes.data.projects)
+
+      // Attach author_role from profiles join
+      const enriched = (commRes.data || []).map((c) => ({
+        ...c,
+        author_role: c.profiles?.role,
+      }))
+      setComments(enriched)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }, [revisionId])
+
+  useEffect(() => { fetchAll() }, [fetchAll])
+
+  const myRole    = profile?.role
+  const myId      = profile?.id
+  const isAdmin   = myRole === 'admin'
+  const isCreative = myRole === 'creative' || (project && (project.creative_id === myId || project.editor_id === myId))
+  const isClient  = myRole === 'client'
+  const isEditor  = project && project.editor_id === myId
+
+  // ── Timeline click → seek + popover ──────────────────────────────────────
+  const handleTimelineClick = (e) => {
+    if (!timelineRef.current || !duration) return
+    const rect  = timelineRef.current.getBoundingClientRect()
+    const ratio = (e.clientX - rect.left) / rect.width
+    const ts    = Math.max(0, Math.min(duration, ratio * duration))
+    if (videoRef.current) videoRef.current.currentTime = ts
+    setPopover({ x: e.clientX - rect.left, timestamp: ts })
+    setAddingFromPanel(false)
+  }
+
+  const seekTo = (ts) => {
+    if (videoRef.current) videoRef.current.currentTime = ts
+  }
+
+  // ── Post comment ──────────────────────────────────────────────────────────
+  const handlePostComment = async (timestamp, text) => {
+    try {
+      const { error } = await supabase.from('revision_comments').insert({
+        revision_id:       revisionId,
+        author_id:         myId,
+        timestamp_seconds: timestamp,
+        content:           text,
+      })
+      if (error) throw error
+      setPopover(null)
+      setAddingFromPanel(false)
+      fetchAll()
+    } catch (err) {
+      setActionError(err.message)
+    }
+  }
+
+  // ── Accept / Decline comment ──────────────────────────────────────────────
+  const handleAccept = async (commentId) => {
+    setUpdatingComment(commentId)
+    await supabase.from('revision_comments').update({ status: 'accepted' }).eq('id', commentId)
+    setUpdatingComment(null)
+    fetchAll()
+  }
+
+  const handleDecline = async (commentId) => {
+    setUpdatingComment(commentId)
+    await supabase.from('revision_comments').update({ status: 'declined' }).eq('id', commentId)
+    setUpdatingComment(null)
+    fetchAll()
+  }
+
+  // ── Creative: submit for client review ────────────────────────────────────
+  const handleSubmitForClient = async () => {
+    setSubmittingAction(true)
+    setActionError('')
+    try {
+      await supabase.from('project_revisions')
+        .update({ status: 'pending_client_review' })
+        .eq('id', revisionId)
+      fetchAll()
+    } catch (err) {
+      setActionError(err.message)
+    } finally {
+      setSubmittingAction(false)
+    }
+  }
+
+  // ── Client: send to editor ─────────────────────────────────────────────────
+  const handleSendToEditor = async () => {
+    setSubmittingAction(true)
+    setActionError('')
+    try {
+      await supabase.from('project_revisions')
+        .update({ status: 'pending_editor' })
+        .eq('id', revisionId)
+      await supabase.from('projects')
+        .update({ stage: 'revisions' })
+        .eq('id', project.id)
+      fetchAll()
+    } catch (err) {
+      setActionError(err.message)
+    } finally {
+      setSubmittingAction(false)
+    }
+  }
+
+  // ── Client: approve final ─────────────────────────────────────────────────
+  const handleApprove = async () => {
+    setSubmittingAction(true)
+    setActionError('')
+    try {
+      await supabase.from('project_revisions')
+        .update({ status: 'approved' })
+        .eq('id', revisionId)
+      await supabase.from('projects')
+        .update({ stage: 'delivered' })
+        .eq('id', project.id)
+      fetchAll()
+    } catch (err) {
+      setActionError(err.message)
+    } finally {
+      setSubmittingAction(false)
+    }
+  }
+
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-screen bg-[#0f0f0f]">
+      <Loader2 size={24} className="animate-spin text-white/30" />
+    </div>
+  )
+
+  if (error || !revision) return (
+    <div className="min-h-screen bg-[#0f0f0f] p-8">
+      <p className="text-white/50 text-sm">{error || 'Revision not found.'}</p>
+    </div>
+  )
+
+  const revNum      = revision.revision_number
+  const revStatus   = revision.status
+  const revCount    = project?.revision_count || revNum
+  const canRevise   = revCount < 3
+  const projectName = project?.name || '—'
+
+  const creativeComments = comments.filter((c) => c.author_role !== 'client')
+  const clientComments   = comments.filter((c) => c.author_role === 'client')
+
+  const REVISION_STATUS_LABELS = {
+    pending_creative_review: 'Creative Review',
+    pending_client_review:   'Client Review',
+    pending_editor:          'Awaiting Editor',
+    approved:                'Approved',
+  }
+
+  const STATUS_BADGE_COLORS = {
+    pending_creative_review: 'bg-amber-500/20 text-amber-300',
+    pending_client_review:   'bg-blue-500/20 text-blue-300',
+    pending_editor:          'bg-purple-500/20 text-purple-300',
+    approved:                'bg-green-500/20 text-green-300',
+  }
+
+  return (
+    <div className="flex flex-col min-h-screen bg-[#0f0f0f] text-white">
+      {/* Top bar */}
+      <div className="flex items-center justify-between px-5 py-3 border-b border-white/5 shrink-0">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate(-1)}
+            className="p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition-all"
+          >
+            <ArrowLeft size={16} />
+          </button>
+          <div>
+            <p className="text-sm font-semibold text-white">{projectName}</p>
+            <p className="text-xs text-white/40">Revision {revNum}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${STATUS_BADGE_COLORS[revStatus] || 'bg-white/10 text-white/50'}`}>
+            {REVISION_STATUS_LABELS[revStatus] || revStatus}
+          </span>
+          <div className="flex items-center gap-2">
+            <Avatar name={profile?.full_name} url={profile?.avatar_url} size={7} />
+            <span className="text-xs text-white/50">{profile?.full_name}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Main area */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Video area — 65% */}
+        <div className="flex-1 flex flex-col p-5 gap-4 min-w-0">
+          {/* Video player */}
+          <div className="bg-black rounded-xl overflow-hidden flex-1 flex items-center justify-center relative">
+            <video
+              ref={videoRef}
+              src={revision.video_url}
+              className="max-h-full max-w-full w-full"
+              controls
+              onClick={() => {
+                if (videoRef.current?.paused) videoRef.current.play()
+                else videoRef.current?.pause()
+              }}
+              onTimeUpdate={() => setCurrentTime(videoRef.current?.currentTime || 0)}
+              onLoadedMetadata={() => setDuration(videoRef.current?.duration || 0)}
+            />
+          </div>
+
+          {/* Timeline */}
+          <div className="bg-white/5 rounded-xl p-3">
+            <div
+              ref={timelineRef}
+              className="relative h-6 bg-white/10 rounded-full cursor-crosshair"
+              onClick={handleTimelineClick}
+            >
+              {/* Progress fill */}
+              {duration > 0 && (
+                <div
+                  className="absolute top-0 left-0 h-full bg-white/20 rounded-full pointer-events-none"
+                  style={{ width: `${(currentTime / duration) * 100}%` }}
+                />
+              )}
+
+              {/* Comment dots */}
+              {comments.map((c) => (
+                <TimelineDot
+                  key={c.id}
+                  comment={c}
+                  duration={duration}
+                  isCreative={c.author_role !== 'client'}
+                  onClick={seekTo}
+                />
+              ))}
+            </div>
+
+            <div className="flex justify-between mt-1.5">
+              <span className="text-xs text-white/30">{fmtTime(currentTime)}</span>
+              <span className="text-xs text-white/30 flex items-center gap-3">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-purple-500 inline-block" /> Creative
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" /> Client
+                </span>
+              </span>
+              <span className="text-xs text-white/30">{fmtTime(duration)}</span>
+            </div>
+          </div>
+
+          {/* Popover for adding comment */}
+          {popover && (
+            <div className="relative">
+              <div
+                style={{ left: Math.min(popover.x, timelineRef.current?.offsetWidth - 280 || 0) }}
+                className="absolute -top-2 z-50"
+              >
+                <AddCommentPopover
+                  timestamp={popover.timestamp}
+                  onPost={handlePostComment}
+                  onCancel={() => setPopover(null)}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right panel — 35% */}
+        <div className="w-[380px] shrink-0 border-l border-white/5 flex flex-col bg-[#111]">
+          {/* Panel header */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
+            <div className="flex items-center gap-2">
+              <MessageSquare size={14} className="text-white/40" />
+              <span className="text-sm font-semibold text-white">Comments</span>
+              <span className="text-xs text-white/30 bg-white/10 px-1.5 py-0.5 rounded-full">{comments.length}</span>
+            </div>
+            <button
+              onClick={() => {
+                const ts = videoRef.current?.currentTime || 0
+                setPopover(null)
+                setAddingFromPanel(true)
+              }}
+              className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 border border-purple-500/20 transition-all"
+            >
+              <Plus size={12} /> Add comment
+            </button>
+          </div>
+
+          {/* Panel add comment (from button) */}
+          {addingFromPanel && (
+            <div className="p-4 border-b border-white/5">
+              <AddCommentPopover
+                timestamp={videoRef.current?.currentTime || 0}
+                onPost={handlePostComment}
+                onCancel={() => setAddingFromPanel(false)}
+              />
+            </div>
+          )}
+
+          {/* Comments list */}
+          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+            {comments.length === 0 ? (
+              <div className="text-center py-10">
+                <MessageSquare size={28} className="mx-auto text-white/20 mb-2" />
+                <p className="text-sm text-white/30">No comments yet.</p>
+                <p className="text-xs text-white/20 mt-1">Click on the timeline to add one.</p>
+              </div>
+            ) : (
+              comments.map((c) => (
+                <CommentItem
+                  key={c.id}
+                  comment={c}
+                  viewerRole={myRole}
+                  isClient={isClient}
+                  onAccept={handleAccept}
+                  onDecline={handleDecline}
+                  updating={updatingComment}
+                />
+              ))
+            )}
+          </div>
+
+          {/* Panel footer actions */}
+          <div className="px-4 py-4 border-t border-white/5 space-y-2">
+            {actionError && (
+              <p className="text-xs text-red-400 mb-2">{actionError}</p>
+            )}
+
+            {/* Creative: submit for client review */}
+            {(isCreative || isAdmin) && revStatus === 'pending_creative_review' && (
+              <button
+                onClick={handleSubmitForClient}
+                disabled={submittingAction}
+                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition-all disabled:opacity-50"
+              >
+                {submittingAction ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                Submit for Client Review
+              </button>
+            )}
+
+            {/* Client: send to editor or approve */}
+            {(isClient || isAdmin) && revStatus === 'pending_client_review' && (
+              <>
+                {canRevise && (
+                  <button
+                    onClick={handleSendToEditor}
+                    disabled={submittingAction}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold transition-all disabled:opacity-50"
+                  >
+                    {submittingAction ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                    Send to Editor
+                  </button>
+                )}
+                <button
+                  onClick={handleApprove}
+                  disabled={submittingAction}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-green-600 hover:bg-green-500 text-white text-sm font-semibold transition-all disabled:opacity-50"
+                >
+                  {submittingAction ? <Loader2 size={14} className="animate-spin" /> : <ThumbsUp size={14} />}
+                  Approve Final
+                </button>
+              </>
+            )}
+
+            {/* Editor: read-only notice */}
+            {isEditor && !isAdmin && revStatus === 'pending_editor' && (
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3">
+                <p className="text-xs text-amber-300 font-medium mb-1">Comments to address</p>
+                <p className="text-xs text-white/40">
+                  {comments.filter((c) => c.status === 'accepted').length} accepted comment{comments.filter((c) => c.status === 'accepted').length !== 1 ? 's' : ''} to address in your next revision.
+                </p>
+              </div>
+            )}
+
+            {revStatus === 'approved' && (
+              <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-3 text-center">
+                <p className="text-sm font-semibold text-green-400">Approved!</p>
+                <p className="text-xs text-white/40 mt-0.5">This revision has been approved.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
