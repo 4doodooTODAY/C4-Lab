@@ -12,6 +12,8 @@ const UserManagement  = lazy(() => import('./pages/admin/UserManagement'))
 const UserDetail      = lazy(() => import('./pages/admin/UserDetail'))
 const AdminClients    = lazy(() => import('./pages/admin/Clients'))
 const ClientDetail    = lazy(() => import('./pages/admin/ClientDetail'))
+const AdminProjects   = lazy(() => import('./pages/admin/Projects'))
+const ProjectDetail   = lazy(() => import('./pages/admin/ProjectDetail'))
 const AdminInbox      = lazy(() => import('./pages/admin/Inbox'))
 const CreativeDashboard = lazy(() => import('./pages/creative/Dashboard'))
 const ClientDashboard = lazy(() => import('./pages/client/Dashboard'))
@@ -104,6 +106,12 @@ function AppRoutes() {
           } />
           <Route path="/admin/inbox" element={
             <ProtectedRoute roles={['admin']}><AdminInbox /></ProtectedRoute>
+          } />
+          <Route path="/projects" element={
+            <ProtectedRoute roles={['admin', 'creative']}><AdminProjects /></ProtectedRoute>
+          } />
+          <Route path="/projects/:id" element={
+            <ProtectedRoute roles={['admin', 'creative']}><ProjectDetail /></ProtectedRoute>
           } />
 
           {/* Creative */}

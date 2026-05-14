@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Film, CalendarDays, Settings,
-  LogOut, Users, Building2, Inbox, Home, PenLine, Upload, MessageSquare, Bell
+  LogOut, Users, Building2, Inbox, Home, PenLine, Upload, MessageSquare, Bell, FolderKanban
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useNotifications } from '../../contexts/NotificationContext'
@@ -12,6 +12,7 @@ const NAV = {
     { to: '/admin',         icon: LayoutDashboard, label: 'Overview', end: true },
     { to: '/admin/users',   icon: Users,           label: 'Users' },
     { to: '/admin/clients', icon: Building2,        label: 'Clients' },
+    { to: '/projects',      icon: FolderKanban,     label: 'Projects' },
     { to: '/admin/inbox',   icon: Inbox,            label: 'Inbox' },
     { to: '/videos',        icon: Film,             label: 'Review' },
     { to: '/calendar',      icon: CalendarDays,     label: 'Calendar' },
@@ -19,6 +20,7 @@ const NAV = {
   ],
   creative: [
     { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', end: true },
+    { to: '/projects',  icon: FolderKanban,    label: 'Projects' },
     { to: '/videos',    icon: Film,             label: 'Review' },
     { to: '/calendar',  icon: CalendarDays,     label: 'Calendar' },
     { to: '/messages',  icon: MessageSquare,    label: 'Messages' },
