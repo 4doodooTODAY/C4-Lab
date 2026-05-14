@@ -142,14 +142,23 @@ Deno.serve(async (req) => {
     if (action === 'invite_client') {
       const { contact_name, business, email, phone, created_by } = body
 
-      // 1. Create auth user via invite email
-      const { data, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+      // 1. Try to invite — if email already exists, fetch the existing user instead
+      let profileId: string
+      const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
         data: { full_name: contact_name, role: 'client', must_change_password: true },
         redirectTo: 'https://c4-lab.vercel.app/change-password',
       })
-      if (inviteError) throw inviteError
 
-      const profileId = data.user.id
+      if (inviteError) {
+        // Email already exists — look them up
+        const { data: listData, error: listError } = await supabaseAdmin.auth.admin.listUsers()
+        if (listError) throw new Error('Failed to invite user: ' + inviteError.message)
+        const existing = listData.users.find((u) => u.email === email)
+        if (!existing) throw new Error('Failed to invite user: ' + inviteError.message)
+        profileId = existing.id
+      } else {
+        profileId = inviteData.user.id
+      }
 
       // 2. Upsert profile record
       const { error: profileError } = await supabaseAdmin.from('profiles').upsert({
@@ -158,25 +167,25 @@ Deno.serve(async (req) => {
         role: 'client',
         must_change_password: true,
         phone,
-      })
-      if (profileError) throw profileError
+      }, { onConflict: 'id' })
+      if (profileError) throw new Error('Profile error: ' + profileError.message)
 
-      // 3. Insert clients record
+      // 3. Upsert clients record (in case client row already exists for this profile)
       const { data: clientData, error: clientError } = await supabaseAdmin
         .from('clients')
-        .insert([{
+        .upsert([{
           name: business,
           contact_name,
           email,
           phone,
           profile_id: profileId,
           created_by: created_by || null,
-        }])
+        }], { onConflict: 'profile_id' })
         .select()
         .single()
-      if (clientError) throw clientError
+      if (clientError) throw new Error('Client error: ' + clientError.message)
 
-      return new Response(JSON.stringify({ user: data.user, client: clientData }), {
+      return new Response(JSON.stringify({ user: { id: profileId, email }, client: clientData }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200,
       })
     }
