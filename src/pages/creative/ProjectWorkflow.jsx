@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
+import { uploadToR2 } from '../../lib/r2'
 import { updateProject } from '../../hooks/useProjects'
 import Avatar from '../../components/ui/Avatar'
 import { format, parseISO } from 'date-fns'
@@ -455,19 +456,17 @@ function UploadFootageSection({ project, uploads, onRefresh }) {
 
     try {
       for (const file of files) {
-        const path = `${project.id}/${Date.now()}-${file.name}`
-        const { error: storageErr } = await supabase.storage
-          .from('shoot-footage')
-          .upload(path, file, { upsert: true })
-        if (storageErr) throw storageErr
-
-        const { data: urlData } = supabase.storage
-          .from('shoot-footage')
-          .getPublicUrl(path)
+        const { publicUrl } = await uploadToR2({
+          file,
+          category: 'footage',
+          clientName: project.clients?.contact_name || project.clients?.name || 'no-client',
+          projectName: project.name,
+          onProgress: (pct) => setProgress((p) => ({ ...p, [file.name]: pct })),
+        })
 
         await supabase.from('shoot_uploads').insert({
           project_id:  project.id,
-          file_url:    urlData?.publicUrl || path,
+          file_url:    publicUrl,
           file_name:   file.name,
           file_size:   file.size,
           uploaded_by: profile.id,
@@ -737,20 +736,17 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
     setUploading(true)
     setUploadError('')
     try {
-      const path = `${project.id}/revision-${nextRevNum}-${Date.now()}.mp4`
-      const { error: storageErr } = await supabase.storage
-        .from('revision-videos')
-        .upload(path, revisionFile, { upsert: true })
-      if (storageErr) throw storageErr
-
-      const { data: urlData } = supabase.storage
-        .from('revision-videos')
-        .getPublicUrl(path)
+      const { publicUrl } = await uploadToR2({
+        file: revisionFile,
+        category: `revisions/revision-${nextRevNum}`,
+        clientName: project.clients?.contact_name || project.clients?.name || 'no-client',
+        projectName: project.name,
+      })
 
       await supabase.from('project_revisions').insert({
         project_id:      project.id,
         revision_number: nextRevNum,
-        video_url:       urlData?.publicUrl || path,
+        video_url:       publicUrl,
         status:          'pending_creative_review',
         uploaded_by:     profile.id,
       })

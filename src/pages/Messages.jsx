@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { uploadToR2 } from '../lib/r2'
 import { format, isToday, isYesterday, formatDistanceToNow } from 'date-fns'
 import Avatar from '../components/ui/Avatar'
 
@@ -457,13 +458,12 @@ export default function Messages() {
         profiles: { id: user.id, full_name: profile?.full_name, avatar_url: profile?.avatar_url },
       }])
       try {
-        const ext = file.name.split('.').pop()
-        const path = `${selectedId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-        const { error: upErr } = await supabase.storage
-          .from('message-images')
-          .upload(path, file, { contentType: file.type })
-        if (upErr) throw upErr
-        const { data: { publicUrl } } = supabase.storage.from('message-images').getPublicUrl(path)
+        const { publicUrl } = await uploadToR2({
+          file,
+          category: 'messages',
+          clientName: 'messages',
+          projectName: selectedId || 'general',
+        })
         const { data: msgData } = await supabase
           .from('messages')
           .insert({ conversation_id: selectedId, sender_id: user.id, content: '', image_url: publicUrl })
