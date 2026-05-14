@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Film, CalendarDays, Settings,
-  LogOut, Users, Building2, Inbox, Home, PenLine, Upload
+  LogOut, Users, Building2, Inbox, Home, PenLine, Upload, MessageSquare
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 
@@ -13,17 +13,20 @@ const NAV = {
     { to: '/admin/inbox',   icon: Inbox,            label: 'Inbox' },
     { to: '/videos',        icon: Film,             label: 'Review' },
     { to: '/calendar',      icon: CalendarDays,     label: 'Calendar' },
+    { to: '/messages',      icon: MessageSquare,    label: 'Messages' },
   ],
   creative: [
     { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', end: true },
     { to: '/videos',    icon: Film,             label: 'Review' },
     { to: '/calendar',  icon: CalendarDays,     label: 'Calendar' },
+    { to: '/messages',  icon: MessageSquare,    label: 'Messages' },
   ],
   client: [
-    { to: '/client',          icon: Home,        label: 'Home',     end: true },
-    { to: '/client/calendar', icon: CalendarDays, label: 'Calendar' },
-    { to: '/client/request',  icon: PenLine,     label: 'Request a Post' },
-    { to: '/client/upload',   icon: Upload,      label: 'Upload Footage' },
+    { to: '/client',          icon: Home,           label: 'Home',           end: true },
+    { to: '/client/calendar', icon: CalendarDays,   label: 'Calendar' },
+    { to: '/client/request',  icon: PenLine,        label: 'Request a Post' },
+    { to: '/client/upload',   icon: Upload,         label: 'Upload Footage' },
+    { to: '/messages',        icon: MessageSquare,  label: 'Messages' },
   ],
 }
 

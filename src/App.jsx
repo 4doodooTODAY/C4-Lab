@@ -21,6 +21,7 @@ const VideoList       = lazy(() => import('./pages/VideoList'))
 const VideoReview     = lazy(() => import('./pages/VideoReview'))
 const CalendarPage    = lazy(() => import('./pages/CalendarPage'))
 const Settings        = lazy(() => import('./pages/Settings'))
+const Messages        = lazy(() => import('./pages/Messages'))
 
 function PageLoader() {
   return (
@@ -131,6 +132,7 @@ function AppRoutes() {
             <ProtectedRoute roles={['admin', 'creative']}><CalendarPage /></ProtectedRoute>
           } />
 
+          <Route path="/messages" element={<Messages />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
