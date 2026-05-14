@@ -3,8 +3,10 @@ import { supabase } from '../lib/supabase'
 
 const PROJECT_SELECT = `
   id, name, type, status, stage,
-  start_date, due_date, budget, paid_amount, payment_status,
+  start_date, due_date, shoot_date, location,
+  budget, paid_amount, payment_status,
   notes, created_by, created_at,
+  creative_id, editor_id, revision_count,
   clients(id, name, contact_name),
   project_members(
     id, role,
