@@ -507,14 +507,26 @@ export default function Messages() {
 
   const startDM = async (otherProfileId) => {
     setDmError('')
+    console.log('[DM] calling RPC with', otherProfileId)
     const { data: convId, error } = await supabase.rpc('create_or_get_dm', { other_profile_id: otherProfileId })
-    if (error) { setDmError(error.message); return }
+    console.log('[DM] result:', { convId, error })
+    if (error) {
+      console.error('[DM] error:', error)
+      setDmError(error.message)
+      return
+    }
+    if (!convId) {
+      setDmError('No conversation ID returned — check browser console')
+      return
+    }
     setShowNewDM(false)
     const updated = await loadConversations(true)
-    if (convId) setSelectedId(convId)
+    console.log('[DM] conversations after reload:', updated?.length, 'looking for:', convId)
+    setSelectedId(convId)
     if (!updated?.some((c) => c.id === convId)) {
+      console.warn('[DM] conv not in list yet, reloading...')
       await loadConversations(false)
-      if (convId) setSelectedId(convId)
+      setSelectedId(convId)
     }
   }
 
