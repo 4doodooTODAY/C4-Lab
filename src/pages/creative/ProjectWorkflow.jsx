@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
+import { updateProject } from '../../hooks/useProjects'
 import Avatar from '../../components/ui/Avatar'
 import { format, parseISO } from 'date-fns'
 
@@ -127,7 +128,7 @@ function CreativeShooterView({ project, uploads, shootNotes, revisions, onRefres
   const handleMarkDone = async () => {
     setMarkingDone(true)
     try {
-      await supabase.from('projects').update({ stage: 'post_production' }).eq('id', project.id)
+      await updateProject(project.id, { stage: 'post_production' })
       onRefresh()
     } catch (err) {
       setUploadError(err.message)
@@ -388,11 +389,8 @@ function EditorView({ project, uploads, shootNotes, revisions, onRefresh }) {
         uploaded_by:     profile.id,
       })
 
-      // Update project stage
-      const newStage = nextRevNum === 1 ? 'review' : 'revisions'
-      await supabase.from('projects')
-        .update({ stage: newStage, revision_count: nextRevNum })
-        .eq('id', project.id)
+      // Update project stage — advance to review when editor uploads a revision
+      await updateProject(project.id, { stage: 'review', revision_count: nextRevNum })
 
       setRevisionFile(null)
       onRefresh()

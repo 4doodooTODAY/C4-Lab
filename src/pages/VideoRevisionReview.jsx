@@ -283,7 +283,7 @@ export default function VideoRevisionReview() {
         .update({ status: 'pending_editor' })
         .eq('id', revisionId)
       await supabase.from('projects')
-        .update({ stage: 'revisions' })
+        .update({ stage: 'post_production' })
         .eq('id', project.id)
       fetchAll()
     } catch (err) {

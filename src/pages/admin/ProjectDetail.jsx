@@ -3,37 +3,34 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   ArrowLeft, Loader2, Check, Trash2, X, Plus, UserMinus,
   CalendarDays, MessageSquare, Film, StickyNote,
-  AlertCircle, Clock, MapPin, Upload, FileVideo, Eye,
-  Camera, Scissors
+  AlertCircle, MapPin, Upload, FileVideo, Eye,
+  Camera, Scissors, Pencil
 } from 'lucide-react'
 import { useProject, updateProject, addMember, removeMember } from '../../hooks/useProjects'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import Avatar from '../../components/ui/Avatar'
-import {
-  format, differenceInDays, isBefore, startOfDay, parseISO
-} from 'date-fns'
+import { format, parseISO } from 'date-fns'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const STAGES = [
-  { key: 'briefing',        label: 'Planning' },
-  { key: 'pre_production',  label: 'Planning' },
-  { key: 'production',      label: 'Shooting' },
-  { key: 'post_production', label: 'Editing' },
-  { key: 'review',          label: 'Rev 1 Review' },
-  { key: 'revisions',       label: 'Rev 2 Review' },
-  { key: 'delivered',       label: 'Delivered' },
-]
-
-// Deduplicated display stages for the progress bar
 const DISPLAY_STAGES = [
   { key: 'briefing',        label: 'Planning' },
   { key: 'production',      label: 'Shooting' },
   { key: 'post_production', label: 'Editing' },
-  { key: 'review',          label: 'Rev 1 Review' },
-  { key: 'revisions',       label: 'Rev 2+ Review' },
+  { key: 'review',          label: 'In Review' },
+  { key: 'revisions',       label: 'Revisions' },
   { key: 'delivered',       label: 'Delivered' },
 ]
+
+const STAGE_CURRENT_LABELS = {
+  briefing:        'Planning & Briefing',
+  pre_production:  'Pre-Production',
+  production:      'Shooting',
+  post_production: 'Editing',
+  review:          'In Review',
+  revisions:       'Revisions',
+  delivered:       'Delivered',
+}
 
 const TYPE_LABELS = {
   photography:     'Photography',
@@ -63,18 +60,6 @@ const STATUS_LABELS = {
   on_hold:   'On Hold',
   completed: 'Completed',
   archived:  'Archived',
-}
-
-const PAYMENT_COLORS = {
-  unpaid:       'bg-red-50 text-red-700',
-  deposit_paid: 'bg-amber-50 text-amber-700',
-  paid:         'bg-green-50 text-green-700',
-}
-
-const PAYMENT_LABELS = {
-  unpaid:       'Unpaid',
-  deposit_paid: 'Deposit Paid',
-  paid:         'Paid',
 }
 
 const MEMBER_ROLE_LABELS = {
@@ -107,15 +92,91 @@ const REVISION_STATUS_COLORS = {
   approved:                'bg-green-50 text-green-700',
 }
 
-function fmt$(n) {
-  if (n == null) return '—'
-  return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
-}
-
 function fmtBytes(bytes) {
   if (!bytes) return '—'
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+}
+
+// ── Inline Editable Field ─────────────────────────────────────────────────────
+function InlineField({ label, value, displayValue, type = 'text', onSave, icon: Icon, readOnly = false }) {
+  const [editing, setEditing]   = useState(false)
+  const [draft, setDraft]       = useState(value || '')
+  const [saving, setSaving]     = useState(false)
+
+  const handleEdit = () => {
+    if (readOnly) return
+    setDraft(value || '')
+    setEditing(true)
+  }
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      await onSave(draft)
+    } finally {
+      setSaving(false)
+      setEditing(false)
+    }
+  }
+
+  const handleCancel = () => {
+    setDraft(value || '')
+    setEditing(false)
+  }
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') handleSave()
+    if (e.key === 'Escape') handleCancel()
+  }
+
+  return (
+    <div className="group">
+      <p className="text-xs text-text-muted mb-1 flex items-center gap-1">
+        {Icon && <Icon size={11} />} {label}
+      </p>
+      {editing ? (
+        <div className="flex items-center gap-2">
+          <input
+            type={type}
+            className="input flex-1 text-sm py-1"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={handleKeyDown}
+            autoFocus
+          />
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="w-7 h-7 rounded-lg bg-accent text-white flex items-center justify-center shrink-0 hover:bg-accent/90 disabled:opacity-50"
+          >
+            {saving ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />}
+          </button>
+          <button
+            onClick={handleCancel}
+            className="w-7 h-7 rounded-lg border border-border text-text-muted flex items-center justify-center shrink-0 hover:bg-surface-2"
+          >
+            <X size={11} />
+          </button>
+        </div>
+      ) : (
+        <div
+          className={`flex items-center gap-2 ${readOnly ? '' : 'cursor-pointer'}`}
+          onClick={handleEdit}
+        >
+          <span className={`text-sm font-medium flex-1 ${displayValue ? 'text-text-primary' : 'text-text-muted/60 italic'}`}>
+            {displayValue || '— Add —'}
+          </span>
+          {!readOnly && (
+            <Pencil
+              size={12}
+              className="text-text-muted opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+            />
+          )}
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ── Add Member Modal ──────────────────────────────────────────────────────────
@@ -207,151 +268,13 @@ function AddMemberModal({ projectId, existingIds, onClose, onAdded }) {
   )
 }
 
-// ── Edit Project Modal ────────────────────────────────────────────────────────
-function EditProjectModal({ project, onClose, onSaved }) {
-  const [clients, setClients]   = useState([])
-  const [creatives, setCreatives] = useState([])
-  const [form, setForm] = useState({
-    name:        project.name || '',
-    type:        project.type || '',
-    client_id:   project.client_id || '',
-    location:    project.location || '',
-    shoot_date:  project.shoot_date || '',
-    start_date:  project.start_date || '',
-    due_date:    project.due_date || '',
-    creative_id: project.creative_id || '',
-    editor_id:   project.editor_id || '',
-  })
-  const [saving, setSaving] = useState(false)
-  const [error, setError]   = useState('')
-
-  useEffect(() => {
-    supabase.from('clients').select('id, name, contact_name').order('name')
-      .then(({ data }) => setClients(data || []))
-    supabase.from('profiles').select('id, full_name, role').in('role', ['admin', 'creative']).order('full_name')
-      .then(({ data }) => setCreatives(data || []))
-  }, [])
-
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
-
-  const handleSave = async (e) => {
-    e.preventDefault()
-    if (!form.name.trim()) return
-    setSaving(true)
-    setError('')
-    try {
-      await updateProject(project.id, {
-        name:        form.name.trim(),
-        type:        form.type || null,
-        client_id:   form.client_id || null,
-        location:    form.location || null,
-        shoot_date:  form.shoot_date || null,
-        start_date:  form.start_date || null,
-        due_date:    form.due_date || null,
-        creative_id: form.creative_id || null,
-        editor_id:   form.editor_id || null,
-      })
-      onSaved()
-      onClose()
-    } catch (err) {
-      setError(err.message)
-      setSaving(false)
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 z-10 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-base font-semibold text-text-primary">Edit Project</h2>
-          <button onClick={onClose} className="btn-ghost p-1.5"><X size={16} /></button>
-        </div>
-
-        <form onSubmit={handleSave} className="space-y-3">
-          <div>
-            <label className="label">Project Name *</label>
-            <input type="text" className="input" value={form.name} onChange={set('name')} required />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">Type</label>
-              <select className="input" value={form.type} onChange={set('type')}>
-                <option value="">— None —</option>
-                {Object.entries(TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="label">Client</label>
-              <select className="input" value={form.client_id} onChange={set('client_id')}>
-                <option value="">— No client —</option>
-                {clients.map((c) => <option key={c.id} value={c.id}>{c.contact_name || c.name}</option>)}
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="label">Location</label>
-            <input type="text" className="input" placeholder="e.g. Studio A, Downtown LA" value={form.location} onChange={set('location')} />
-          </div>
-
-          <div>
-            <label className="label">Shoot Date</label>
-            <input type="date" className="input" value={form.shoot_date} onChange={set('shoot_date')} />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">Start Date</label>
-              <input type="date" className="input" value={form.start_date} onChange={set('start_date')} />
-            </div>
-            <div>
-              <label className="label">Due Date</label>
-              <input type="date" className="input" value={form.due_date} onChange={set('due_date')} />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">Creative (Shooter)</label>
-              <select className="input" value={form.creative_id} onChange={set('creative_id')}>
-                <option value="">— Unassigned —</option>
-                {creatives.map((c) => <option key={c.id} value={c.id}>{c.full_name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="label">Editor</label>
-              <select className="input" value={form.editor_id} onChange={set('editor_id')}>
-                <option value="">— Unassigned —</option>
-                {creatives.map((c) => <option key={c.id} value={c.id}>{c.full_name}</option>)}
-              </select>
-            </div>
-          </div>
-
-          {error && <p className="text-xs text-red-500 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p>}
-
-          <div className="flex gap-2 justify-end pt-1">
-            <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
-            <button type="submit" disabled={saving} className="btn-primary disabled:opacity-50 flex items-center gap-1.5">
-              {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-              Save Changes
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
-}
-
 // ── Stage Progress Bar ────────────────────────────────────────────────────────
 function StageBar({ currentStage, isAdmin, onStageClick }) {
   const currentIdx = DISPLAY_STAGES.findIndex((s) => s.key === currentStage)
-  // For planning stages (briefing, pre_production), map to index 0
   const effectiveIdx = currentStage === 'pre_production' ? 0 : currentIdx
 
   return (
-    <div className="bg-white rounded-2xl border border-border p-5 mb-6">
+    <div className="bg-white rounded-2xl border border-border p-5 mb-4">
       <p className="text-xs font-semibold text-text-muted mb-3 uppercase tracking-wide">Stage Progress</p>
       <div className="flex items-center gap-0">
         {DISPLAY_STAGES.map((s, i) => {
@@ -388,6 +311,12 @@ function StageBar({ currentStage, isAdmin, onStageClick }) {
           )
         })}
       </div>
+      <div className="mt-3 flex items-center justify-between">
+        <p className="text-xs text-text-primary font-medium">
+          Current: <span className="text-accent">{STAGE_CURRENT_LABELS[currentStage] || currentStage}</span>
+        </p>
+        <p className="text-xs text-text-muted">Stage advances automatically as the team completes work.</p>
+      </div>
     </div>
   )
 }
@@ -400,9 +329,6 @@ export default function ProjectDetail() {
   const isAdmin = profile?.role === 'admin'
 
   const { project, loading, error: loadError, refetch } = useProject(id)
-
-  // Edit modal
-  const [showEdit, setShowEdit] = useState(false)
 
   // Notes
   const [notes, setNotes]               = useState('')
@@ -573,6 +499,12 @@ export default function ProjectDetail() {
     }
   }
 
+  // Inline field save handlers
+  const handleSaveField = async (field, value) => {
+    await updateProject(id, { [field]: value || null })
+    refetch()
+  }
+
   if (loading) return (
     <div className="flex justify-center py-24">
       <Loader2 size={22} className="animate-spin text-text-muted" />
@@ -588,13 +520,7 @@ export default function ProjectDetail() {
     </div>
   )
 
-  const members   = project.project_members || []
-  const today     = startOfDay(new Date())
-  const dueDate   = project.due_date ? parseISO(project.due_date) : null
-  const startDate = project.start_date ? parseISO(project.start_date) : null
-  const shootDate = project.shoot_date ? parseISO(project.shoot_date) : null
-  const isOD      = dueDate && isBefore(dueDate, today)
-  const daysLeft  = dueDate ? differenceInDays(dueDate, today) : null
+  const members = project.project_members || []
 
   return (
     <div className="p-8 max-w-5xl">
@@ -626,18 +552,8 @@ export default function ProjectDetail() {
                 {STATUS_LABELS[status] || status}
               </span>
             )}
-            {project.clients && (
-              <span className="text-xs text-text-muted">
-                {project.clients.contact_name || project.clients.name}
-              </span>
-            )}
           </div>
         </div>
-        {isAdmin && (
-          <button onClick={() => setShowEdit(true)} className="btn-secondary shrink-0">
-            Edit Project
-          </button>
-        )}
       </div>
 
       {actionError && (
@@ -647,55 +563,80 @@ export default function ProjectDetail() {
       {/* Stage progress */}
       <StageBar currentStage={project.stage} isAdmin={isAdmin} onStageClick={handleStageClick} />
 
-      {/* Project info grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <div className="bg-white rounded-2xl border border-border p-4">
-          <p className="text-xs text-text-muted mb-1 flex items-center gap-1"><CalendarDays size={11} /> Shoot Date</p>
-          <p className="text-sm font-semibold text-text-primary">
-            {shootDate ? format(shootDate, 'MMM d, yyyy') : '—'}
-          </p>
-        </div>
-        <div className="bg-white rounded-2xl border border-border p-4">
-          <p className="text-xs text-text-muted mb-1 flex items-center gap-1"><MapPin size={11} /> Location</p>
-          <p className="text-sm font-semibold text-text-primary truncate" title={project.location}>
-            {project.location || '—'}
-          </p>
-        </div>
-        <div className="bg-white rounded-2xl border border-border p-4">
-          <p className="text-xs text-text-muted mb-1 flex items-center gap-1">
-            {isOD ? <AlertCircle size={11} className="text-red-500" /> : <CalendarDays size={11} />} Due Date
-          </p>
-          <p className={`text-sm font-semibold ${isOD ? 'text-red-600' : 'text-text-primary'}`}>
-            {dueDate ? format(dueDate, 'MMM d, yyyy') : '—'}
-          </p>
+      {/* Project info — inline editable */}
+      <div className="bg-white rounded-2xl border border-border p-5 mb-6">
+        <p className="text-xs font-semibold text-text-muted mb-4 uppercase tracking-wide">Project Details</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <InlineField
+            label="Shoot Date"
+            icon={CalendarDays}
+            type="date"
+            value={project.shoot_date || ''}
+            displayValue={project.shoot_date ? format(parseISO(project.shoot_date), 'MMM d, yyyy') : ''}
+            onSave={(v) => handleSaveField('shoot_date', v)}
+            readOnly={!isAdmin}
+          />
+          <InlineField
+            label="Location"
+            icon={MapPin}
+            value={project.location || ''}
+            displayValue={project.location || ''}
+            onSave={(v) => handleSaveField('location', v)}
+            readOnly={!isAdmin}
+          />
+          <InlineField
+            label="Due Date"
+            icon={CalendarDays}
+            type="date"
+            value={project.due_date || ''}
+            displayValue={project.due_date ? format(parseISO(project.due_date), 'MMM d, yyyy') : ''}
+            onSave={(v) => handleSaveField('due_date', v)}
+            readOnly={!isAdmin}
+          />
+          <div>
+            <p className="text-xs text-text-muted mb-1">Client</p>
+            <p className="text-sm font-medium text-text-primary">
+              {project.clients ? (project.clients.contact_name || project.clients.name) : <span className="text-text-muted/60 italic">— None —</span>}
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Assigned creative + editor */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-        <div className="bg-white rounded-2xl border border-border p-4">
-          <p className="text-xs text-text-muted mb-3 flex items-center gap-1"><Camera size={11} /> Assigned Creative</p>
-          {creativeProfile ? (
-            <div className="flex items-center gap-3">
-              <Avatar name={creativeProfile.full_name} url={creativeProfile.avatar_url} size={9} />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-text-primary">{creativeProfile.full_name}</p>
-                <p className="text-xs text-text-muted">Photographer / Videographer</p>
-              </div>
-              {isAdmin && !showCreativeSelect && (
-                <button
-                  onClick={() => { setShowCreativeSelect(true); setSelectedCreative('') }}
-                  className="text-xs text-accent hover:text-accent/80 font-medium shrink-0"
-                >
-                  Change
-                </button>
-              )}
+      {/* Assigned Team */}
+      <div className="bg-white rounded-2xl border border-border p-5 mb-6">
+        <p className="text-xs font-semibold text-text-muted mb-4 uppercase tracking-wide">Assigned Team</p>
+        <div className="space-y-4">
+
+          {/* Creative row */}
+          <div className="flex items-center gap-3">
+            <div className="w-6 flex items-center justify-center shrink-0">
+              <Camera size={13} className="text-text-muted" />
             </div>
-          ) : (
-            <p className="text-sm text-text-muted">Not assigned</p>
-          )}
-          {isAdmin && (showCreativeSelect || !creativeProfile) && (
-            <div className={`flex items-center gap-2 ${creativeProfile ? 'mt-3' : ''}`}>
+            <span className="text-xs text-text-muted w-14 shrink-0">Creative</span>
+            {creativeProfile ? (
+              <div className="flex items-center gap-3 flex-1">
+                <Avatar name={creativeProfile.full_name} url={creativeProfile.avatar_url} size={8} />
+                <p className="text-sm font-medium text-text-primary flex-1">{creativeProfile.full_name}</p>
+                {isAdmin && !showCreativeSelect && (
+                  <button
+                    onClick={() => { setShowCreativeSelect(true); setSelectedCreative('') }}
+                    className="text-xs text-accent hover:text-accent/80 font-medium shrink-0"
+                  >
+                    Change
+                  </button>
+                )}
+              </div>
+            ) : (
+              <button
+                onClick={() => isAdmin && setShowCreativeSelect(true)}
+                className={`text-sm flex-1 text-left ${isAdmin ? 'text-text-muted/60 italic hover:text-accent transition-colors cursor-pointer' : 'text-text-muted/60 italic'}`}
+              >
+                Unassigned — {isAdmin ? 'click to assign' : 'not yet assigned'}
+              </button>
+            )}
+          </div>
+          {isAdmin && (showCreativeSelect || (!creativeProfile && showCreativeSelect)) && (
+            <div className="flex items-center gap-2 ml-10">
               <select
                 className="input flex-1 text-sm"
                 value={selectedCreative}
@@ -714,37 +655,44 @@ export default function ProjectDetail() {
                 {assigningCreative ? <Loader2 size={12} className="animate-spin" /> : null}
                 Assign
               </button>
-              {showCreativeSelect && (
-                <button onClick={() => setShowCreativeSelect(false)} className="btn-ghost p-1.5 shrink-0">
-                  <X size={14} />
-                </button>
-              )}
+              <button onClick={() => setShowCreativeSelect(false)} className="btn-ghost p-1.5 shrink-0">
+                <X size={14} />
+              </button>
             </div>
           )}
-        </div>
-        <div className="bg-white rounded-2xl border border-border p-4">
-          <p className="text-xs text-text-muted mb-3 flex items-center gap-1"><Scissors size={11} /> Assigned Editor</p>
-          {editorProfile ? (
-            <div className="flex items-center gap-3">
-              <Avatar name={editorProfile.full_name} url={editorProfile.avatar_url} size={9} />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-text-primary">{editorProfile.full_name}</p>
-                <p className="text-xs text-text-muted">Editor</p>
+
+          <div className="border-t border-border" />
+
+          {/* Editor row */}
+          <div className="flex items-center gap-3">
+            <div className="w-6 flex items-center justify-center shrink-0">
+              <Scissors size={13} className="text-text-muted" />
+            </div>
+            <span className="text-xs text-text-muted w-14 shrink-0">Editor</span>
+            {editorProfile ? (
+              <div className="flex items-center gap-3 flex-1">
+                <Avatar name={editorProfile.full_name} url={editorProfile.avatar_url} size={8} />
+                <p className="text-sm font-medium text-text-primary flex-1">{editorProfile.full_name}</p>
+                {isAdmin && !showEditorSelect && (
+                  <button
+                    onClick={() => { setShowEditorSelect(true); setSelectedEditor('') }}
+                    className="text-xs text-accent hover:text-accent/80 font-medium shrink-0"
+                  >
+                    Change
+                  </button>
+                )}
               </div>
-              {isAdmin && !showEditorSelect && (
-                <button
-                  onClick={() => { setShowEditorSelect(true); setSelectedEditor('') }}
-                  className="text-xs text-accent hover:text-accent/80 font-medium shrink-0"
-                >
-                  Change
-                </button>
-              )}
-            </div>
-          ) : (
-            <p className="text-sm text-text-muted">Not assigned</p>
-          )}
-          {isAdmin && (showEditorSelect || !editorProfile) && (
-            <div className={`flex items-center gap-2 ${editorProfile ? 'mt-3' : ''}`}>
+            ) : (
+              <button
+                onClick={() => isAdmin && setShowEditorSelect(true)}
+                className={`text-sm flex-1 text-left ${isAdmin ? 'text-text-muted/60 italic hover:text-accent transition-colors cursor-pointer' : 'text-text-muted/60 italic'}`}
+              >
+                Unassigned — {isAdmin ? 'click to assign' : 'not yet assigned'}
+              </button>
+            )}
+          </div>
+          {isAdmin && showEditorSelect && (
+            <div className="flex items-center gap-2 ml-10">
               <select
                 className="input flex-1 text-sm"
                 value={selectedEditor}
@@ -763,11 +711,9 @@ export default function ProjectDetail() {
                 {assigningEditor ? <Loader2 size={12} className="animate-spin" /> : null}
                 Assign
               </button>
-              {showEditorSelect && (
-                <button onClick={() => setShowEditorSelect(false)} className="btn-ghost p-1.5 shrink-0">
-                  <X size={14} />
-                </button>
-              )}
+              <button onClick={() => setShowEditorSelect(false)} className="btn-ghost p-1.5 shrink-0">
+                <X size={14} />
+              </button>
             </div>
           )}
         </div>
@@ -834,9 +780,12 @@ export default function ProjectDetail() {
 
           {/* Revisions */}
           <div className="bg-white rounded-2xl border border-border p-5">
-            <h2 className="text-sm font-semibold text-text-primary mb-4 flex items-center gap-2">
-              <FileVideo size={14} className="text-text-muted" /> Revisions
-            </h2>
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+                <FileVideo size={14} className="text-text-muted" /> Revisions
+              </h2>
+            </div>
+            <p className="text-xs text-text-muted mb-4">Client can approve at any revision — up to 3 total.</p>
             {loadingExtras ? (
               <Loader2 size={16} className="animate-spin text-text-muted" />
             ) : revisions.length === 0 ? (
@@ -909,68 +858,10 @@ export default function ProjectDetail() {
               </div>
             )}
           </div>
-
-          {/* Internal Notes card */}
-          <div className="bg-white rounded-2xl border border-border p-5">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold text-text-primary">Internal Notes</h2>
-              <span className="text-xs text-text-muted flex items-center gap-1"><StickyNote size={11} /> Admin only</span>
-            </div>
-            <textarea
-              className="input w-full min-h-[100px] resize-y"
-              placeholder="Project notes, context, reminders…"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              onBlur={handleSaveNotes}
-            />
-            <button
-              onClick={handleSaveNotes}
-              disabled={notesSaving}
-              className="btn-primary flex items-center gap-1.5 disabled:opacity-50 mt-3"
-            >
-              {notesSaving ? <Loader2 size={13} className="animate-spin" /> : notesSaved ? <Check size={13} /> : null}
-              {notesSaved ? 'Saved!' : 'Save Notes'}
-            </button>
-          </div>
         </div>
 
         {/* Right column */}
         <div className="space-y-5">
-          {/* Timeline card */}
-          <div className="bg-white rounded-2xl border border-border p-5">
-            <h2 className="text-sm font-semibold text-text-primary mb-4 flex items-center gap-1.5">
-              <Clock size={14} /> Timeline
-            </h2>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-text-muted">Start</span>
-                <span className="font-medium text-text-primary">
-                  {startDate ? format(startDate, 'MMM d, yyyy') : '—'}
-                </span>
-              </div>
-              {shootDate && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-text-muted">Shoot</span>
-                  <span className="font-medium text-text-primary">{format(shootDate, 'MMM d, yyyy')}</span>
-                </div>
-              )}
-              <div className="flex justify-between text-sm">
-                <span className="text-text-muted">Due</span>
-                <span className={`font-medium ${isOD ? 'text-red-600' : 'text-text-primary'}`}>
-                  {dueDate ? format(dueDate, 'MMM d, yyyy') : '—'}
-                </span>
-              </div>
-              {daysLeft != null && (
-                <div className="flex justify-between text-sm border-t border-border pt-2">
-                  <span className="text-text-muted">{isOD ? 'Overdue by' : 'Days left'}</span>
-                  <span className={`font-semibold ${isOD ? 'text-red-600' : daysLeft <= 7 ? 'text-amber-600' : 'text-text-primary'}`}>
-                    {Math.abs(daysLeft)} day{Math.abs(daysLeft) !== 1 ? 's' : ''}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-
           {/* Quick links */}
           <div className="bg-white rounded-2xl border border-border p-5">
             <h2 className="text-sm font-semibold text-text-primary mb-3">Quick Links</h2>
@@ -994,6 +885,29 @@ export default function ProjectDetail() {
                 <Camera size={14} /> Workflow View
               </Link>
             </div>
+          </div>
+
+          {/* Internal Notes */}
+          <div className="bg-white rounded-2xl border border-border p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold text-text-primary">Internal Notes</h2>
+              <span className="text-xs text-text-muted flex items-center gap-1"><StickyNote size={11} /> Admin only</span>
+            </div>
+            <textarea
+              className="input w-full min-h-[100px] resize-y"
+              placeholder="Project notes, context, reminders…"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              onBlur={handleSaveNotes}
+            />
+            <button
+              onClick={handleSaveNotes}
+              disabled={notesSaving}
+              className="btn-primary flex items-center gap-1.5 disabled:opacity-50 mt-3"
+            >
+              {notesSaving ? <Loader2 size={13} className="animate-spin" /> : notesSaved ? <Check size={13} /> : null}
+              {notesSaved ? 'Saved!' : 'Save Notes'}
+            </button>
           </div>
         </div>
       </div>
@@ -1072,14 +986,6 @@ export default function ProjectDetail() {
           existingIds={members.map((m) => m.profiles?.id).filter(Boolean)}
           onClose={() => setShowAdd(false)}
           onAdded={refetch}
-        />
-      )}
-
-      {showEdit && (
-        <EditProjectModal
-          project={project}
-          onClose={() => setShowEdit(false)}
-          onSaved={refetch}
         />
       )}
     </div>
