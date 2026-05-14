@@ -11,16 +11,6 @@ export const supabase = createClient(
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
-      storageKey: 'c4lab-auth',
-    },
-    global: {
-      headers: { 'x-application-name': 'c4-lab' },
-    },
-    db: {
-      schema: 'public',
-    },
-    realtime: {
-      params: { eventsPerSecond: 10 },
     },
   }
 )

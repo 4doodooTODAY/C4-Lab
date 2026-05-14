@@ -20,12 +20,13 @@ import RequestPost from './pages/client/RequestPost'
 import UploadFootage from './pages/client/UploadFootage'
 
 function RoleRedirect() {
-  const { profile } = useAuth()
-  if (!profile) return null
+  const { profile, loading } = useAuth()
+  if (loading) return null
+  if (!profile) return <Navigate to="/login" replace />
   if (profile.role === 'admin') return <Navigate to="/admin" replace />
   if (profile.role === 'creative') return <Navigate to="/dashboard" replace />
   if (profile.role === 'client') return <Navigate to="/client" replace />
-  return <Navigate to="/dashboard" replace />
+  return <Navigate to="/login" replace />
 }
 
 function ProtectedRoute({ children, roles }) {
