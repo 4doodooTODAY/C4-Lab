@@ -31,12 +31,23 @@ export default function ChangePassword() {
     setLoading(true)
     setError('')
 
-    const { error: updateError } = await supabase.auth.updateUser({ password })
-    if (updateError) { setError(updateError.message); setLoading(false); return }
+    try {
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Request timed out — please try again')), 10000)
+      )
 
-    await supabase.from('profiles').update({ must_change_password: false }).eq('id', user.id)
+      const update = supabase.auth.updateUser({ password })
+      const { error: updateError } = await Promise.race([update, timeout])
+      if (updateError) { setError(updateError.message); setLoading(false); return }
 
-    navigate('/')
+      // Fire and forget — don't block navigation on this
+      supabase.from('profiles').update({ must_change_password: false }).eq('id', user.id).then(() => {})
+
+      navigate('/')
+    } catch (err) {
+      setError(err.message)
+      setLoading(false)
+    }
   }
 
   return (
