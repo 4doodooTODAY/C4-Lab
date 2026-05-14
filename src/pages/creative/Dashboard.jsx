@@ -14,8 +14,8 @@ export default function CreativeDashboard() {
   useEffect(() => {
     async function load() {
       const [{ data: proj }, { data: media }] = await Promise.all([
-        supabase.from('projects').select('*, clients(name)').order('created_at', { ascending: false }).limit(6),
-        supabase.from('media').select('*, projects(title)').order('created_at', { ascending: false }).limit(4),
+        supabase.from('projects').select('id, title, status, created_at, clients(name)').order('created_at', { ascending: false }).limit(6),
+        supabase.from('media').select('id, title, status, created_at, projects(title)').order('created_at', { ascending: false }).limit(4),
       ])
       setProjects(proj || [])
       setRecentMedia(media || [])

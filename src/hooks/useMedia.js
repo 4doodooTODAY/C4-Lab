@@ -38,7 +38,7 @@ export function useMedia(projectId) {
     setLoading(true)
     const { data, error } = await supabase
       .from('media')
-      .select('*')
+      .select('id, title, description, media_url, media_type, status, created_at, project_id')
       .eq('project_id', projectId)
       .order('created_at', { ascending: false })
     if (error) setError(error.message)
@@ -51,15 +51,8 @@ export function useMedia(projectId) {
   const addMedia = async ({ title, description, media_url, media_type = 'video' }) => {
     const { data, error } = await supabase
       .from('media')
-      .insert([{
-        title,
-        description,
-        media_url,
-        media_type,
-        project_id: projectId,
-        uploaded_by: user.id,
-      }])
-      .select()
+      .insert([{ title, description, media_url, media_type, project_id: projectId, uploaded_by: user.id }])
+      .select('id, title, description, media_url, media_type, status, created_at, project_id')
       .single()
     if (error) throw error
     setMedia((prev) => [data, ...prev])
@@ -72,7 +65,7 @@ export function useMedia(projectId) {
     if (error) throw error
     if (item && isStorageUrl(item.media_url)) {
       const path = storagePathFromUrl(item.media_url)
-      if (path) await supabase.storage.from(STORAGE_BUCKET).remove([path])
+      if (path) supabase.storage.from(STORAGE_BUCKET).remove([path]) // fire and forget
     }
     setMedia((prev) => prev.filter((m) => m.id !== id))
   }
@@ -87,10 +80,9 @@ export function useMediaItem(id) {
 
   useEffect(() => {
     if (!id) return
-    setLoading(true)
     supabase
       .from('media')
-      .select('*')
+      .select('id, title, description, media_url, media_type, status, created_at, project_id')
       .eq('id', id)
       .single()
       .then(({ data, error }) => {

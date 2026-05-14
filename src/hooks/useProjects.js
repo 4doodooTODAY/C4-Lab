@@ -13,31 +13,27 @@ export function useProjects() {
     setLoading(true)
     const { data, error } = await supabase
       .from('projects')
-      .select('*, clients(name)')
+      .select('id, title, status, created_at, client_id, clients(name)')
       .order('created_at', { ascending: false })
     if (error) setError(error.message)
     else setProjects(data || [])
     setLoading(false)
   }, [user])
 
-  useEffect(() => {
-    fetchProjects()
-  }, [fetchProjects])
+  useEffect(() => { fetchProjects() }, [fetchProjects])
 
-  // Creates a client + project in one call, keeping the UI simple
   const addProject = async (title) => {
-    // Auto-create a client with the same name as the project
     const { data: client, error: clientError } = await supabase
       .from('clients')
       .insert([{ name: title, created_by: user.id }])
-      .select()
+      .select('id, name')
       .single()
     if (clientError) throw clientError
 
     const { data: project, error: projectError } = await supabase
       .from('projects')
       .insert([{ title, client_id: client.id, created_by: user.id }])
-      .select('*, clients(name)')
+      .select('id, title, status, created_at, client_id, clients(name)')
       .single()
     if (projectError) throw projectError
 

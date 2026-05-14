@@ -11,11 +11,7 @@ export function useContentRequests() {
     setLoading(true)
     const { data, error } = await supabase
       .from('content_requests')
-      .select(`
-        *,
-        profiles (id, full_name, role, avatar_url),
-        clients (id, name)
-      `)
+      .select('id, type, idea, platform, priority, notes, inspiration_url, status, created_at, file_url, file_name, file_size, profiles(id, full_name), clients(id, name)')
       .order('created_at', { ascending: false })
     if (error) setError(error.message)
     else setRequests(data || [])
@@ -45,7 +41,7 @@ export function useClientRequests() {
     if (!user) return
     supabase
       .from('content_requests')
-      .select('*')
+      .select('id, type, idea, platform, priority, status, created_at')
       .eq('submitted_by', user.id)
       .order('created_at', { ascending: false })
       .then(({ data }) => {
@@ -58,7 +54,7 @@ export function useClientRequests() {
     const { data, error } = await supabase
       .from('content_requests')
       .insert([{ type, idea, platform, priority, notes, client_id, inspiration_url, submitted_by: user.id, status: 'new' }])
-      .select()
+      .select('id, type, idea, platform, priority, status, created_at')
       .single()
     if (error) throw error
     setRequests((prev) => [data, ...prev])
@@ -69,7 +65,7 @@ export function useClientRequests() {
     const { data, error } = await supabase
       .from('content_requests')
       .insert([{ type: 'footage', idea: title, notes, client_id, file_url, file_name, file_size, submitted_by: user.id, status: 'new' }])
-      .select()
+      .select('id, type, idea, status, created_at')
       .single()
     if (error) throw error
     setRequests((prev) => [data, ...prev])

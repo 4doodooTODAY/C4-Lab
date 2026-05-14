@@ -22,7 +22,7 @@ export default function AdminDashboard() {
         supabase.from('profiles').select('*', { count: 'exact', head: true }),
         supabase.from('projects').select('*', { count: 'exact', head: true }),
         supabase.from('media').select('*', { count: 'exact', head: true }),
-        supabase.from('projects').select('*, clients(name)').order('created_at', { ascending: false }).limit(5),
+        supabase.from('projects').select('id, title, status, created_at, clients(name)').order('created_at', { ascending: false }).limit(5),
       ])
       setStats({ userCount, projectCount, mediaCount })
       setProjects(recentProjects || [])

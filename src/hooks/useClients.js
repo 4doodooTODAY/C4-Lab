@@ -10,16 +10,9 @@ export function useClients() {
 
   const fetchClients = useCallback(async () => {
     setLoading(true)
-    // Fetch client companies with their assigned creatives
     const { data, error } = await supabase
       .from('clients')
-      .select(`
-        *,
-        client_access (
-          profile_id,
-          profiles (id, full_name, role, avatar_url)
-        )
-      `)
+      .select('id, name, created_at, client_access(profile_id, profiles(id, full_name, role))')
       .order('created_at', { ascending: false })
     if (error) setError(error.message)
     else setClients(data || [])
@@ -32,7 +25,7 @@ export function useClients() {
     const { data, error } = await supabase
       .from('clients')
       .insert([{ name, created_by: user.id }])
-      .select()
+      .select('id, name, created_at')
       .single()
     if (error) throw error
     setClients((prev) => [{ ...data, client_access: [] }, ...prev])
@@ -44,7 +37,11 @@ export function useClients() {
       .from('client_access')
       .insert([{ client_id: clientId, profile_id: profileId }])
     if (error) throw error
-    fetchClients()
+    // Optimistic update — no refetch needed
+    setClients((prev) => prev.map((c) => {
+      if (c.id !== clientId) return c
+      return { ...c, client_access: [...(c.client_access || []), { profile_id: profileId }] }
+    }))
   }
 
   const removeCreative = async (clientId, profileId) => {
@@ -54,7 +51,10 @@ export function useClients() {
       .eq('client_id', clientId)
       .eq('profile_id', profileId)
     if (error) throw error
-    fetchClients()
+    setClients((prev) => prev.map((c) => {
+      if (c.id !== clientId) return c
+      return { ...c, client_access: (c.client_access || []).filter((a) => a.profile_id !== profileId) }
+    }))
   }
 
   return { clients, loading, error, addClient, assignCreative, removeCreative, refetch: fetchClients }
@@ -66,7 +66,7 @@ export function useCreatives() {
   useEffect(() => {
     supabase
       .from('profiles')
-      .select('*')
+      .select('id, full_name, role')
       .in('role', ['creative', 'admin'])
       .order('full_name')
       .then(({ data }) => setCreatives(data || []))

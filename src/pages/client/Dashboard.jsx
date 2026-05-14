@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { Link } from 'react-router-dom'
 import { CalendarDays, PenLine, Upload, ChevronRight } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
