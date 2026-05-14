@@ -3,6 +3,21 @@ import { supabase } from '../lib/supabase'
 
 const AuthContext = createContext(null)
 
+const fetchProfileWithTimeout = async (userId, ms = 8000) => {
+  const profilePromise = supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .single()
+    .then(({ data }) => data ?? null)
+
+  const timeoutPromise = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('Profile fetch timed out')), ms)
+  )
+
+  return Promise.race([profilePromise, timeoutPromise])
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
@@ -12,24 +27,22 @@ export function AuthProvider({ children }) {
     let mounted = true
 
     const init = async () => {
-      // Hard timeout — never spin forever
       const timeout = setTimeout(() => {
         if (mounted) setLoading(false)
-      }, 6000)
+      }, 8000)
 
       try {
         const { data: { session } } = await supabase.auth.getSession()
-
         if (!mounted) return
 
         if (session?.user) {
           setUser(session.user)
-          const { data } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single()
-          if (mounted) setProfile(data ?? null)
+          try {
+            const data = await fetchProfileWithTimeout(session.user.id)
+            if (mounted) setProfile(data)
+          } catch {
+            // Profile timed out — still let them through, profile will retry on next load
+          }
         }
       } catch (e) {
         console.error('Auth init error', e)
@@ -51,19 +64,27 @@ export function AuthProvider({ children }) {
         return
       }
 
-      if (session?.user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
+      if (session?.user && event === 'SIGNED_IN') {
         setUser(session.user)
         setLoading(true)
+
+        const signInTimeout = setTimeout(() => {
+          if (mounted) setLoading(false)
+        }, 8000)
+
         try {
-          const { data } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single()
-          if (mounted) setProfile(data ?? null)
+          const data = await fetchProfileWithTimeout(session.user.id)
+          if (mounted) setProfile(data)
+        } catch {
+          // timed out — proceed anyway
         } finally {
+          clearTimeout(signInTimeout)
           if (mounted) setLoading(false)
         }
+      }
+
+      if (event === 'TOKEN_REFRESHED' && session?.user) {
+        setUser(session.user)
       }
     })
 
@@ -79,7 +100,6 @@ export function AuthProvider({ children }) {
   }
 
   const signOut = async () => {
-    setLoading(true)
     await supabase.auth.signOut()
     setUser(null)
     setProfile(null)
