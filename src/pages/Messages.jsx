@@ -327,10 +327,17 @@ export default function Messages() {
   }
 
   const startDM = async (otherProfileId) => {
-    const { data: convId } = await supabase.rpc('create_or_get_dm', { other_profile_id: otherProfileId })
+    const { data: convId, error } = await supabase.rpc('create_or_get_dm', { other_profile_id: otherProfileId })
+    if (error) { console.error('DM error:', error); return }
     setShowNewDM(false)
-    await loadConversations(true)
-    setSelectedId(convId)
+    // Reload conversations then select the new one
+    const updated = await loadConversations(true)
+    const exists = updated?.some(c => c.id === convId)
+    if (!exists) {
+      // Not in list yet — reload without keepSelected so it fetches fresh
+      await loadConversations(false)
+    }
+    if (convId) setSelectedId(convId)
   }
 
   // ── Derived ─────────────────────────────────────────────────────────────

@@ -90,6 +90,15 @@ export default function Sidebar() {
           <div className="flex-1 min-w-0">
             <p className="text-white/80 text-xs font-medium truncate">{displayName}</p>
             <p className="text-white/30 text-xs">{ROLE_LABELS[role] || role}</p>
+            {profile?.tags?.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-1">
+                {profile.tags.map((tag) => (
+                  <span key={tag} className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-white/10 text-white/50">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
           <button onClick={signOut} title="Sign out" className="text-white/30 hover:text-white transition-colors shrink-0">
             <LogOut size={14} />
