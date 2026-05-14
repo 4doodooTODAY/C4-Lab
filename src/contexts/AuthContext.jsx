@@ -7,21 +7,20 @@ const PROFILE_CACHE_KEY = 'c4lab_profile'
 const getCachedProfile = () => {
   try { return JSON.parse(sessionStorage.getItem(PROFILE_CACHE_KEY)) } catch { return null }
 }
-const setCachedProfile = (profile) => {
-  try { sessionStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(profile)) } catch {}
+const setCachedProfile = (p) => {
+  try { sessionStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(p)) } catch {}
 }
 const clearCachedProfile = () => {
   try { sessionStorage.removeItem(PROFILE_CACHE_KEY) } catch {}
 }
 
-const fetchProfile = async (userId) => {
-  const { data } = await supabase
+const fetchProfile = (userId) =>
+  supabase
     .from('profiles')
     .select('*')
     .eq('id', userId)
     .single()
-  return data ?? null
-}
+    .then(({ data }) => data ?? null)
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
@@ -31,57 +30,11 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let mounted = true
 
-    const init = async () => {
-      // Hard timeout — never spin forever
-      const timeout = setTimeout(() => {
-        if (mounted) setLoading(false)
-      }, 8000)
-
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!mounted) return
-
-        if (session?.user) {
-          setUser(session.user)
-
-          // Use cached profile immediately so app loads fast
-          const cached = getCachedProfile()
-          if (cached && cached.id === session.user.id) {
-            setProfile(cached)
-            setLoading(false)
-            clearTimeout(timeout)
-            // Refresh profile in background
-            fetchProfile(session.user.id).then((fresh) => {
-              if (mounted && fresh) {
-                setProfile(fresh)
-                setCachedProfile(fresh)
-              }
-            }).catch(() => {})
-          } else {
-            // No cache — fetch and wait
-            const data = await fetchProfile(session.user.id).catch(() => null)
-            if (mounted) {
-              setProfile(data)
-              if (data) setCachedProfile(data)
-            }
-          }
-        } else {
-          clearCachedProfile()
-        }
-      } catch (e) {
-        console.error('Auth init error', e)
-      } finally {
-        clearTimeout(timeout)
-        if (mounted) setLoading(false)
-      }
-    }
-
-    init()
-
+    // Single source of truth — onAuthStateChange handles everything including initial session
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return
 
-      if (event === 'SIGNED_OUT') {
+      if (!session) {
         setUser(null)
         setProfile(null)
         clearCachedProfile()
@@ -89,48 +42,38 @@ export function AuthProvider({ children }) {
         return
       }
 
-      if (session?.user && event === 'SIGNED_IN') {
-        setUser(session.user)
-        setLoading(true)
+      setUser(session.user)
 
-        const signInTimeout = setTimeout(() => {
-          if (mounted) setLoading(false)
-        }, 8000)
-
-        try {
-          const data = await fetchProfile(session.user.id).catch(() => null)
-          if (mounted) {
-            setProfile(data)
-            if (data) setCachedProfile(data)
-          }
-        } finally {
-          clearTimeout(signInTimeout)
-          if (mounted) setLoading(false)
-        }
-      }
-
-      if (event === 'TOKEN_REFRESHED' && session?.user) {
-        setUser(session.user)
+      // Use cache immediately so UI doesn't block
+      const cached = getCachedProfile()
+      if (cached?.id === session.user.id) {
+        setProfile(cached)
+        setLoading(false)
+        // Refresh in background
+        fetchProfile(session.user.id).then((fresh) => {
+          if (mounted && fresh) { setProfile(fresh); setCachedProfile(fresh) }
+        }).catch(() => {})
+      } else {
+        // No cache — fetch and wait (first login)
+        const fallback = setTimeout(() => { if (mounted) setLoading(false) }, 8000)
+        fetchProfile(session.user.id)
+          .then((data) => { if (mounted) { setProfile(data); if (data) setCachedProfile(data) } })
+          .catch(() => {})
+          .finally(() => { clearTimeout(fallback); if (mounted) setLoading(false) })
       }
     })
 
-    return () => {
-      mounted = false
-      subscription.unsubscribe()
-    }
+    return () => { mounted = false; subscription.unsubscribe() }
   }, [])
 
-  const signIn = async (email, password) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) throw error
-  }
+  const signIn = (email, password) =>
+    supabase.auth.signInWithPassword({ email, password }).then(({ error }) => { if (error) throw error })
 
   const signOut = async () => {
     clearCachedProfile()
     await supabase.auth.signOut()
     setUser(null)
     setProfile(null)
-    setLoading(false)
   }
 
   const createUser = async ({ email, full_name, role }) => {
