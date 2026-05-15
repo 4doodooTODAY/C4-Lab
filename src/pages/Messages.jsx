@@ -268,12 +268,50 @@ export default function Messages() {
 
   useEffect(() => {
     if (!user?.id) return
-    supabase.from('profiles')
-      .select('id, full_name, role, avatar_url')
-      .neq('id', user.id)
-      .order('full_name')
-      .then(({ data }) => setAllProfiles(data || []))
-  }, [user?.id])
+
+    if (isAdmin) {
+      // Admin sees everyone
+      supabase.from('profiles')
+        .select('id, full_name, role, avatar_url')
+        .neq('id', user.id)
+        .order('full_name')
+        .then(({ data }) => setAllProfiles(data || []))
+    } else {
+      // Creatives only see people on their projects + admins
+      const load = async () => {
+        const [{ data: myProjects }, { data: admins }] = await Promise.all([
+          supabase.from('projects')
+            .select('creative_id, editor_id')
+            .or(`creative_id.eq.${user.id},editor_id.eq.${user.id}`)
+            .neq('stage', 'archived'),
+          supabase.from('profiles')
+            .select('id, full_name, role, avatar_url')
+            .eq('role', 'admin'),
+        ])
+        const projectPeopleIds = new Set(
+          (myProjects || []).flatMap((p) => [p.creative_id, p.editor_id].filter(Boolean))
+        )
+        projectPeopleIds.delete(user.id) // exclude self
+        const projectPeopleQuery = projectPeopleIds.size > 0
+          ? await supabase.from('profiles')
+              .select('id, full_name, role, avatar_url')
+              .in('id', [...projectPeopleIds])
+          : { data: [] }
+        const all = [
+          ...(admins || []),
+          ...(projectPeopleQuery.data || []),
+        ]
+        // dedupe by id, exclude self
+        const seen = new Set()
+        const deduped = all.filter((p) => {
+          if (p.id === user.id || seen.has(p.id)) return false
+          seen.add(p.id); return true
+        }).sort((a, b) => a.full_name.localeCompare(b.full_name))
+        setAllProfiles(deduped)
+      }
+      load()
+    }
+  }, [user?.id, isAdmin])
 
   // ── Load messages + pinned + requests when conversation changes ─────────────
   useEffect(() => {

@@ -292,16 +292,19 @@ export default function ClientMessages() {
       const creativeId = projects.find((p) => p.creative_id)?.creative_id || null
       const editorId   = projects.find((p) => p.editor_id)?.editor_id     || null
 
-      const profileIds = [...new Set([creativeId, editorId].filter(Boolean))]
-      if (!profileIds.length) { setLoading(false); return }
+      const teamIds = [...new Set([creativeId, editorId].filter(Boolean))]
 
-      // 3. Fetch their profiles
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, full_name, avatar_url, role')
-        .in('id', profileIds)
+      // 3. Fetch team profiles + all admins in parallel
+      const [teamRes, adminRes] = await Promise.all([
+        teamIds.length
+          ? supabase.from('profiles').select('id, full_name, avatar_url, role').in('id', teamIds)
+          : { data: [] },
+        supabase.from('profiles').select('id, full_name, avatar_url, role').eq('role', 'admin'),
+      ])
 
-      const profileMap = Object.fromEntries((profiles || []).map((p) => [p.id, p]))
+      const profileMap = Object.fromEntries(
+        [...(teamRes.data || []), ...(adminRes.data || [])].map((p) => [p.id, p])
+      )
 
       // 4. Find or create conversations
       const result = []
@@ -314,6 +317,14 @@ export default function ClientMessages() {
         const label = `Your Editor · ${profileMap[editorId].full_name}`
         const convId = await findOrCreateDM(user.id, editorId, label)
         result.push({ profile: profileMap[editorId], label: 'Your Editor', convId })
+      }
+      // Admins — always available (skip if already added as photographer/editor)
+      const addedIds = new Set(result.map((r) => r.profile.id))
+      for (const admin of (adminRes.data || [])) {
+        if (addedIds.has(admin.id)) continue
+        const label = `C4 Lab Support · ${admin.full_name}`
+        const convId = await findOrCreateDM(user.id, admin.id, label)
+        result.push({ profile: admin, label: 'C4 Lab Support', convId })
       }
 
       setContacts(result)

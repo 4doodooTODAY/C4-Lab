@@ -77,14 +77,14 @@ const EVENT_LABEL = {
 // ── Stat chip ──────────────────────────────────────────────────────────────────
 function Stat({ label, value, icon: Icon, accent }) {
   return (
-    <div className="card flex items-center gap-3 px-4 py-3.5">
-      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0`}
+    <div className="card flex items-center gap-4 px-5 py-5">
+      <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
         style={{ backgroundColor: accent + '18' }}>
-        <Icon size={16} style={{ color: accent }} />
+        <Icon size={20} style={{ color: accent }} />
       </div>
       <div>
-        <p className="text-xl font-bold text-text-primary leading-none">{value}</p>
-        <p className="text-xs text-text-muted mt-0.5">{label}</p>
+        <p className="text-3xl font-bold text-text-primary leading-none">{value}</p>
+        <p className="text-sm text-text-muted mt-1">{label}</p>
       </div>
     </div>
   )
@@ -209,18 +209,18 @@ export default function CreativeDashboard() {
   )
 
   return (
-    <div className="p-6 max-w-3xl space-y-7">
+    <div className="p-8 max-w-4xl space-y-9">
 
       {/* Greeting */}
       <div>
-        <p className="text-sm text-text-muted">{format(new Date(), 'EEEE, MMMM d')}</p>
-        <h1 className="text-2xl font-bold text-text-primary mt-0.5">
+        <p className="text-base text-text-muted">{format(new Date(), 'EEEE, MMMM d')}</p>
+        <h1 className="text-3xl font-bold text-text-primary mt-1">
           Hey, {firstName} 👋
         </h1>
       </div>
 
       {/* Stats row */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 gap-4">
         <Stat label="Active projects"   value={activeProjs.length}   icon={FolderKanban} accent="#6C63FF" />
         <Stat label="Need your action"  value={actionItems.length}   icon={AlertCircle}  accent={actionItems.length ? '#f59e0b' : '#94a3b8'} />
         <Stat label="Next 14 days"       value={shootsThisWeek}       icon={CalendarDays} accent="#10b981" />
@@ -229,38 +229,38 @@ export default function CreativeDashboard() {
       {/* Needs attention */}
       {actionItems.length > 0 && (
         <section>
-          <h2 className="text-sm font-semibold text-text-primary mb-2.5 flex items-center gap-2">
-            <AlertCircle size={14} className="text-amber-500" />
+          <h2 className="text-base font-semibold text-text-primary mb-3 flex items-center gap-2">
+            <AlertCircle size={16} className="text-amber-500" />
             Needs your attention
           </h2>
           <div className="card divide-y divide-border overflow-hidden">
             {actionItems.map(({ project, action }) => {
               const ActionIcon = action.icon
               const colors = {
-                amber:  { bg: 'bg-amber-50',  text: 'text-amber-700',  dot: 'bg-amber-400'  },
-                purple: { bg: 'bg-purple-50', text: 'text-purple-700', dot: 'bg-purple-400' },
-                orange: { bg: 'bg-orange-50', text: 'text-orange-700', dot: 'bg-orange-400' },
-                blue:   { bg: 'bg-blue-50',   text: 'text-blue-700',   dot: 'bg-blue-400'   },
+                amber:  { bg: 'bg-amber-50',  text: 'text-amber-700'  },
+                purple: { bg: 'bg-purple-50', text: 'text-purple-700' },
+                orange: { bg: 'bg-orange-50', text: 'text-orange-700' },
+                blue:   { bg: 'bg-blue-50',   text: 'text-blue-700'   },
               }[action.color]
 
               return (
                 <Link
                   key={project.id}
                   to={`/projects/${project.id}`}
-                  className="flex items-center gap-3 px-4 py-3.5 hover:bg-surface-2 transition-colors group"
+                  className="flex items-center gap-4 px-5 py-4 hover:bg-surface-2 transition-colors group"
                 >
-                  <div className={`w-8 h-8 rounded-lg ${colors.bg} flex items-center justify-center shrink-0`}>
-                    <ActionIcon size={15} className={colors.text} />
+                  <div className={`w-10 h-10 rounded-xl ${colors.bg} flex items-center justify-center shrink-0`}>
+                    <ActionIcon size={18} className={colors.text} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-text-primary truncate">{project.name}</p>
-                    <p className={`text-xs font-medium ${colors.text}`}>{action.label}</p>
+                    <p className="font-semibold text-text-primary truncate">{project.name}</p>
+                    <p className={`text-sm font-medium ${colors.text} mt-0.5`}>{action.label}</p>
                   </div>
-                  <div className="shrink-0 flex items-center gap-2">
+                  <div className="shrink-0 flex items-center gap-3">
                     {project.clients?.name && (
-                      <span className="text-xs text-text-muted hidden sm:block">{project.clients.name}</span>
+                      <span className="text-sm text-text-muted hidden sm:block">{project.clients.name}</span>
                     )}
-                    <ChevronRight size={14} className="text-text-muted group-hover:text-accent transition-colors" />
+                    <ChevronRight size={16} className="text-text-muted group-hover:text-accent transition-colors" />
                   </div>
                 </Link>
               )
@@ -272,8 +272,8 @@ export default function CreativeDashboard() {
       {/* Upcoming */}
       {upcoming.length > 0 && (
         <section>
-          <h2 className="text-sm font-semibold text-text-primary mb-2.5 flex items-center gap-2">
-            <CalendarDays size={14} className="text-blue-500" />
+          <h2 className="text-base font-semibold text-text-primary mb-3 flex items-center gap-2">
+            <CalendarDays size={16} className="text-blue-500" />
             Coming up
           </h2>
           <div className="card divide-y divide-border overflow-hidden">
@@ -287,21 +287,20 @@ export default function CreativeDashboard() {
                 <Link
                   key={item.id}
                   to={item.link}
-                  className="flex items-center gap-3 px-4 py-3.5 hover:bg-surface-2 transition-colors group"
+                  className="flex items-center gap-4 px-5 py-4 hover:bg-surface-2 transition-colors group"
                 >
-                  {/* Color dot */}
-                  <span className="w-2.5 h-2.5 rounded-full shrink-0 mt-px"
+                  <span className="w-3 h-3 rounded-full shrink-0"
                     style={{ backgroundColor: dotColor }} />
 
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-text-primary truncate">{item.title}</p>
+                    <p className="font-medium text-text-primary truncate">{item.title}</p>
                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                       {item.sub && (
-                        <span className="text-xs text-text-muted">{item.sub}</span>
+                        <span className="text-sm text-text-muted">{item.sub}</span>
                       )}
                       {item.loc && (
-                        <span className="flex items-center gap-0.5 text-xs text-text-muted">
-                          <MapPin size={10} />
+                        <span className="flex items-center gap-1 text-sm text-text-muted">
+                          <MapPin size={12} />
                           {item.loc}
                         </span>
                       )}
@@ -309,9 +308,9 @@ export default function CreativeDashboard() {
                   </div>
 
                   <div className="shrink-0 text-right">
-                    {lbl && <p className={`text-xs ${lbl.cls}`}>{lbl.text}</p>}
+                    {lbl && <p className={`text-sm ${lbl.cls}`}>{lbl.text}</p>}
                     {item.type === 'event' && (
-                      <p className="text-[10px] text-text-muted mt-0.5">
+                      <p className="text-xs text-text-muted mt-0.5">
                         {format(parseISO(item.date), 'h:mm a')}
                       </p>
                     )}
@@ -321,7 +320,7 @@ export default function CreativeDashboard() {
             })}
           </div>
           {upcoming.length > 6 && (
-            <Link to="/calendar" className="block text-xs text-accent text-center mt-2 hover:underline">
+            <Link to="/calendar" className="block text-sm text-accent text-center mt-2 hover:underline">
               + {upcoming.length - 6} more on calendar
             </Link>
           )}
@@ -331,34 +330,34 @@ export default function CreativeDashboard() {
       {/* Active projects */}
       {activeProjs.length > 0 && (
         <section>
-          <div className="flex items-center justify-between mb-2.5">
-            <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
-              <FolderKanban size={14} className="text-accent" />
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-semibold text-text-primary flex items-center gap-2">
+              <FolderKanban size={16} className="text-accent" />
               {isAdmin ? 'All active projects' : 'Your projects'}
             </h2>
-            <Link to="/projects" className="text-xs text-accent hover:underline">View all</Link>
+            <Link to="/projects" className="text-sm text-accent hover:underline">View all</Link>
           </div>
           <div className="card divide-y divide-border overflow-hidden">
             {activeProjs.map((p) => (
               <Link
                 key={p.id}
                 to={`/projects/${p.id}`}
-                className="flex items-center gap-3 px-4 py-3 hover:bg-surface-2 transition-colors group"
+                className="flex items-center gap-4 px-5 py-4 hover:bg-surface-2 transition-colors group"
               >
-                <span className={`w-2 h-2 rounded-full shrink-0 ${STAGE_DOT[p.stage] || 'bg-gray-400'}`} />
+                <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${STAGE_DOT[p.stage] || 'bg-gray-400'}`} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-text-primary truncate">{p.name}</p>
+                  <p className="font-medium text-text-primary truncate">{p.name}</p>
                   {(p.clients?.name || p.clients?.contact_name) && (
-                    <p className="text-xs text-text-muted truncate">
+                    <p className="text-sm text-text-muted truncate">
                       {p.clients.name || p.clients.contact_name}
                     </p>
                   )}
                 </div>
-                <div className="shrink-0 flex items-center gap-2">
-                  <span className="text-[10px] font-medium text-text-muted">
+                <div className="shrink-0 flex items-center gap-3">
+                  <span className="text-xs font-medium text-text-muted">
                     {STAGE_LABEL[p.stage] || p.stage}
                   </span>
-                  <ChevronRight size={14} className="text-text-muted group-hover:text-accent transition-colors" />
+                  <ChevronRight size={16} className="text-text-muted group-hover:text-accent transition-colors" />
                 </div>
               </Link>
             ))}
