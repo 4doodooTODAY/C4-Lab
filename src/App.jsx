@@ -12,11 +12,15 @@ const UserManagement  = lazy(() => import('./pages/admin/UserManagement'))
 const UserDetail      = lazy(() => import('./pages/admin/UserDetail'))
 const AdminClients    = lazy(() => import('./pages/admin/Clients'))
 const ClientDetail    = lazy(() => import('./pages/admin/ClientDetail'))
+const ClientHub       = lazy(() => import('./pages/admin/ClientHub'))
 const AdminProjects   = lazy(() => import('./pages/admin/Projects'))
 const ProjectDetail   = lazy(() => import('./pages/admin/ProjectDetail'))
 const AdminInbox      = lazy(() => import('./pages/admin/Inbox'))
 const CreativeDashboard = lazy(() => import('./pages/creative/Dashboard'))
-const ClientDashboard = lazy(() => import('./pages/client/Dashboard'))
+const CreativeClients   = lazy(() => import('./pages/creative/Clients'))
+const CreativeClientPage = lazy(() => import('./pages/creative/ClientPage'))
+const ClientDashboard   = lazy(() => import('./pages/client/Dashboard'))
+const ContentCalendar   = lazy(() => import('./pages/client/ContentCalendar'))
 const ClientCalendarView = lazy(() => import('./pages/client/CalendarView'))
 const RequestPost     = lazy(() => import('./pages/client/RequestPost'))
 const UploadFootage   = lazy(() => import('./pages/client/UploadFootage'))
@@ -115,7 +119,7 @@ function AppRoutes() {
             <ProtectedRoute roles={['admin']}><AdminClients /></ProtectedRoute>
           } />
           <Route path="/admin/clients/:id" element={
-            <ProtectedRoute roles={['admin']}><ClientDetail /></ProtectedRoute>
+            <ProtectedRoute roles={['admin']}><ClientHub /></ProtectedRoute>
           } />
           <Route path="/admin/inbox" element={
             <ProtectedRoute roles={['admin']}><AdminInbox /></ProtectedRoute>
@@ -142,6 +146,12 @@ function AppRoutes() {
           <Route path="/dashboard" element={
             <ProtectedRoute roles={['admin', 'creative']}><CreativeDashboard /></ProtectedRoute>
           } />
+          <Route path="/clients" element={
+            <ProtectedRoute roles={['creative']}><CreativeClients /></ProtectedRoute>
+          } />
+          <Route path="/clients/:id" element={
+            <ProtectedRoute roles={['creative', 'admin']}><CreativeClientPage /></ProtectedRoute>
+          } />
 
           {/* Client */}
           <Route path="/my-projects" element={
@@ -151,7 +161,7 @@ function AppRoutes() {
             <ProtectedRoute roles={['client']}><ClientDashboard /></ProtectedRoute>
           } />
           <Route path="/client/calendar" element={
-            <ProtectedRoute roles={['client']}><ClientCalendarView /></ProtectedRoute>
+            <ProtectedRoute roles={['client']}><ContentCalendar /></ProtectedRoute>
           } />
           <Route path="/client/request" element={
             <ProtectedRoute roles={['client']}><RequestPost /></ProtectedRoute>

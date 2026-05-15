@@ -3,6 +3,7 @@ import {
   LayoutDashboard, Film, CalendarDays, Settings,
   LogOut, Users, Building2, Inbox, Home, PenLine, Upload, MessageSquare, Bell, FolderKanban
 } from 'lucide-react'
+
 import { useAuth } from '../../contexts/AuthContext'
 import { useNotifications } from '../../contexts/NotificationContext'
 import Avatar from '../ui/Avatar'
@@ -20,6 +21,7 @@ const NAV = {
   ],
   creative: [
     { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', end: true },
+    { to: '/clients',   icon: Building2,        label: 'Clients' },
     { to: '/projects',  icon: FolderKanban,    label: 'Projects' },
     { to: '/videos',    icon: Film,             label: 'Review' },
     { to: '/calendar',  icon: CalendarDays,     label: 'Calendar' },
@@ -27,7 +29,6 @@ const NAV = {
   ],
   client: [
     { to: '/client',          icon: Home,           label: 'Home',        end: true },
-    { to: '/my-projects',     icon: FolderKanban,   label: 'My Projects' },
     { to: '/client/calendar', icon: CalendarDays,   label: 'Calendar' },
   ],
 }

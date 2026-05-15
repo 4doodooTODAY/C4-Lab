@@ -34,6 +34,8 @@ export default function RequestPost() {
     priority: 'normal',
     notes: '',
     inspiration_url: '',
+    target_date: '',
+    inspiration_links_extra: '',
   })
   const [saving, setSaving] = useState(false)
   const [done, setDone] = useState(false)
@@ -61,7 +63,15 @@ export default function RequestPost() {
     setSaving(true)
     setError('')
     try {
-      await submitRequest({ ...form, type: 'post_request', client_id: clientId })
+      const allLinks = [form.inspiration_url, ...form.inspiration_links_extra.split(/[\n,]+/)]
+        .map((l) => l.trim()).filter(Boolean)
+      await submitRequest({
+        ...form,
+        type: 'post_request',
+        client_id: clientId,
+        inspiration_links: allLinks.length ? allLinks : null,
+        target_date: form.target_date || null,
+      })
       setDone(true)
     } catch (err) {
       setError(err.message)
@@ -82,7 +92,7 @@ export default function RequestPost() {
             Your team has been notified and will get started on your post.
           </p>
           <div className="flex gap-3">
-            <button onClick={() => { setDone(false); setForm({ idea: '', platform: '', priority: 'normal', notes: '', inspiration_url: '' }) }}
+            <button onClick={() => { setDone(false); setForm({ idea: '', platform: '', priority: 'normal', notes: '', inspiration_url: '', target_date: '', inspiration_links_extra: '' }) }}
               className="btn-secondary flex-1">
               Submit another
             </button>
@@ -160,17 +170,37 @@ export default function RequestPost() {
           </div>
         </div>
 
+        {/* Target Date */}
+        <div>
+          <label className="block text-xs font-medium text-text-secondary mb-1.5">
+            Target date <span className="text-text-muted font-normal">(optional)</span>
+          </label>
+          <input
+            type="date"
+            className="input w-full"
+            value={form.target_date}
+            onChange={(e) => set('target_date', e.target.value)}
+          />
+        </div>
+
         {/* Inspiration */}
         <div>
           <label className="block text-xs font-medium text-text-secondary mb-1.5">
-            Inspiration link <span className="text-text-muted font-normal">(optional)</span>
+            Inspiration links <span className="text-text-muted font-normal">(optional)</span>
           </label>
           <input
             type="url"
-            className="input w-full"
+            className="input w-full mb-2"
             placeholder="https://..."
             value={form.inspiration_url}
             onChange={(e) => set('inspiration_url', e.target.value)}
+          />
+          <textarea
+            className="input w-full resize-none text-xs"
+            rows={2}
+            placeholder="More links — one per line..."
+            value={form.inspiration_links_extra}
+            onChange={(e) => set('inspiration_links_extra', e.target.value)}
           />
         </div>
 
