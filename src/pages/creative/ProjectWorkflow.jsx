@@ -15,6 +15,11 @@ import { format, parseISO } from 'date-fns'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+// "Initial Cut" for the first upload; "Revision N" for subsequent client-driven rounds
+function revisionLabel(n) {
+  return n === 1 ? 'Initial Cut' : `Revision ${n - 1}`
+}
+
 function fmtBytes(bytes) {
   if (!bytes) return '—'
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
@@ -175,7 +180,7 @@ function ActionBanner({ project, uploads, revisions, isCreative, isEditor, navig
       banner = {
         variant: 'accent',
         icon: <FileVideo size={18} />,
-        title: `Revision ${pendingReview.revision_number} is ready for your review`,
+        title: `${revisionLabel(pendingReview.revision_number)} is ready for your review`,
         body: 'Leave comments before sending to the client.',
         action: {
           label: 'Review Now →',
@@ -196,16 +201,33 @@ function ActionBanner({ project, uploads, revisions, isCreative, isEditor, navig
         variant: 'accent',
         icon: <Upload size={18} />,
         title: 'Footage is ready',
-        body: 'Upload your first edit when you\'re done.',
+        body: 'Upload your initial cut when you\'re done editing.',
       }
     } else if (latestRev && latestRev.status === 'pending_editor') {
+      const label = revisionLabel(latestRev.revision_number)
+      const isInitialCut = latestRev.revision_number === 1
       banner = {
         variant: 'red',
         icon: <AlertCircle size={18} />,
-        title: `Revision ${latestRev.revision_number} sent back with feedback`,
-        body: 'Address the accepted comments and upload a revised cut.',
+        title: isInitialCut
+          ? 'Client sent edits on your initial cut'
+          : `${label} sent back with feedback`,
+        body: 'Review the client\'s comments and upload a revised cut.',
         action: {
           label: 'View Feedback →',
+          onClick: () => navigate(`/projects/${project.id}/revision/${latestRev.id}`),
+        },
+      }
+    } else if (latestRev && latestRev.status === 'pending_client_review' && stage === 'post_production') {
+      // Stage updated to post_production by client "Send to Editor" but revision status
+      // update may have been blocked by RLS — show a clear message anyway
+      banner = {
+        variant: 'red',
+        icon: <AlertCircle size={18} />,
+        title: 'Client sent your cut back for edits',
+        body: 'Check the revision comments and upload a revised cut.',
+        action: {
+          label: 'View Comments →',
           onClick: () => navigate(`/projects/${project.id}/revision/${latestRev.id}`),
         },
       }
@@ -1118,16 +1140,16 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
   const gateTitle = isAdminRework
     ? 'Address admin feedback and submit to client'
     : nextRevNum === 1
-    ? (project.admin_review_required ? 'Ready to submit your first edit?' : 'Ready to submit your edit?')
-    : `Ready to upload Revision ${nextRevNum}?`
+    ? (project.admin_review_required ? 'Ready to submit your initial cut?' : 'Ready to submit your initial cut?')
+    : `Ready to upload ${revisionLabel(nextRevNum)}?`
 
   const gateBody = isAdminRework
     ? 'Admin requested changes. Fix them and upload — it will go straight to the client (no extra revision count).'
     : nextRevNum > 1
-    ? `Address the feedback from Revision ${nextRevNum - 1} and upload your new cut.`
+    ? `Address the client's feedback on the initial cut and upload your revised cut.`
     : project.admin_review_required
-    ? 'Your edit will go to admin for approval before the client sees it.'
-    : 'Upload the first edit for the creative team to review.'
+    ? 'Your cut will go to admin for approval before the client sees it.'
+    : 'Upload your initial cut for the creative team to review.'
 
   if (!open) {
     return (
@@ -1143,7 +1165,7 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
           </div>
         )}
         <button onClick={() => setOpen(true)} className="btn-primary">
-          {isAdminRework ? 'Upload Corrected Edit' : `Begin Revision ${nextRevNum} Upload`}
+          {isAdminRework ? 'Upload Corrected Edit' : `Upload ${revisionLabel(nextRevNum)}`}
         </button>
       </div>
     )
@@ -1152,7 +1174,7 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
   return (
     <div className="bg-white rounded-2xl border border-border p-5 space-y-4">
       <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
-        <FileVideo size={14} className="text-text-muted" /> Upload Revision {nextRevNum}
+        <FileVideo size={14} className="text-text-muted" /> Upload {revisionLabel(nextRevNum)}
       </h2>
 
       {/* Accepted comments */}
@@ -1235,7 +1257,7 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
           className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50"
         >
           {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-          {uploading ? 'Uploading…' : `Submit Revision ${nextRevNum} →`}
+          {uploading ? 'Uploading…' : `Submit ${revisionLabel(nextRevNum)} →`}
         </button>
       </div>
     </div>
@@ -1263,7 +1285,7 @@ function RevisionsCard({ project, revisions, commentCounts, navigate }) {
               <div key={r.id} className="border border-border rounded-xl p-3">
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <p className="text-sm font-bold text-text-primary">
-                    Revision {r.revision_number}
+                    {revisionLabel(r.revision_number)}
                   </p>
                   <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
                     REVISION_STATUS_COLORS[r.status] || 'bg-surface-2 text-text-muted border-border'

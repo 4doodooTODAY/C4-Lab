@@ -10,6 +10,11 @@ import Avatar from '../components/ui/Avatar'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+// "Initial Cut" for first upload; "Revision N" for subsequent client-driven rounds
+function revisionLabel(n) {
+  return n === 1 ? 'Initial Cut' : `Revision ${n - 1}`
+}
+
 // Snap a raw float timestamp to the nearest 0.25s increment
 function snapToQuarter(s) {
   return Math.round(s * 4) / 4
@@ -358,6 +363,7 @@ export default function VideoRevisionReview() {
   const clientComments   = comments.filter((c) => c.author_role === 'client')
 
   const REVISION_STATUS_LABELS = {
+    pending_admin_review:    'Admin Review',
     pending_creative_review: 'Creative Review',
     pending_client_review:   'Client Review',
     pending_editor:          'Awaiting Editor',
@@ -384,7 +390,7 @@ export default function VideoRevisionReview() {
           </button>
           <div>
             <p className="text-sm font-semibold text-white">{projectName}</p>
-            <p className="text-xs text-white/40">Revision {revNum}</p>
+            <p className="text-xs text-white/40">{revisionLabel(revNum)}</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
