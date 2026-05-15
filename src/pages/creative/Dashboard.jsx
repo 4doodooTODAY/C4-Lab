@@ -74,6 +74,33 @@ const EVENT_LABEL = {
   personal:    'Personal',
 }
 
+// ── Who's Up — whose court is the ball in for a given project ─────────────────
+function whosUp(project, revisions) {
+  const stage = project.stage
+  const latestRev = [...revisions]
+    .filter((r) => r.project_id === project.id)
+    .sort((a, b) => b.revision_number - a.revision_number)[0]
+
+  if (stage === 'delivered') return { name: 'Done', detail: 'Project delivered ✓', color: 'text-green-600' }
+  if (stage === 'briefing' || stage === 'pre_production')
+    return { name: 'Admin', detail: 'Setting up the project', color: 'text-slate-500' }
+  if (stage === 'production')
+    return { name: project.creative?.full_name || 'Photographer', detail: 'Out on the shoot', color: 'text-amber-600' }
+  if (stage === 'post_production')
+    return { name: project.editor?.full_name || project.creative?.full_name || 'Editor', detail: 'Working on the edit', color: 'text-purple-600' }
+  if (stage === 'review') {
+    if (!latestRev || latestRev.status === 'pending_creative_review')
+      return { name: project.creative?.full_name || 'Creative', detail: 'Reviewing before client sees it', color: 'text-orange-600' }
+    if (latestRev.status === 'pending_client_review')
+      return { name: 'Client', detail: 'Watching and giving feedback', color: 'text-blue-600' }
+    if (latestRev.status === 'pending_editor')
+      return { name: project.editor?.full_name || 'Editor', detail: 'Addressing revision feedback', color: 'text-purple-600' }
+    if (latestRev.status === 'approved')
+      return { name: 'Done', detail: 'Approved by client ✓', color: 'text-green-600' }
+  }
+  return { name: '—', detail: '', color: 'text-text-muted' }
+}
+
 // ── Stat chip ──────────────────────────────────────────────────────────────────
 function Stat({ label, value, icon: Icon, accent }) {
   return (
@@ -110,7 +137,7 @@ export default function CreativeDashboard() {
       // My projects (or all for admin)
       let projQuery = supabase
         .from('projects')
-        .select('id, name, stage, shoot_date, location, creative_id, editor_id, clients(name, contact_name)')
+        .select('id, name, stage, shoot_date, location, creative_id, editor_id, clients(name, contact_name), creative:profiles!creative_id(id, full_name), editor:profiles!editor_id(id, full_name)')
         .neq('stage', 'archived')
         .order('shoot_date', { ascending: true, nullsFirst: false })
 
@@ -225,6 +252,40 @@ export default function CreativeDashboard() {
         <Stat label="Need your action"  value={actionItems.length}   icon={AlertCircle}  accent={actionItems.length ? '#f59e0b' : '#94a3b8'} />
         <Stat label="Next 14 days"       value={shootsThisWeek}       icon={CalendarDays} accent="#10b981" />
       </div>
+
+      {/* Who's Up */}
+      {activeProjs.length > 0 && (
+        <section>
+          <h2 className="text-base font-semibold text-text-primary mb-3 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-accent animate-pulse inline-block" />
+            Who's Up
+          </h2>
+          <div className="card divide-y divide-border overflow-hidden">
+            {activeProjs.map((p) => {
+              const { name, detail, color } = whosUp(p, revisions)
+              return (
+                <Link
+                  key={p.id}
+                  to={`/projects/${p.id}`}
+                  className="flex items-center gap-4 px-5 py-4 hover:bg-surface-2 transition-colors group"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-text-primary truncate">{p.name}</p>
+                    {(p.clients?.name || p.clients?.contact_name) && (
+                      <p className="text-sm text-text-muted truncate">{p.clients.name || p.clients.contact_name}</p>
+                    )}
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className={`text-sm font-semibold ${color}`}>{name}</p>
+                    <p className="text-xs text-text-muted mt-0.5">{detail}</p>
+                  </div>
+                  <ChevronRight size={16} className="text-text-muted group-hover:text-accent transition-colors shrink-0" />
+                </Link>
+              )
+            })}
+          </div>
+        </section>
+      )}
 
       {/* Needs attention */}
       {actionItems.length > 0 && (

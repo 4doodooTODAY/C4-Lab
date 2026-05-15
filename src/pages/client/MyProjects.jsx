@@ -36,17 +36,18 @@ function getStatusText(project, pendingRevision) {
 
 function getStep(project, pendingRevision) {
   const stage = project.stage
-  if (stage === 'delivered') return 4
+  if (stage === 'delivered') return 5
   if (stage === 'review' || stage === 'revisions') {
-    if (pendingRevision?.status === 'pending_client_review') return 3
-    return 2
+    if (pendingRevision?.status === 'pending_client_review') return 4
+    return 3
   }
-  if (stage === 'post_production') return 2
-  if (stage === 'production') return 1
-  return 0
+  if (stage === 'post_production') return 3
+  if (stage === 'production') return 2
+  if (stage === 'pre_production') return 1
+  return 0 // briefing / planning
 }
 
-const STEPS = ['Shoot', 'Edit', 'Review', 'Done']
+const STEPS = ['Planning', 'Shoot', 'Edit', 'Review', 'Done']
 
 function StepDots({ activeStep }) {
   return (
