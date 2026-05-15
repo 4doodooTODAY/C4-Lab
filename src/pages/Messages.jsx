@@ -277,31 +277,47 @@ export default function Messages() {
         .order('full_name')
         .then(({ data }) => setAllProfiles(data || []))
     } else {
-      // Creatives only see people on their projects + admins
+      // Creatives see: admins + teammates on their projects + assigned clients
       const load = async () => {
         const [{ data: myProjects }, { data: admins }] = await Promise.all([
           supabase.from('projects')
-            .select('creative_id, editor_id')
+            .select('creative_id, editor_id, client_id, clients(profile_id, name, contact_name)')
             .or(`creative_id.eq.${user.id},editor_id.eq.${user.id}`)
             .neq('stage', 'archived'),
           supabase.from('profiles')
             .select('id, full_name, role, avatar_url')
             .eq('role', 'admin'),
         ])
+
+        // Team members on same projects
         const projectPeopleIds = new Set(
           (myProjects || []).flatMap((p) => [p.creative_id, p.editor_id].filter(Boolean))
         )
-        projectPeopleIds.delete(user.id) // exclude self
-        const projectPeopleQuery = projectPeopleIds.size > 0
-          ? await supabase.from('profiles')
-              .select('id, full_name, role, avatar_url')
-              .in('id', [...projectPeopleIds])
-          : { data: [] }
+        projectPeopleIds.delete(user.id)
+
+        // Client profile_ids from assigned projects
+        const clientProfileIds = [
+          ...new Set(
+            (myProjects || [])
+              .map((p) => p.clients?.profile_id)
+              .filter(Boolean)
+          )
+        ]
+
+        const [projectPeopleRes, clientProfilesRes] = await Promise.all([
+          projectPeopleIds.size > 0
+            ? supabase.from('profiles').select('id, full_name, role, avatar_url').in('id', [...projectPeopleIds])
+            : { data: [] },
+          clientProfileIds.length > 0
+            ? supabase.from('profiles').select('id, full_name, role, avatar_url').in('id', clientProfileIds)
+            : { data: [] },
+        ])
+
         const all = [
           ...(admins || []),
-          ...(projectPeopleQuery.data || []),
+          ...(projectPeopleRes.data || []),
+          ...(clientProfilesRes.data || []),
         ]
-        // dedupe by id, exclude self
         const seen = new Set()
         const deduped = all.filter((p) => {
           if (p.id === user.id || seen.has(p.id)) return false
