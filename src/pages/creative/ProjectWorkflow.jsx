@@ -453,7 +453,8 @@ function ShootDeliverySection({ project, uploads, shootNotes, onRefresh }) {
   const [noteSaved,   setNoteSaved]   = useState(false)
 
   // Send to editor state
-  const [sending, setSending] = useState(false)
+  const [sending,   setSending]   = useState(false)
+  const [sendError, setSendError] = useState('')
 
   const stage      = STAGE_KEY_MAP[project.stage] || project.stage
   const hasUploads = uploads.length > 0
@@ -519,11 +520,15 @@ function ShootDeliverySection({ project, uploads, shootNotes, onRefresh }) {
 
   const handleSendToEditor = async () => {
     setSending(true)
+    setSendError('')
     try {
       await updateProject(project.id, { stage: 'post_production' })
       onRefresh()
-    } catch {}
-    finally { setSending(false) }
+    } catch (err) {
+      setSendError(err.message || 'Failed to send — check permissions.')
+    } finally {
+      setSending(false)
+    }
   }
 
   // ── Gate: not started yet ──────────────────────────────────────────────────
@@ -687,6 +692,9 @@ function ShootDeliverySection({ project, uploads, shootNotes, onRefresh }) {
             {sending ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
             {sending ? 'Sending…' : 'Send to Editor →'}
           </button>
+          {sendError && (
+            <p className="text-xs text-red-500 text-center mt-2">{sendError}</p>
+          )}
           <p className="text-xs text-text-muted text-center mt-2">
             This will notify the editor that footage is ready.
           </p>
