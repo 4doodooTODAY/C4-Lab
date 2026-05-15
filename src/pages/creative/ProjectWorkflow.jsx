@@ -1336,19 +1336,33 @@ function QuickActionsCard({ projectId, isAdmin }) {
 
 // ── Project Status Card (Right column) ────────────────────────────────────────
 
-function ProjectStatusCard({ project, creativeProfile, editorProfile }) {
-  const stage = STAGE_KEY_MAP[project.stage] || project.stage
+function ProjectStatusCard({ project, revisions, creativeProfile, editorProfile }) {
+  const stage     = STAGE_KEY_MAP[project.stage] || project.stage
+  const latestRev = [...(revisions || [])].sort((a, b) => b.revision_number - a.revision_number)[0]
+
+  // For the review stage, branch on the actual revision status
+  const reviewCurrent = (() => {
+    if (stage !== 'review') return null
+    const s = latestRev?.status
+    if (s === 'pending_client_review')
+      return { label: 'Client', detail: 'Watching and giving feedback.' }
+    if (s === 'pending_editor')
+      return { label: editorProfile?.full_name || 'Editor', detail: 'Addressing revision feedback.' }
+    if (s === 'pending_admin_review')
+      return { label: 'Admin', detail: 'Reviewing the edit before the client sees it.' }
+    // pending_creative_review or unknown
+    return { label: creativeProfile?.full_name || 'Creative', detail: 'Reviewing the edit before client sees it.' }
+  })()
 
   const controlMap = {
-    planning:        { label: 'Admin is in control', detail: 'Waiting for shoot setup.' },
+    planning:        { label: 'Admin', detail: 'Waiting for shoot setup.' },
     production:      { label: creativeProfile?.full_name || 'Shooter', detail: 'Out on the shoot.' },
     post_production: { label: editorProfile?.full_name || 'Editor', detail: 'Working on the edit.' },
-    review:          { label: 'Creative is reviewing', detail: 'Reviewing the edit before client sees it.' },
     revisions:       { label: editorProfile?.full_name || 'Editor', detail: 'Addressing revision feedback.' },
     delivered:       { label: 'Complete', detail: 'Project has been delivered.' },
   }
 
-  const current = controlMap[stage] || { label: stage, detail: '' }
+  const current = reviewCurrent || controlMap[stage] || { label: stage, detail: '' }
 
   return (
     <div className="bg-white rounded-2xl border border-border p-5">
@@ -1611,6 +1625,7 @@ export default function ProjectWorkflow() {
           {/* 3. Who's Up */}
           <ProjectStatusCard
             project={project}
+            revisions={revisions}
             creativeProfile={creativeProfile}
             editorProfile={editorProfile}
           />
