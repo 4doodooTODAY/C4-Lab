@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   ArrowLeft, Loader2, Upload, Check, Film, StickyNote, Send,
-  Download, FileVideo, CalendarDays, MapPin,
+  Download, FileVideo, CalendarDays, MapPin, Eye,
   ChevronRight, X, MessageSquare, Users, ExternalLink,
   AlertCircle, CheckCircle2, Clock, Zap,
 } from 'lucide-react'
@@ -52,6 +52,7 @@ const STAGE_DESCRIPTIONS = {
 }
 
 const REVISION_STATUS_LABELS = {
+  pending_admin_review:    'Pending Admin Approval',
   pending_creative_review: 'Needs Your Review',
   pending_client_review:   'Client Reviewing',
   pending_editor:          'Awaiting Revisions',
@@ -59,6 +60,7 @@ const REVISION_STATUS_LABELS = {
 }
 
 const REVISION_STATUS_COLORS = {
+  pending_admin_review:    'bg-orange-50 text-orange-700 border-orange-200',
   pending_creative_review: 'bg-amber-50 text-amber-700 border-amber-200',
   pending_client_review:   'bg-blue-50 text-blue-700 border-blue-200',
   pending_editor:          'bg-purple-50 text-purple-700 border-purple-200',
@@ -124,10 +126,26 @@ function StagePipeline({ currentStage }) {
 // ── Action Banner ─────────────────────────────────────────────────────────────
 
 function ActionBanner({ project, uploads, revisions, isCreative, isEditor, navigate }) {
-  const stage        = STAGE_KEY_MAP[project.stage] || project.stage
-  const pendingReview = revisions.find((r) => r.status === 'pending_creative_review')
-  const latestRev     = [...revisions].sort((a, b) => b.revision_number - a.revision_number)[0]
-  const hasUploads    = uploads.length > 0
+  const stage             = STAGE_KEY_MAP[project.stage] || project.stage
+  const pendingReview     = revisions.find((r) => r.status === 'pending_creative_review')
+  const pendingAdminRev   = revisions.find((r) => r.status === 'pending_admin_review')
+  const latestRev         = [...revisions].sort((a, b) => b.revision_number - a.revision_number)[0]
+  const hasUploads        = uploads.length > 0
+
+  // If first edit is waiting on admin approval, show waiting banner to editor/creative
+  if (pendingAdminRev && (isCreative || isEditor)) {
+    return (
+      <div className="mb-4 rounded-2xl border border-orange-200 bg-orange-50 px-5 py-4 flex items-start gap-3">
+        <div className="w-9 h-9 rounded-xl bg-orange-100 flex items-center justify-center shrink-0 mt-0.5">
+          <Eye size={18} className="text-orange-600" />
+        </div>
+        <div>
+          <p className="text-sm font-bold text-orange-800">Waiting for admin approval</p>
+          <p className="text-xs text-orange-600 mt-0.5">Your edit has been submitted. Admin will review it before it goes to the client.</p>
+        </div>
+      </div>
+    )
+  }
 
   let banner = null
 
@@ -866,6 +884,145 @@ function SourceFootageSection({ uploads, shootNotes }) {
   )
 }
 
+// ── Admin Review Section ──────────────────────────────────────────────────────
+
+function AdminReviewSection({ revision, project, onRefresh }) {
+  const { profile } = useAuth()
+  const [feedback,    setFeedback]   = useState('')
+  const [showReject,  setShowReject]  = useState(false)
+  const [loading,     setLoading]    = useState(false)
+  const [error,       setError]      = useState('')
+
+  const handleApprove = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const { error: e } = await supabase.from('project_revisions')
+        .update({ status: 'pending_client_review', admin_reviewed: true })
+        .eq('id', revision.id)
+      if (e) throw new Error(e.message)
+      onRefresh()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleReject = async () => {
+    if (!feedback.trim()) return
+    setLoading(true)
+    setError('')
+    try {
+      // Save feedback as a revision comment so the editor sees it
+      const { error: ce } = await supabase.from('revision_comments').insert({
+        revision_id:       revision.id,
+        author_id:         profile.id,
+        content:           feedback.trim(),
+        timestamp_seconds: 0,
+      })
+      if (ce) throw new Error(ce.message)
+
+      const { error: re } = await supabase.from('project_revisions')
+        .update({ status: 'pending_editor', admin_reviewed: true })
+        .eq('id', revision.id)
+      if (re) throw new Error(re.message)
+
+      setFeedback('')
+      setShowReject(false)
+      onRefresh()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border-2 border-orange-200 p-5 space-y-4">
+      {/* Header */}
+      <div className="flex items-center gap-2">
+        <div className="w-8 h-8 rounded-xl bg-orange-100 flex items-center justify-center shrink-0">
+          <Eye size={16} className="text-orange-600" />
+        </div>
+        <div>
+          <h2 className="text-sm font-bold text-text-primary">Admin Review — First Edit</h2>
+          <p className="text-xs text-text-muted">Review before it reaches the client</p>
+        </div>
+      </div>
+
+      {/* Video */}
+      <div className="rounded-xl overflow-hidden bg-black aspect-video">
+        <video
+          src={revision.video_url}
+          controls
+          className="w-full h-full"
+        />
+      </div>
+
+      {error && (
+        <p className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
+      )}
+
+      {/* Reject panel */}
+      {showReject && (
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-text-secondary">Feedback for the editor</p>
+          <textarea
+            className="input w-full resize-none text-sm"
+            rows={3}
+            placeholder="Describe what needs to be changed before this goes to the client…"
+            value={feedback}
+            onChange={(e) => setFeedback(e.target.value)}
+            autoFocus
+          />
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="flex gap-2">
+        {showReject ? (
+          <>
+            <button
+              onClick={() => { setShowReject(false); setFeedback('') }}
+              className="btn-secondary flex-1 text-sm"
+              disabled={loading}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleReject}
+              disabled={!feedback.trim() || loading}
+              className="flex-1 text-sm font-semibold px-4 py-2 rounded-xl bg-red-500 hover:bg-red-600 text-white transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+            >
+              {loading ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
+              Send Back to Editor
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={() => setShowReject(true)}
+              className="btn-secondary flex-1 text-sm text-red-600 hover:text-red-700"
+              disabled={loading}
+            >
+              Request Changes
+            </button>
+            <button
+              onClick={handleApprove}
+              disabled={loading}
+              className="flex-1 text-sm font-semibold px-4 py-2 rounded-xl bg-green-500 hover:bg-green-600 text-white transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+            >
+              {loading ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+              Approve — Send to Client
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Upload Revision Section (Editor only) ─────────────────────────────────────
 
 function UploadRevisionSection({ project, revisions, onRefresh }) {
@@ -882,10 +1039,17 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
 
   const stage      = STAGE_KEY_MAP[project.stage] || project.stage
   const latestRev  = [...revisions].sort((a, b) => b.revision_number - a.revision_number)[0]
-  const nextRevNum = latestRev ? latestRev.revision_number + 1 : 1
-  const canUpload  = stage === 'post_production' || (latestRev && latestRev.status === 'pending_editor')
 
-  if (!canUpload) return null
+  // "Rework" = admin rejected and editor is fixing it — update same revision, skip to client
+  const isAdminRework = latestRev?.status === 'pending_editor' && latestRev?.admin_reviewed === true
+  const nextRevNum    = isAdminRework
+    ? latestRev.revision_number  // same number — not a new client revision
+    : (latestRev ? latestRev.revision_number + 1 : 1)
+
+  const canUpload = stage === 'post_production' || (latestRev && latestRev.status === 'pending_editor')
+  // Don't show upload while awaiting admin review
+  const pendingAdminRev = revisions.find((r) => r.status === 'pending_admin_review')
+  if (!canUpload || pendingAdminRev) return null
 
   const handleUploadRevision = async () => {
     if (!revisionFile) return
@@ -905,15 +1069,31 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
         onStats:     setUploadStats,
       })
 
-      await supabase.from('project_revisions').insert({
-        project_id:      project.id,
-        revision_number: nextRevNum,
-        video_url:       publicUrl,
-        status:          'pending_creative_review',
-        uploaded_by:     profile.id,
-      })
+      if (isAdminRework) {
+        // Update the existing revision file and send straight to client
+        // (admin already reviewed once — this correction goes directly to client)
+        const { error: e } = await supabase.from('project_revisions')
+          .update({ video_url: publicUrl, status: 'pending_client_review' })
+          .eq('id', latestRev.id)
+        if (e) throw new Error(e.message)
+      } else {
+        // Determine where this revision goes first
+        const goesToAdmin = project.admin_review_required && nextRevNum === 1
+        const status = goesToAdmin ? 'pending_admin_review' : 'pending_creative_review'
 
-      // Save editor note as a shoot note tagged for this revision
+        const { error: e } = await supabase.from('project_revisions').insert({
+          project_id:      project.id,
+          revision_number: nextRevNum,
+          video_url:       publicUrl,
+          status,
+          uploaded_by:     profile.id,
+        })
+        if (e) throw new Error(e.message)
+
+        await updateProject(project.id, { stage: 'review', revision_count: nextRevNum })
+      }
+
+      // Save editor note
       if (editorNote.trim()) {
         await supabase.from('shoot_notes').insert({
           project_id: project.id,
@@ -921,8 +1101,6 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
           content:    `[Revision ${nextRevNum} note] ${editorNote.trim()}`,
         })
       }
-
-      await updateProject(project.id, { stage: 'review', revision_count: nextRevNum })
 
       setRevisionFile(null)
       setEditorNote('')
@@ -936,27 +1114,36 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
   }
 
   // ── Gate ───────────────────────────────────────────────────────────────────
+  // Contextual copy based on situation
+  const gateTitle = isAdminRework
+    ? 'Address admin feedback and submit to client'
+    : nextRevNum === 1
+    ? (project.admin_review_required ? 'Ready to submit your first edit?' : 'Ready to submit your edit?')
+    : `Ready to upload Revision ${nextRevNum}?`
+
+  const gateBody = isAdminRework
+    ? 'Admin requested changes. Fix them and upload — it will go straight to the client (no extra revision count).'
+    : nextRevNum > 1
+    ? `Address the feedback from Revision ${nextRevNum - 1} and upload your new cut.`
+    : project.admin_review_required
+    ? 'Your edit will go to admin for approval before the client sees it.'
+    : 'Upload the first edit for the creative team to review.'
+
   if (!open) {
     return (
       <div className="bg-white rounded-2xl border border-border p-6 text-center">
         <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center mx-auto mb-3">
           <FileVideo size={22} className="text-accent" />
         </div>
-        <h2 className="text-sm font-bold text-text-primary mb-1">
-          {nextRevNum === 1 ? 'Ready to submit your edit?' : `Ready to upload Revision ${nextRevNum}?`}
-        </h2>
-        <p className="text-xs text-text-muted mb-4">
-          {nextRevNum > 1
-            ? `Address the feedback from Revision ${nextRevNum - 1} and upload your new cut.`
-            : 'Upload the first edit for the creative team to review.'}
-        </p>
+        <h2 className="text-sm font-bold text-text-primary mb-1">{gateTitle}</h2>
+        <p className="text-xs text-text-muted mb-4">{gateBody}</p>
         {latestRev && latestRev.status === 'pending_editor' && (
           <div className="mb-4">
             <RevisionCommentsList revisionId={latestRev.id} />
           </div>
         )}
         <button onClick={() => setOpen(true)} className="btn-primary">
-          Begin Revision {nextRevNum} Upload
+          {isAdminRework ? 'Upload Corrected Edit' : `Begin Revision ${nextRevNum} Upload`}
         </button>
       </div>
     )
@@ -1374,6 +1561,18 @@ export default function ProjectWorkflow() {
               onRefresh={fetchAll}
             />
           )}
+
+          {/* Admin Review Gate — shown to admin when first edit is pending their approval */}
+          {isAdmin && (() => {
+            const pendingAdminRev = revisions.find((r) => r.status === 'pending_admin_review')
+            return pendingAdminRev ? (
+              <AdminReviewSection
+                revision={pendingAdminRev}
+                project={project}
+                onRefresh={fetchAll}
+              />
+            ) : null
+          })()}
 
           {/* 3a. Source Footage — visible to any editor role (incl. creative+editor combo) */}
           {isEditor && (

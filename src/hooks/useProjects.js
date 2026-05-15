@@ -7,6 +7,7 @@ const PROJECT_SELECT = `
   budget, paid_amount, payment_status,
   notes, created_by, created_at,
   creative_id, editor_id, revision_count,
+  admin_review_required,
   clients(id, name, contact_name),
   project_members(
     id, role,

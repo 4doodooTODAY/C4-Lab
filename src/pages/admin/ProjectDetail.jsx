@@ -63,6 +63,7 @@ const STATUS_LABELS = {
 }
 
 const REVISION_STATUS_LABELS = {
+  pending_admin_review:    'Admin Review',
   pending_creative_review: 'Creative Review',
   pending_client_review:   'Client Review',
   pending_editor:          'Back to Editor',
@@ -70,6 +71,7 @@ const REVISION_STATUS_LABELS = {
 }
 
 const REVISION_STATUS_COLORS = {
+  pending_admin_review:    'bg-orange-50 text-orange-700',
   pending_creative_review: 'bg-amber-50 text-amber-700',
   pending_client_review:   'bg-blue-50 text-blue-700',
   pending_editor:          'bg-purple-50 text-purple-700',

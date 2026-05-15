@@ -85,7 +85,7 @@ function NewProjectModal({ onClose, onCreated }) {
   const [clients, setClients]     = useState([])
   const [clientsLoaded, setCL]    = useState(false)
   const [form, setForm]           = useState({
-    name: '', client_id: '',
+    name: '', client_id: '', admin_review_required: false,
   })
   const [saving, setSaving]       = useState(false)
   const [error, setError]         = useState('')
@@ -107,10 +107,11 @@ function NewProjectModal({ onClose, onCreated }) {
     setError('')
     try {
       const payload = {
-        name:      form.name.trim(),
-        client_id: form.client_id || null,
-        stage:     'briefing',
-        created_by: user?.id,
+        name:                 form.name.trim(),
+        client_id:            form.client_id || null,
+        stage:                'briefing',
+        created_by:           user?.id,
+        admin_review_required: form.admin_review_required,
       }
       const row = await createProject(payload)
       onCreated(row.id)
@@ -155,6 +156,22 @@ function NewProjectModal({ onClose, onCreated }) {
               ))}
             </select>
           </div>
+
+          {/* Admin review gate */}
+          <label className="flex items-start gap-3 p-3 rounded-xl border border-border hover:border-accent/40 cursor-pointer transition-colors bg-surface-2/40">
+            <input
+              type="checkbox"
+              className="mt-0.5 accent-accent"
+              checked={form.admin_review_required}
+              onChange={(e) => setForm((f) => ({ ...f, admin_review_required: e.target.checked }))}
+            />
+            <div>
+              <p className="text-sm font-semibold text-text-primary">Admin must approve first edit</p>
+              <p className="text-xs text-text-muted mt-0.5">
+                The first cut goes to you for approval before the client ever sees it. If you reject it, the editor revises and it goes straight to the client — no revision count added.
+              </p>
+            </div>
+          </label>
 
           {error && (
             <p className="text-xs text-red-500 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p>
