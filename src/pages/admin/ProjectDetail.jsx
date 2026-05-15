@@ -243,10 +243,12 @@ export default function ProjectDetail() {
   const [actionError, setActionError]   = useState('')
 
   // Shoot dates
-  const [shoots, setShoots]             = useState([])
-  const [showAddShoot, setShowAddShoot] = useState(false)
-  const [newShootDate, setNewShootDate] = useState('')
-  const [addingShoot, setAddingShoot]   = useState(false)
+  const [shoots, setShoots]                 = useState([])
+  const [showAddShoot, setShowAddShoot]     = useState(false)
+  const [newShootDate, setNewShootDate]     = useState('')
+  const [newShootTime, setNewShootTime]     = useState('')
+  const [newShootLocation, setNewShootLocation] = useState('')
+  const [addingShoot, setAddingShoot]       = useState(false)
 
   // Shoot uploads + notes + revisions
   const [shootUploads, setShootUploads] = useState([])
@@ -303,8 +305,41 @@ export default function ProjectDetail() {
     if (!newShootDate) return
     setAddingShoot(true)
     try {
-      await supabase.from('project_shoots').insert({ project_id: id, shoot_date: newShootDate })
+      await supabase.from('project_shoots').insert({
+        project_id:  id,
+        shoot_date:  newShootDate,
+        shoot_time:  newShootTime  || null,
+        location:    newShootLocation || null,
+      })
+
+      // Auto-create a calendar event for this shoot
+      const timeStr   = newShootTime || '09:00'
+      const startAt   = new Date(`${newShootDate}T${timeStr}:00`)
+      const endAt     = new Date(startAt.getTime() + 2 * 60 * 60 * 1000) // default 2hr block
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+      const { data: evtData } = await supabase.from('calendar_events').insert({
+        title:      `${project.name} — Shoot`,
+        event_type: 'in_person',
+        start_at:   startAt.toISOString(),
+        end_at:     endAt.toISOString(),
+        all_day:    false,
+        location:   newShootLocation || null,
+        created_by: authUser.id,
+      }).select().single()
+
+      // Add creative + editor as members so they see it
+      if (evtData) {
+        const memberIds = [project.creative_id, project.editor_id].filter(Boolean)
+        if (memberIds.length) {
+          await supabase.from('calendar_event_members').insert(
+            memberIds.map((profile_id) => ({ event_id: evtData.id, profile_id }))
+          )
+        }
+      }
+
       setNewShootDate('')
+      setNewShootTime('')
+      setNewShootLocation('')
       setShowAddShoot(false)
       fetchShoots()
     } finally {
@@ -479,6 +514,22 @@ export default function ProjectDetail() {
       {/* Stage progress */}
       <StageBar currentStage={project.stage} isAdmin={isAdmin} onStageClick={handleStageClick} />
 
+      {/* Advance from Planning — admin must do this manually */}
+      {isAdmin && project.stage === 'briefing' && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 mb-2 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-amber-800">Project is in Planning</p>
+            <p className="text-xs text-amber-600 mt-0.5">Shoot dates and team are set. Ready to move to production?</p>
+          </div>
+          <button
+            onClick={() => handleStageClick('production')}
+            className="shrink-0 text-sm font-semibold px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white transition-colors"
+          >
+            Advance to Production →
+          </button>
+        </div>
+      )}
+
       {/* Project info — inline editable */}
       <div className="bg-white rounded-2xl border border-border p-5 mb-6">
         <p className="text-xs font-semibold text-text-muted mb-4 uppercase tracking-wide">Project Details</p>
@@ -512,9 +563,13 @@ export default function ProjectDetail() {
               {shoots.map((s) => (
                 <div key={s.id} className="flex items-center gap-2 py-1.5 border-b border-border last:border-0">
                   <CalendarDays size={13} className="text-text-muted shrink-0" />
-                  <span className="text-sm font-medium text-text-primary flex-1">
-                    {format(parseISO(s.shoot_date), 'MMM d, yyyy')}
-                  </span>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm font-medium text-text-primary">
+                      {format(parseISO(s.shoot_date), 'MMM d, yyyy')}
+                      {s.shoot_time && ` · ${s.shoot_time.slice(0, 5)}`}
+                    </span>
+                    {s.location && <p className="text-xs text-text-muted truncate">{s.location}</p>}
+                  </div>
                   {isAdmin && (
                     <button
                       onClick={() => handleDeleteShoot(s.id)}
@@ -530,28 +585,46 @@ export default function ProjectDetail() {
           )}
           {isAdmin && (
             showAddShoot ? (
-              <div className="flex items-center gap-2 mt-1">
-                <input
-                  type="date"
-                  className="input text-sm py-1 flex-1"
-                  value={newShootDate}
-                  onChange={(e) => setNewShootDate(e.target.value)}
-                  autoFocus
-                />
-                <button
-                  onClick={handleAddShoot}
-                  disabled={!newShootDate || addingShoot}
-                  className="btn-primary text-xs px-3 py-1.5 flex items-center gap-1 disabled:opacity-50 shrink-0"
-                >
-                  {addingShoot ? <Loader2 size={12} className="animate-spin" /> : null}
-                  Add
-                </button>
-                <button
-                  onClick={() => { setShowAddShoot(false); setNewShootDate('') }}
-                  className="btn-ghost p-1.5 shrink-0"
-                >
-                  <X size={13} />
-                </button>
+              <div className="space-y-2 mt-2">
+                <div className="flex gap-2">
+                  <input
+                    type="date"
+                    className="input text-sm py-1 flex-1"
+                    value={newShootDate}
+                    onChange={(e) => setNewShootDate(e.target.value)}
+                    autoFocus
+                  />
+                  <input
+                    type="time"
+                    className="input text-sm py-1 w-32 shrink-0"
+                    value={newShootTime}
+                    onChange={(e) => setNewShootTime(e.target.value)}
+                    placeholder="Time"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    className="input text-sm py-1 flex-1"
+                    value={newShootLocation}
+                    onChange={(e) => setNewShootLocation(e.target.value)}
+                    placeholder="Location (address or venue)"
+                  />
+                  <button
+                    onClick={handleAddShoot}
+                    disabled={!newShootDate || addingShoot}
+                    className="btn-primary text-xs px-3 py-1.5 flex items-center gap-1 disabled:opacity-50 shrink-0"
+                  >
+                    {addingShoot ? <Loader2 size={12} className="animate-spin" /> : null}
+                    Add
+                  </button>
+                  <button
+                    onClick={() => { setShowAddShoot(false); setNewShootDate(''); setNewShootTime(''); setNewShootLocation('') }}
+                    className="btn-ghost p-1.5 shrink-0"
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
               </div>
             ) : (
               <button

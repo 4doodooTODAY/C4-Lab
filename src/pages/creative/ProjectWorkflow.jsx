@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
-  ArrowLeft, Loader2, Upload, Check, Film, StickyNote,
+  ArrowLeft, Loader2, Upload, Check, Film, StickyNote, Send,
   Download, FileVideo, CalendarDays, MapPin,
   ChevronRight, X, MessageSquare, Users, ExternalLink,
   AlertCircle, CheckCircle2, Clock, Zap,
@@ -469,8 +469,8 @@ function ShootDeliverySection({ project, uploads, shootNotes, onRefresh }) {
     setProgress({ ...progressMap })
 
     try {
-      for (const file of files) {
-        setUploadStats(null)
+      // Upload all files in parallel for maximum speed
+      await Promise.all(files.map(async (file) => {
         const { publicUrl } = await uploadToR2({
           file,
           category:    'footage',
@@ -489,7 +489,7 @@ function ShootDeliverySection({ project, uploads, shootNotes, onRefresh }) {
           uploaded_by: profile.id,
         })
         setProgress((p) => ({ ...p, [file.name]: 100 }))
-      }
+      }))
       setFiles([])
       setUploadStats(null)
       onRefresh()
@@ -666,9 +666,10 @@ function ShootDeliverySection({ project, uploads, shootNotes, onRefresh }) {
               <button
                 onClick={handleSaveNote}
                 disabled={savingNote || !noteContent.trim()}
-                className="btn-secondary shrink-0 self-end disabled:opacity-50"
+                className="btn-primary shrink-0 self-end disabled:opacity-50 flex items-center gap-1.5"
               >
-                {savingNote ? <Loader2 size={14} className="animate-spin" /> : noteSaved ? <Check size={14} className="text-green-500" /> : <StickyNote size={14} />}
+                {savingNote ? <Loader2 size={14} className="animate-spin" /> : noteSaved ? <Check size={14} /> : <Send size={14} />}
+                {!savingNote && !noteSaved && 'Send'}
               </button>
             </div>
           )}

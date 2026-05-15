@@ -8,14 +8,22 @@ import { EVENT_TYPES } from '../components/calendar/EventChip'
 import { useAuth } from '../contexts/AuthContext'
 
 export default function CalendarPage() {
-  const { profile } = useAuth()
+  const { profile, user } = useAuth()
+  const isAdmin = profile?.role === 'admin'
   const [currentDate, setCurrentDate] = useState(new Date())
   const [modalState,  setModalState]  = useState(null) // { date, event? }
 
   const year  = currentDate.getFullYear()
   const month = currentDate.getMonth() + 1
 
-  const { events, loading, addEvent, updateEvent, deleteEvent } = useCalendarEvents(year, month)
+  const { events: allEvents, loading, addEvent, updateEvent, deleteEvent } = useCalendarEvents(year, month)
+
+  // Admins see everything; creatives only see events they're a member of
+  const events = isAdmin
+    ? allEvents
+    : allEvents.filter((e) =>
+        (e.calendar_event_members || []).some((m) => m.profile_id === user?.id)
+      )
 
   const prevMonth = () => setCurrentDate((d) => subMonths(d, 1))
   const nextMonth = () => setCurrentDate((d) => addMonths(d, 1))
