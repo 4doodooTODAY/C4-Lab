@@ -285,17 +285,22 @@ export default function MyProjects() {
       .then(async ({ data: client }) => {
         if (!client) { setLoading(false); return }
         setClientName(client.name || '')
-        const [projRes, revRes] = await Promise.all([
-          supabase
-            .from('projects')
-            .select('id, name, stage, revision_count')
-            .eq('client_id', client.id)
-            .neq('stage', 'archived')
-            .order('created_at', { ascending: false }),
-          supabase
-            .from('project_revisions')
-            .select('id, project_id, revision_number, status'),
-        ])
+        const projRes = await supabase
+          .from('projects')
+          .select('id, name, stage, revision_count')
+          .eq('client_id', client.id)
+          .neq('stage', 'archived')
+          .order('created_at', { ascending: false })
+
+        const projectIds = (projRes.data || []).map((p) => p.id)
+
+        const revRes = projectIds.length
+          ? await supabase
+              .from('project_revisions')
+              .select('id, project_id, revision_number, status')
+              .in('project_id', projectIds)
+          : { data: [] }
+
         setProjects(projRes.data || [])
         setRevisions(revRes.data || [])
         setLoading(false)
