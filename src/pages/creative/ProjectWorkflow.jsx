@@ -713,128 +713,140 @@ function ShootDeliverySection({ project, uploads, shootNotes, onRefresh }) {
 
 // ── Source Footage Section (Editor only) ──────────────────────────────────────
 
+function FileList({ files, accent = false }) {
+  return (
+    <div className={`mt-2 rounded-xl divide-y ${accent ? 'border border-blue-100 divide-blue-50' : 'border border-border divide-border'}`}>
+      {files.map((f) => (
+        <div key={f.id} className="flex items-center gap-3 px-3 py-2.5">
+          <Film size={13} className={accent ? 'text-blue-300 shrink-0' : 'text-text-muted shrink-0'} />
+          <span className={`text-sm truncate flex-1 ${accent ? 'text-blue-900' : 'text-text-primary'}`}>{f.file_name}</span>
+          <span className={`text-xs ${accent ? 'text-blue-400' : 'text-text-muted'}`}>{fmtBytes(f.file_size)}</span>
+          {f.file_url && (
+            <a href={f.file_url} download={f.file_name} target="_blank" rel="noreferrer"
+              className={`transition-colors shrink-0 ${accent ? 'text-blue-500 hover:text-blue-700' : 'text-accent hover:text-accent/80'}`}>
+              <Download size={13} />
+            </a>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+async function downloadFiles(files, setDownloading) {
+  setDownloading(true)
+  for (const f of files) {
+    if (f.file_url) {
+      const a = document.createElement('a')
+      a.href = f.file_url
+      a.download = f.file_name
+      a.target = '_blank'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      await new Promise((r) => setTimeout(r, 400))
+    }
+  }
+  setDownloading(false)
+}
+
 function SourceFootageSection({ uploads, shootNotes }) {
-  const [showFiles,        setShowFiles]        = useState(false)
-  const [showClientFiles,  setShowClientFiles]  = useState(false)
-  const [downloadingAll,   setDownloadingAll]   = useState(false)
+  const [showTeam,         setShowTeam]         = useState(false)
+  const [showClient,       setShowClient]        = useState(false)
+  const [dlTeam,           setDlTeam]           = useState(false)
+  const [dlClient,         setDlClient]         = useState(false)
 
   const teamUploads   = uploads.filter((f) => f.profiles?.role !== 'client')
   const clientUploads = uploads.filter((f) => f.profiles?.role === 'client')
-  const totalSize = teamUploads.reduce((acc, f) => acc + (f.file_size || 0), 0)
 
-  const handleDownloadAll = async () => {
-    setDownloadingAll(true)
-    for (const f of uploads) {
-      if (f.file_url) {
-        const a = document.createElement('a')
-        a.href = f.file_url
-        a.download = f.file_name
-        a.target = '_blank'
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-        await new Promise((r) => setTimeout(r, 400))
-      }
-    }
-    setDownloadingAll(false)
-  }
-
-  if (uploads.length === 0) {
-    return (
-      <div className="bg-white rounded-2xl border border-border p-5">
-        <h2 className="text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
-          <Film size={14} className="text-text-muted" /> Source Footage
-        </h2>
-        <p className="text-sm text-text-muted italic">
-          Waiting on the shooter to upload footage.
-        </p>
-      </div>
-    )
-  }
+  const teamSize   = teamUploads.reduce((acc, f) => acc + (f.file_size || 0), 0)
+  const clientSize = clientUploads.reduce((acc, f) => acc + (f.file_size || 0), 0)
 
   return (
-    <div className="bg-white rounded-2xl border border-border p-5 space-y-4">
+    <div className="bg-white rounded-2xl border border-border p-5 space-y-5">
       <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
         <Film size={14} className="text-text-muted" /> Source Footage
       </h2>
 
-      {/* Team footage */}
-      {teamUploads.length > 0 && (
-        <div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex-1">
-              <p className="text-sm font-bold text-text-primary">
-                {teamUploads.length} file{teamUploads.length !== 1 ? 's' : ''} from team
-              </p>
-              <p className="text-xs text-text-muted">{fmtBytes(totalSize)} total</p>
-            </div>
-            <button onClick={() => setShowFiles((v) => !v)} className="btn-secondary text-xs">
-              {showFiles ? 'Hide' : 'Show files'}
-            </button>
-            <button
-              onClick={handleDownloadAll}
-              disabled={downloadingAll}
-              className="btn-primary text-xs flex items-center gap-1.5 disabled:opacity-50"
-            >
-              {downloadingAll ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
-              {downloadingAll ? 'Downloading…' : 'Download All'}
-            </button>
-          </div>
-          {showFiles && (
-            <div className="mt-2 border border-border rounded-xl divide-y divide-border">
-              {teamUploads.map((f) => (
-                <div key={f.id} className="flex items-center gap-3 px-3 py-2.5">
-                  <Film size={13} className="text-text-muted shrink-0" />
-                  <span className="text-sm text-text-primary truncate flex-1">{f.file_name}</span>
-                  <span className="text-xs text-text-muted">{fmtBytes(f.file_size)}</span>
-                  {f.file_url && (
-                    <a href={f.file_url} download={f.file_name} target="_blank" rel="noreferrer"
-                      className="text-accent hover:text-accent/80 transition-colors shrink-0">
-                      <Download size={13} />
-                    </a>
-                  )}
-                </div>
-              ))}
-            </div>
+      {/* ── Client Assets ─────────────────────────────────────────────────── */}
+      <div>
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Client Assets</span>
+          {clientUploads.length > 0 && (
+            <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">
+              {clientUploads.length}
+            </span>
           )}
         </div>
-      )}
 
-      {/* Client footage */}
-      {clientUploads.length > 0 && (
-        <div className="border border-blue-100 rounded-xl p-3 bg-blue-50/50">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-semibold text-blue-700 flex items-center gap-1.5">
-              <Film size={12} /> Client Uploaded · {clientUploads.length} file{clientUploads.length !== 1 ? 's' : ''}
-            </p>
-            <button
-              onClick={() => setShowClientFiles((v) => !v)}
-              className="text-xs text-blue-600 hover:text-blue-800 font-medium"
-            >
-              {showClientFiles ? 'Hide' : 'Show'}
-            </button>
-          </div>
-          {showClientFiles && (
-            <div className="space-y-1.5">
-              {clientUploads.map((f) => (
-                <div key={f.id} className="flex items-center gap-2">
-                  <Film size={12} className="text-blue-400 shrink-0" />
-                  <span className="text-xs text-blue-900 truncate flex-1">{f.file_name}</span>
-                  <span className="text-xs text-blue-400">{fmtBytes(f.file_size)}</span>
-                  {f.file_url && (
-                    <a href={f.file_url} download={f.file_name} target="_blank" rel="noreferrer"
-                      className="text-blue-500 hover:text-blue-700">
-                      <Download size={12} />
-                    </a>
-                  )}
-                </div>
-              ))}
+        {clientUploads.length === 0 ? (
+          <p className="text-xs text-text-muted italic">No files uploaded by the client yet.</p>
+        ) : (
+          <div className="bg-blue-50/60 border border-blue-100 rounded-xl p-3">
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex-1">
+                <p className="text-sm font-bold text-blue-900">
+                  {clientUploads.length} file{clientUploads.length !== 1 ? 's' : ''}
+                </p>
+                <p className="text-xs text-blue-500">{fmtBytes(clientSize)} total</p>
+              </div>
+              <button onClick={() => setShowClient((v) => !v)} className="text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors">
+                {showClient ? 'Hide' : 'Show files'}
+              </button>
+              <button
+                onClick={() => downloadFiles(clientUploads, setDlClient)}
+                disabled={dlClient}
+                className="text-xs flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1.5 rounded-lg font-semibold disabled:opacity-50 transition-colors"
+              >
+                {dlClient ? <Loader2 size={11} className="animate-spin" /> : <Download size={11} />}
+                {dlClient ? 'Downloading…' : 'Download All'}
+              </button>
             </div>
+            {showClient && <FileList files={clientUploads} accent />}
+          </div>
+        )}
+      </div>
+
+      {/* ── Shoot Footage (from creative) ──────────────────────────────────── */}
+      <div>
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-xs font-semibold text-text-secondary uppercase tracking-wide">Shoot Footage</span>
+          {teamUploads.length > 0 && (
+            <span className="text-[10px] font-bold bg-surface-2 text-text-muted px-1.5 py-0.5 rounded-full">
+              {teamUploads.length}
+            </span>
           )}
         </div>
-      )}
 
-      {/* Shoot notes from creative */}
+        {teamUploads.length === 0 ? (
+          <p className="text-xs text-text-muted italic">Waiting on the shooter to upload footage.</p>
+        ) : (
+          <div>
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex-1">
+                <p className="text-sm font-bold text-text-primary">
+                  {teamUploads.length} file{teamUploads.length !== 1 ? 's' : ''}
+                </p>
+                <p className="text-xs text-text-muted">{fmtBytes(teamSize)} total</p>
+              </div>
+              <button onClick={() => setShowTeam((v) => !v)} className="btn-secondary text-xs">
+                {showTeam ? 'Hide' : 'Show files'}
+              </button>
+              <button
+                onClick={() => downloadFiles(teamUploads, setDlTeam)}
+                disabled={dlTeam}
+                className="btn-primary text-xs flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {dlTeam ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                {dlTeam ? 'Downloading…' : 'Download All'}
+              </button>
+            </div>
+            {showTeam && <FileList files={teamUploads} />}
+          </div>
+        )}
+      </div>
+
+      {/* ── Shooter notes ─────────────────────────────────────────────────── */}
       {shootNotes.length > 0 && (
         <div>
           <p className="text-xs font-semibold text-text-secondary mb-2 flex items-center gap-1">
