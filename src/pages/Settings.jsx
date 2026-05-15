@@ -130,11 +130,13 @@ export default function Settings() {
             <input className="input w-full bg-surface-2 text-text-muted cursor-not-allowed" value={user?.email || ''} disabled />
           </div>
 
-          <div className="mb-4">
-            <label className="block text-xs font-medium text-text-secondary mb-1.5">Role</label>
-            <input className="input w-full bg-surface-2 text-text-muted cursor-not-allowed capitalize"
-              value={ROLE_LABELS[profile?.role] || profile?.role || ''} disabled />
-          </div>
+          {profile?.role !== 'client' && (
+            <div className="mb-4">
+              <label className="block text-xs font-medium text-text-secondary mb-1.5">Role</label>
+              <input className="input w-full bg-surface-2 text-text-muted cursor-not-allowed capitalize"
+                value={ROLE_LABELS[profile?.role] || profile?.role || ''} disabled />
+            </div>
+          )}
 
           <form onSubmit={handleNameSave}>
             <label className="block text-xs font-medium text-text-secondary mb-1.5">Full Name</label>

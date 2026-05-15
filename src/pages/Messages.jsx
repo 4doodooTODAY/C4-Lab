@@ -460,9 +460,8 @@ export default function Messages() {
       try {
         const { publicUrl } = await uploadToR2({
           file,
-          category: 'messages',
-          clientName: 'messages',
-          projectName: selectedId || 'general',
+          category:   'messages',
+          folderType: 'tools',
         })
         const { data: msgData } = await supabase
           .from('messages')

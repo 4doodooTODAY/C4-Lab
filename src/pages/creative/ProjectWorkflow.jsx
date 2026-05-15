@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
-import { uploadToR2 } from '../../lib/r2'
+import { uploadToR2, fmtSpeed, fmtEta } from '../../lib/r2'
 import { updateProject } from '../../hooks/useProjects'
 import Avatar from '../../components/ui/Avatar'
 import { format, parseISO } from 'date-fns'
@@ -433,18 +433,32 @@ function ProjectOverviewCard({ project, projectShoots, creativeProfile, editorPr
   )
 }
 
-// ── Upload Footage Section (Creative only) ────────────────────────────────────
+// ── Shoot Delivery Section (Creative only — footage + notes in one flow) ──────
 
-function UploadFootageSection({ project, uploads, onRefresh }) {
+function ShootDeliverySection({ project, uploads, shootNotes, onRefresh }) {
   const { profile } = useAuth()
 
-  const [files,        setFiles]       = useState([])
-  const [uploading,    setUploading]   = useState(false)
-  const [uploadProgress, setProgress] = useState({})
-  const [uploadError,  setUploadError] = useState('')
-  const [markingDone,  setMarkingDone] = useState(false)
+  // Upload state
+  const [open,           setOpen]         = useState(false)
+  const [showFiles,      setShowFiles]    = useState(false)
+  const [files,          setFiles]        = useState([])
+  const [uploading,      setUploading]    = useState(false)
+  const [uploadProgress, setProgress]     = useState({})
+  const [uploadStats,    setUploadStats]  = useState(null)
+  const [uploadError,    setUploadError]  = useState('')
 
-  const stage = STAGE_KEY_MAP[project.stage] || project.stage
+  // Note state
+  const [noteContent, setNoteContent] = useState('')
+  const [savingNote,  setSavingNote]  = useState(false)
+  const [noteSaved,   setNoteSaved]   = useState(false)
+
+  // Send to editor state
+  const [sending, setSending] = useState(false)
+
+  const stage      = STAGE_KEY_MAP[project.stage] || project.stage
+  const hasUploads = uploads.length > 0
+  const totalSize  = uploads.reduce((acc, f) => acc + (f.file_size || 0), 0)
+  const alreadySent = stage !== 'production'  // once moved past production, footage is sent
 
   const handleUpload = async () => {
     if (!files.length) return
@@ -456,14 +470,17 @@ function UploadFootageSection({ project, uploads, onRefresh }) {
 
     try {
       for (const file of files) {
+        setUploadStats(null)
         const { publicUrl } = await uploadToR2({
           file,
-          category: 'footage',
-          clientName: project.clients?.contact_name || project.clients?.name || 'no-client',
+          category:    'footage',
+          clientName:  project.clients?.name || '',
           projectName: project.name,
+          folderType:  'shoots',
+          shootDate:   project.shoot_date || null,
           onProgress: (pct) => setProgress((p) => ({ ...p, [file.name]: pct })),
+          onStats:    (s)   => setUploadStats(s),
         })
-
         await supabase.from('shoot_uploads').insert({
           project_id:  project.id,
           file_url:    publicUrl,
@@ -471,10 +488,10 @@ function UploadFootageSection({ project, uploads, onRefresh }) {
           file_size:   file.size,
           uploaded_by: profile.id,
         })
-
         setProgress((p) => ({ ...p, [file.name]: 100 }))
       }
       setFiles([])
+      setUploadStats(null)
       onRefresh()
     } catch (err) {
       setUploadError(err.message)
@@ -483,112 +500,9 @@ function UploadFootageSection({ project, uploads, onRefresh }) {
     }
   }
 
-  const handleMarkDone = async () => {
-    setMarkingDone(true)
-    try {
-      await updateProject(project.id, { stage: 'post_production' })
-      onRefresh()
-    } catch (err) {
-      setUploadError(err.message)
-    } finally {
-      setMarkingDone(false)
-    }
-  }
-
-  return (
-    <div className="bg-white rounded-2xl border border-border p-5">
-      <h2 className="text-sm font-semibold text-text-primary mb-4 flex items-center gap-2">
-        <Upload size={14} className="text-text-muted" /> Upload Footage
-      </h2>
-
-      {uploads.length > 0 && (
-        <div className="mb-4 space-y-2">
-          <p className="text-xs text-text-muted font-medium">
-            {uploads.length} file{uploads.length !== 1 ? 's' : ''} uploaded
-          </p>
-          {uploads.map((f) => (
-            <div key={f.id} className="flex items-center gap-3 py-1.5">
-              <Film size={14} className="text-text-muted shrink-0" />
-              <span className="text-sm text-text-primary truncate flex-1">{f.file_name}</span>
-              <span className="text-xs text-text-muted">{fmtBytes(f.file_size)}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {files.length > 0 ? (
-        <div className="space-y-2 mb-4">
-          {files.map((f) => (
-            <div key={f.name} className="flex items-center gap-3 py-2 border border-border rounded-xl px-3">
-              <Film size={14} className="text-text-muted shrink-0" />
-              <span className="text-sm text-text-primary truncate flex-1">{f.name}</span>
-              <span className="text-xs text-text-muted">{fmtBytes(f.size)}</span>
-              {uploadProgress[f.name] === 100 ? (
-                <Check size={13} className="text-green-500" />
-              ) : uploading ? (
-                <Loader2 size={13} className="animate-spin text-text-muted" />
-              ) : (
-                <button onClick={() => setFiles((prev) => prev.filter((x) => x.name !== f.name))}>
-                  <X size={13} className="text-text-muted hover:text-red-500" />
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      ) : (
-        <DropZone onFiles={(f) => setFiles((prev) => [...prev, ...f])} />
-      )}
-
-      {uploadError && (
-        <p className="text-xs text-red-500 mt-2">{uploadError}</p>
-      )}
-
-      <div className="flex gap-2 mt-4 flex-wrap">
-        {files.length > 0 && (
-          <button
-            onClick={handleUpload}
-            disabled={uploading}
-            className="btn-primary flex items-center gap-2 disabled:opacity-50"
-          >
-            {uploading
-              ? <Loader2 size={14} className="animate-spin" />
-              : <Upload size={14} />}
-            {uploading
-              ? 'Uploading…'
-              : `Upload ${files.length} file${files.length !== 1 ? 's' : ''}`}
-          </button>
-        )}
-        {uploads.length > 0 && stage === 'production' && (
-          <button
-            onClick={handleMarkDone}
-            disabled={markingDone}
-            className="btn-secondary flex items-center gap-2 disabled:opacity-50"
-          >
-            {markingDone
-              ? <Loader2 size={14} className="animate-spin" />
-              : <Check size={14} />}
-            Mark Footage as Uploaded
-          </button>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// ── Shoot Notes Section (Creative only) ──────────────────────────────────────
-
-function ShootNotesSection({ project, shootNotes, onRefresh }) {
-  const { profile } = useAuth()
-
-  const [noteContent, setNoteContent] = useState('')
-  const [savingNote,  setSavingNote]  = useState(false)
-  const [noteSaved,   setNoteSaved]   = useState(false)
-  const [noteError,   setNoteError]   = useState('')
-
   const handleSaveNote = async () => {
     if (!noteContent.trim()) return
     setSavingNote(true)
-    setNoteError('')
     try {
       await supabase.from('shoot_notes').insert({
         project_id: project.id,
@@ -599,53 +513,191 @@ function ShootNotesSection({ project, shootNotes, onRefresh }) {
       setNoteSaved(true)
       setTimeout(() => setNoteSaved(false), 2500)
       onRefresh()
-    } catch (err) {
-      setNoteError(err.message)
-    } finally {
-      setSavingNote(false)
-    }
+    } catch {}
+    finally { setSavingNote(false) }
+  }
+
+  const handleSendToEditor = async () => {
+    setSending(true)
+    try {
+      await updateProject(project.id, { stage: 'post_production' })
+      onRefresh()
+    } catch {}
+    finally { setSending(false) }
+  }
+
+  // ── Gate: not started yet ──────────────────────────────────────────────────
+  if (!hasUploads && !open) {
+    return (
+      <div className="bg-white rounded-2xl border border-border p-6 text-center">
+        <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center mx-auto mb-3">
+          <Upload size={22} className="text-accent" />
+        </div>
+        <h2 className="text-sm font-bold text-text-primary mb-1">Ready to deliver footage?</h2>
+        <p className="text-xs text-text-muted mb-4">
+          Upload your files, add notes for the editor, then send it over.
+        </p>
+        <button onClick={() => setOpen(true)} className="btn-primary">
+          Begin Upload Process
+        </button>
+      </div>
+    )
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-border p-5">
-      <h2 className="text-sm font-semibold text-text-primary mb-4 flex items-center gap-2">
-        <StickyNote size={14} className="text-text-muted" /> Shoot Notes
+    <div className="bg-white rounded-2xl border border-border p-5 space-y-5">
+      <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+        <Upload size={14} className="text-text-muted" /> Shoot Delivery
       </h2>
 
-      {shootNotes.length > 0 && (
-        <div className="space-y-3 mb-4">
-          {shootNotes.map((n) => (
-            <div key={n.id} className="bg-surface-2 rounded-xl p-3">
-              <p className="text-xs text-text-muted mb-1">
-                {format(new Date(n.created_at), 'MMM d, yyyy h:mm a')}
-              </p>
-              <p className="text-sm text-text-primary whitespace-pre-wrap">{n.content}</p>
+      {/* ── Uploaded files summary ─────────────────────────────────────────── */}
+      {hasUploads && (
+        <div className="bg-green-50 border border-green-200 rounded-xl p-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Check size={14} className="text-green-600" />
+              <span className="text-sm font-semibold text-green-800">
+                {uploads.length} file{uploads.length !== 1 ? 's' : ''} uploaded
+              </span>
+              <span className="text-xs text-green-600">· {fmtBytes(totalSize)}</span>
             </div>
-          ))}
+            <button
+              onClick={() => setShowFiles((v) => !v)}
+              className="text-xs text-green-700 hover:text-green-900 font-medium transition-colors"
+            >
+              {showFiles ? 'Hide' : 'Show files'}
+            </button>
+          </div>
+          {showFiles && (
+            <div className="mt-3 space-y-1.5 border-t border-green-200 pt-3">
+              {uploads.map((f) => (
+                <div key={f.id} className="flex items-center gap-2">
+                  <Film size={12} className="text-green-600 shrink-0" />
+                  <span className="text-xs text-green-900 truncate flex-1">{f.file_name}</span>
+                  <span className="text-xs text-green-600">{fmtBytes(f.file_size)}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      <textarea
-        className="input w-full min-h-[120px] resize-y"
-        placeholder="Write your shoot recap, notes, anything the editor should know…"
-        value={noteContent}
-        onChange={(e) => setNoteContent(e.target.value)}
-      />
+      {/* ── Upload zone (visible while open or no uploads yet) ─────────────── */}
+      {!alreadySent && (
+        <div>
+          {files.length > 0 ? (
+            <div className="space-y-2">
+              {files.map((f) => (
+                <div key={f.name} className="flex items-center gap-3 py-2 border border-border rounded-xl px-3">
+                  <Film size={14} className="text-text-muted shrink-0" />
+                  <span className="text-sm text-text-primary truncate flex-1">{f.name}</span>
+                  <span className="text-xs text-text-muted">{fmtBytes(f.size)}</span>
+                  {uploadProgress[f.name] === 100 ? (
+                    <Check size={13} className="text-green-500" />
+                  ) : uploading ? (
+                    <Loader2 size={13} className="animate-spin text-text-muted" />
+                  ) : (
+                    <button onClick={() => setFiles((prev) => prev.filter((x) => x.name !== f.name))}>
+                      <X size={13} className="text-text-muted hover:text-red-500" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <DropZone onFiles={(f) => setFiles((prev) => [...prev, ...f])} />
+          )}
 
-      {noteError && <p className="text-xs text-red-500 mt-2">{noteError}</p>}
+          {uploadError && <p className="text-xs text-red-500 mt-2">{uploadError}</p>}
 
-      <button
-        onClick={handleSaveNote}
-        disabled={savingNote || !noteContent.trim()}
-        className="btn-primary mt-3 flex items-center gap-2 disabled:opacity-50"
-      >
-        {savingNote
-          ? <Loader2 size={14} className="animate-spin" />
-          : noteSaved
-          ? <Check size={14} />
-          : <StickyNote size={14} />}
-        {noteSaved ? 'Saved!' : 'Save Note'}
-      </button>
+          {uploading && uploadStats && (
+            <div className="mt-3 flex items-center gap-3 text-xs text-text-muted">
+              <div className="flex-1 h-1 bg-surface-3 rounded-full overflow-hidden">
+                {(() => {
+                  const cur = files.find((f) => (uploadProgress[f.name] || 0) < 100 && (uploadProgress[f.name] || 0) > 0) || files[0]
+                  const pct = cur ? (uploadProgress[cur.name] || 0) : 0
+                  return <div className="h-full bg-accent rounded-full transition-all duration-200" style={{ width: `${pct}%` }} />
+                })()}
+              </div>
+              <span className="shrink-0 font-medium text-text-secondary">{fmtSpeed(uploadStats.speed)}</span>
+              {uploadStats.eta != null && <span className="shrink-0">{fmtEta(uploadStats.eta)}</span>}
+            </div>
+          )}
+
+          {files.length > 0 && (
+            <button
+              onClick={handleUpload}
+              disabled={uploading}
+              className="btn-primary mt-3 flex items-center gap-2 disabled:opacity-50"
+            >
+              {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+              {uploading ? 'Uploading…' : `Upload ${files.length} file${files.length !== 1 ? 's' : ''}`}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* ── Notes ─────────────────────────────────────────────────────────── */}
+      {(hasUploads || open) && (
+        <div>
+          <p className="text-xs font-semibold text-text-secondary mb-2 flex items-center gap-1">
+            <StickyNote size={12} /> Notes for editor
+          </p>
+
+          {shootNotes.length > 0 && (
+            <div className="space-y-2 mb-3">
+              {shootNotes.map((n) => (
+                <div key={n.id} className="bg-surface-2 rounded-xl p-3">
+                  <p className="text-xs text-text-muted mb-1">{format(new Date(n.created_at), 'MMM d, h:mm a')}</p>
+                  <p className="text-sm text-text-primary whitespace-pre-wrap">{n.content}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!alreadySent && (
+            <div className="flex gap-2">
+              <textarea
+                className="input flex-1 min-h-[80px] resize-none text-sm"
+                placeholder="Key moments, what to cut, style notes, timestamps…"
+                value={noteContent}
+                onChange={(e) => setNoteContent(e.target.value)}
+              />
+              <button
+                onClick={handleSaveNote}
+                disabled={savingNote || !noteContent.trim()}
+                className="btn-secondary shrink-0 self-end disabled:opacity-50"
+              >
+                {savingNote ? <Loader2 size={14} className="animate-spin" /> : noteSaved ? <Check size={14} className="text-green-500" /> : <StickyNote size={14} />}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Send to Editor CTA ─────────────────────────────────────────────── */}
+      {hasUploads && stage === 'production' && (
+        <div className="pt-2 border-t border-border">
+          <button
+            onClick={handleSendToEditor}
+            disabled={sending}
+            className="btn-primary w-full flex items-center justify-center gap-2"
+          >
+            {sending ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+            {sending ? 'Sending…' : 'Send to Editor →'}
+          </button>
+          <p className="text-xs text-text-muted text-center mt-2">
+            This will notify the editor that footage is ready.
+          </p>
+        </div>
+      )}
+
+      {alreadySent && (
+        <div className="flex items-center gap-2 text-xs text-green-700 bg-green-50 rounded-xl px-3 py-2">
+          <CheckCircle2 size={13} />
+          Footage delivered to editor.
+        </div>
+      )}
     </div>
   )
 }
@@ -653,6 +705,31 @@ function ShootNotesSection({ project, shootNotes, onRefresh }) {
 // ── Source Footage Section (Editor only) ──────────────────────────────────────
 
 function SourceFootageSection({ uploads, shootNotes }) {
+  const [showFiles,        setShowFiles]        = useState(false)
+  const [showClientFiles,  setShowClientFiles]  = useState(false)
+  const [downloadingAll,   setDownloadingAll]   = useState(false)
+
+  const teamUploads   = uploads.filter((f) => f.profiles?.role !== 'client')
+  const clientUploads = uploads.filter((f) => f.profiles?.role === 'client')
+  const totalSize = teamUploads.reduce((acc, f) => acc + (f.file_size || 0), 0)
+
+  const handleDownloadAll = async () => {
+    setDownloadingAll(true)
+    for (const f of uploads) {
+      if (f.file_url) {
+        const a = document.createElement('a')
+        a.href = f.file_url
+        a.download = f.file_name
+        a.target = '_blank'
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        await new Promise((r) => setTimeout(r, 400))
+      }
+    }
+    setDownloadingAll(false)
+  }
+
   if (uploads.length === 0) {
     return (
       <div className="bg-white rounded-2xl border border-border p-5">
@@ -660,50 +737,104 @@ function SourceFootageSection({ uploads, shootNotes }) {
           <Film size={14} className="text-text-muted" /> Source Footage
         </h2>
         <p className="text-sm text-text-muted italic">
-          No footage uploaded yet. The shooter will upload files here.
+          Waiting on the shooter to upload footage.
         </p>
       </div>
     )
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-border p-5">
-      <h2 className="text-sm font-semibold text-text-primary mb-4 flex items-center gap-2">
+    <div className="bg-white rounded-2xl border border-border p-5 space-y-4">
+      <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
         <Film size={14} className="text-text-muted" /> Source Footage
       </h2>
 
-      <div className="space-y-2 mb-5">
-        {uploads.map((f) => (
-          <div key={f.id} className="flex items-center gap-3 py-1.5">
-            <Film size={14} className="text-text-muted shrink-0" />
-            <span className="text-sm text-text-primary truncate flex-1">{f.file_name}</span>
-            <span className="text-xs text-text-muted">{fmtBytes(f.file_size)}</span>
-            {f.file_url && (
-              <a
-                href={f.file_url}
-                download
-                className="text-accent hover:text-accent/80 transition-colors"
-                title="Download"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <Download size={14} />
-              </a>
-            )}
+      {/* Team footage */}
+      {teamUploads.length > 0 && (
+        <div>
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex-1">
+              <p className="text-sm font-bold text-text-primary">
+                {teamUploads.length} file{teamUploads.length !== 1 ? 's' : ''} from team
+              </p>
+              <p className="text-xs text-text-muted">{fmtBytes(totalSize)} total</p>
+            </div>
+            <button onClick={() => setShowFiles((v) => !v)} className="btn-secondary text-xs">
+              {showFiles ? 'Hide' : 'Show files'}
+            </button>
+            <button
+              onClick={handleDownloadAll}
+              disabled={downloadingAll}
+              className="btn-primary text-xs flex items-center gap-1.5 disabled:opacity-50"
+            >
+              {downloadingAll ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+              {downloadingAll ? 'Downloading…' : 'Download All'}
+            </button>
           </div>
-        ))}
-      </div>
+          {showFiles && (
+            <div className="mt-2 border border-border rounded-xl divide-y divide-border">
+              {teamUploads.map((f) => (
+                <div key={f.id} className="flex items-center gap-3 px-3 py-2.5">
+                  <Film size={13} className="text-text-muted shrink-0" />
+                  <span className="text-sm text-text-primary truncate flex-1">{f.file_name}</span>
+                  <span className="text-xs text-text-muted">{fmtBytes(f.file_size)}</span>
+                  {f.file_url && (
+                    <a href={f.file_url} download={f.file_name} target="_blank" rel="noreferrer"
+                      className="text-accent hover:text-accent/80 transition-colors shrink-0">
+                      <Download size={13} />
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
+      {/* Client footage */}
+      {clientUploads.length > 0 && (
+        <div className="border border-blue-100 rounded-xl p-3 bg-blue-50/50">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-semibold text-blue-700 flex items-center gap-1.5">
+              <Film size={12} /> Client Uploaded · {clientUploads.length} file{clientUploads.length !== 1 ? 's' : ''}
+            </p>
+            <button
+              onClick={() => setShowClientFiles((v) => !v)}
+              className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+            >
+              {showClientFiles ? 'Hide' : 'Show'}
+            </button>
+          </div>
+          {showClientFiles && (
+            <div className="space-y-1.5">
+              {clientUploads.map((f) => (
+                <div key={f.id} className="flex items-center gap-2">
+                  <Film size={12} className="text-blue-400 shrink-0" />
+                  <span className="text-xs text-blue-900 truncate flex-1">{f.file_name}</span>
+                  <span className="text-xs text-blue-400">{fmtBytes(f.file_size)}</span>
+                  {f.file_url && (
+                    <a href={f.file_url} download={f.file_name} target="_blank" rel="noreferrer"
+                      className="text-blue-500 hover:text-blue-700">
+                      <Download size={12} />
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Shoot notes from creative */}
       {shootNotes.length > 0 && (
         <div>
-          <p className="text-xs font-semibold text-text-muted mb-2">
-            Shoot Notes from Creative
+          <p className="text-xs font-semibold text-text-secondary mb-2 flex items-center gap-1">
+            <StickyNote size={12} /> Notes from Shooter
           </p>
           <div className="space-y-2">
             {shootNotes.map((n) => (
-              <div key={n.id} className="bg-surface-2 rounded-xl p-3">
-                <p className="text-xs text-text-muted mb-1">
-                  {format(new Date(n.created_at), 'MMM d, yyyy')}
-                </p>
+              <div key={n.id} className="bg-amber-50 border border-amber-100 rounded-xl p-3">
+                <p className="text-xs text-text-muted mb-1">{format(new Date(n.created_at), 'MMM d, h:mm a')}</p>
                 <p className="text-sm text-text-primary whitespace-pre-wrap">{n.content}</p>
               </div>
             ))}
@@ -720,9 +851,13 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
   const { profile }  = useAuth()
   const fileInputRef = useRef()
 
+  const [open,         setOpen]        = useState(false)
   const [revisionFile, setRevisionFile] = useState(null)
-  const [uploading,    setUploading]    = useState(false)
-  const [uploadError,  setUploadError]  = useState('')
+  const [uploading,    setUploading]   = useState(false)
+  const [uploadStats,  setUploadStats] = useState(null)
+  const [uploadPct,    setUploadPct]   = useState(0)
+  const [editorNote,   setEditorNote]  = useState('')
+  const [uploadError,  setUploadError] = useState('')
 
   const stage      = STAGE_KEY_MAP[project.stage] || project.stage
   const latestRev  = [...revisions].sort((a, b) => b.revision_number - a.revision_number)[0]
@@ -735,12 +870,18 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
     if (!revisionFile) return
     setUploading(true)
     setUploadError('')
+    setUploadPct(0)
+    setUploadStats(null)
     try {
       const { publicUrl } = await uploadToR2({
-        file: revisionFile,
-        category: `revisions/revision-${nextRevNum}`,
-        clientName: project.clients?.contact_name || project.clients?.name || 'no-client',
+        file:        revisionFile,
+        category:    'revisions',
+        clientName:  project.clients?.name || '',
         projectName: project.name,
+        folderType:  'shoots',
+        shootDate:   project.shoot_date || null,
+        onProgress:  setUploadPct,
+        onStats:     setUploadStats,
       })
 
       await supabase.from('project_revisions').insert({
@@ -751,9 +892,20 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
         uploaded_by:     profile.id,
       })
 
+      // Save editor note as a shoot note tagged for this revision
+      if (editorNote.trim()) {
+        await supabase.from('shoot_notes').insert({
+          project_id: project.id,
+          author_id:  profile.id,
+          content:    `[Revision ${nextRevNum} note] ${editorNote.trim()}`,
+        })
+      }
+
       await updateProject(project.id, { stage: 'review', revision_count: nextRevNum })
 
       setRevisionFile(null)
+      setEditorNote('')
+      setOpen(false)
       onRefresh()
     } catch (err) {
       setUploadError(err.message)
@@ -762,31 +914,55 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
     }
   }
 
+  // ── Gate ───────────────────────────────────────────────────────────────────
+  if (!open) {
+    return (
+      <div className="bg-white rounded-2xl border border-border p-6 text-center">
+        <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center mx-auto mb-3">
+          <FileVideo size={22} className="text-accent" />
+        </div>
+        <h2 className="text-sm font-bold text-text-primary mb-1">
+          {nextRevNum === 1 ? 'Ready to submit your edit?' : `Ready to upload Revision ${nextRevNum}?`}
+        </h2>
+        <p className="text-xs text-text-muted mb-4">
+          {nextRevNum > 1
+            ? `Address the feedback from Revision ${nextRevNum - 1} and upload your new cut.`
+            : 'Upload the first edit for the creative team to review.'}
+        </p>
+        {latestRev && latestRev.status === 'pending_editor' && (
+          <div className="mb-4">
+            <RevisionCommentsList revisionId={latestRev.id} />
+          </div>
+        )}
+        <button onClick={() => setOpen(true)} className="btn-primary">
+          Begin Revision {nextRevNum} Upload
+        </button>
+      </div>
+    )
+  }
+
   return (
-    <div className="bg-white rounded-2xl border border-border p-5">
-      <h2 className="text-sm font-semibold text-text-primary mb-1 flex items-center gap-2">
+    <div className="bg-white rounded-2xl border border-border p-5 space-y-4">
+      <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
         <FileVideo size={14} className="text-text-muted" /> Upload Revision {nextRevNum}
       </h2>
-      <p className="text-xs text-text-muted mb-4">
-        {nextRevNum > 1
-          ? `Address the accepted comments from Revision ${nextRevNum - 1} and upload the new cut.`
-          : 'Upload the first edit for creative review.'}
-      </p>
 
+      {/* Accepted comments */}
       {latestRev && latestRev.status === 'pending_editor' && (
         <RevisionCommentsList revisionId={latestRev.id} />
       )}
 
+      {/* File picker */}
       <div
-        className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all mb-4 ${
+        className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${
           revisionFile ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/50'
         }`}
-        onClick={() => fileInputRef.current?.click()}
+        onClick={() => !uploading && fileInputRef.current?.click()}
       >
-        <FileVideo size={24} className="mx-auto text-text-muted mb-2" />
+        <FileVideo size={22} className="mx-auto text-text-muted mb-2" />
         {revisionFile ? (
           <>
-            <p className="text-sm font-medium text-text-primary">{revisionFile.name}</p>
+            <p className="text-sm font-semibold text-text-primary">{revisionFile.name}</p>
             <p className="text-xs text-text-muted">{fmtBytes(revisionFile.size)}</p>
           </>
         ) : (
@@ -804,20 +980,56 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
         />
       </div>
 
-      {uploadError && (
-        <p className="text-xs text-red-500 mb-3">{uploadError}</p>
+      {/* Upload progress */}
+      {uploading && (
+        <div>
+          <div className="flex items-center justify-between mb-1 text-xs text-text-muted">
+            <span>Uploading…</span>
+            <div className="flex items-center gap-2">
+              {uploadStats && <span className="font-medium text-text-secondary">{fmtSpeed(uploadStats.speed)}</span>}
+              {uploadStats?.eta != null && <span>{fmtEta(uploadStats.eta)}</span>}
+              <span>{uploadPct}%</span>
+            </div>
+          </div>
+          <div className="h-1.5 bg-surface-3 rounded-full overflow-hidden">
+            <div className="h-full bg-accent rounded-full transition-all duration-200" style={{ width: `${uploadPct}%` }} />
+          </div>
+        </div>
       )}
 
-      <button
-        onClick={handleUploadRevision}
-        disabled={!revisionFile || uploading}
-        className="btn-primary flex items-center gap-2 disabled:opacity-50"
-      >
-        {uploading
-          ? <Loader2 size={14} className="animate-spin" />
-          : <Upload size={14} />}
-        {uploading ? 'Uploading…' : `Upload Revision ${nextRevNum}`}
-      </button>
+      {/* Notes for creative */}
+      <div>
+        <label className="block text-xs font-semibold text-text-secondary mb-1.5 flex items-center gap-1">
+          <StickyNote size={12} /> Notes for creative team <span className="font-normal text-text-muted">(optional)</span>
+        </label>
+        <textarea
+          className="input w-full min-h-[80px] resize-none text-sm"
+          placeholder="What changed, any context, things to look out for…"
+          value={editorNote}
+          onChange={(e) => setEditorNote(e.target.value)}
+          disabled={uploading}
+        />
+      </div>
+
+      {uploadError && <p className="text-xs text-red-500">{uploadError}</p>}
+
+      <div className="flex gap-2">
+        <button
+          onClick={() => setOpen(false)}
+          className="btn-secondary"
+          disabled={uploading}
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleUploadRevision}
+          disabled={!revisionFile || uploading}
+          className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50"
+        >
+          {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+          {uploading ? 'Uploading…' : `Submit Revision ${nextRevNum} →`}
+        </button>
+      </div>
     </div>
   )
 }
@@ -977,7 +1189,7 @@ export default function ProjectWorkflow() {
       // 2. Fetch everything else in parallel
       const [shootsRes, uploadsRes, notesRes, revsRes] = await Promise.all([
         supabase.from('project_shoots').select('*').eq('project_id', id).order('shoot_date'),
-        supabase.from('shoot_uploads').select('*').eq('project_id', id).order('created_at'),
+        supabase.from('shoot_uploads').select('*, profiles(id, full_name, role)').eq('project_id', id).order('created_at'),
         supabase.from('shoot_notes').select('*').eq('project_id', id).order('created_at'),
         supabase.from('project_revisions').select('*').eq('project_id', id).order('revision_number'),
       ])
@@ -1132,19 +1344,11 @@ export default function ProjectWorkflow() {
             editorProfile={editorProfile}
           />
 
-          {/* 2a. Upload Footage — creative (or admin) */}
-          {isCreative && (
-            <UploadFootageSection
+          {/* 2. Shoot Delivery — creative (footage + notes in one flow) */}
+          {isCreative && !pureEditor && (
+            <ShootDeliverySection
               project={project}
               uploads={uploads}
-              onRefresh={fetchAll}
-            />
-          )}
-
-          {/* 2b. Shoot Notes — creative (or admin) */}
-          {isCreative && (
-            <ShootNotesSection
-              project={project}
               shootNotes={shootNotes}
               onRefresh={fetchAll}
             />

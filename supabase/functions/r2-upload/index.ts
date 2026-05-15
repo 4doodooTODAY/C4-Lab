@@ -27,13 +27,27 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
-    const { filename, contentType, category, clientName, projectName } = await req.json()
+    const { filename, contentType, category, clientName, projectName, folderType, shootDate } = await req.json()
 
-    const clientSlug  = slugify(clientName || 'no-client')
-    const projectSlug = slugify(projectName || 'no-project')
+    const clientSlug  = slugify(clientName || '')
+    const projectSlug = slugify(projectName || 'untitled')
     const timestamp   = Date.now()
     const safeName    = filename.replace(/[^a-zA-Z0-9._-]/g, '-')
-    const key         = `clients/${clientSlug}/${projectSlug}/${category}/${timestamp}-${safeName}`
+
+    // Date for shoot folder name — use provided shootDate or today
+    const dateStr = shootDate
+      ? shootDate.slice(0, 10)
+      : new Date().toISOString().slice(0, 10)
+
+    let key: string
+    if (folderType === 'tools' || !clientSlug) {
+      // Non-project files: tools/messages, logos, etc.
+      key = `tools/${category}/${timestamp}-${safeName}`
+    } else {
+      // Project shoot files: clients/{client}/shoots/{project} {date}/{category}/
+      const shootFolder = `${projectSlug} ${dateStr}`
+      key = `clients/${clientSlug}/shoots/${shootFolder}/${category}/${timestamp}-${safeName}`
+    }
 
     const command = new PutObjectCommand({
       Bucket: R2_BUCKET,

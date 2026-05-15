@@ -26,12 +26,10 @@ const NAV = {
     { to: '/messages',  icon: MessageSquare,    label: 'Messages' },
   ],
   client: [
-    { to: '/client',          icon: Home,           label: 'Home',           end: true },
+    { to: '/client',          icon: Home,           label: 'Home',        end: true },
     { to: '/my-projects',     icon: FolderKanban,   label: 'My Projects' },
     { to: '/client/calendar', icon: CalendarDays,   label: 'Calendar' },
-    { to: '/client/request',  icon: PenLine,        label: 'Request a Post' },
-    { to: '/client/upload',   icon: Upload,         label: 'Upload Footage' },
-    { to: '/messages',        icon: MessageSquare,  label: 'Messages' },
+    { to: '/client/messages', icon: MessageSquare,  label: 'Messages' },
   ],
 }
 
@@ -113,7 +111,7 @@ export default function Sidebar() {
           <Avatar name={displayName} url={profile?.avatar_url} size={7} />
           <div className="flex-1 min-w-0">
             <p className="text-white/80 text-xs font-medium truncate">{displayName}</p>
-            <p className="text-white/30 text-xs">{ROLE_LABELS[role] || role}</p>
+            {role !== 'client' && <p className="text-white/30 text-xs">{ROLE_LABELS[role] || role}</p>}
             {profile?.tags?.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-1">
                 {profile.tags.map((tag) => (

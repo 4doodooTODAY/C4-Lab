@@ -142,31 +142,34 @@ Deno.serve(async (req) => {
     if (action === 'invite_client') {
       const { contact_name, business, email, phone, created_by } = body
 
-      // 1. Create user directly (more reliable than inviteUserByEmail)
-      //    email_confirm:true means they can log in right away via the reset link we send
+      // 1. Invite user — this creates the account AND sends the invite email
+      //    via Supabase's built-in email service (no external SMTP needed)
       let profileId: string
-      const { data: createData, error: createError } = await supabaseAdmin.auth.admin.createUser({
-        email,
-        email_confirm: true,
-        user_metadata: { full_name: contact_name, role: 'client', must_change_password: true },
+      const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+        data: { full_name: contact_name, role: 'client', must_change_password: true },
+        redirectTo: 'https://c4-lab.vercel.app/change-password',
       })
 
-      if (createError) {
-        // User already exists — look them up
-        if (createError.message.includes('already') || createError.message.includes('duplicate') || createError.message.includes('exists')) {
+      if (inviteError) {
+        // User already exists — look them up and continue (no re-invite needed)
+        if (
+          inviteError.message.toLowerCase().includes('already') ||
+          inviteError.message.toLowerCase().includes('registered') ||
+          inviteError.message.toLowerCase().includes('exists')
+        ) {
           const { data: listData, error: listError } = await supabaseAdmin.auth.admin.listUsers()
           if (listError) throw new Error('Lookup error: ' + listError.message)
           const existing = listData.users.find((u) => u.email === email)
-          if (!existing) throw new Error('User creation failed: ' + createError.message)
+          if (!existing) throw new Error('User not found after conflict: ' + inviteError.message)
           profileId = existing.id
         } else {
-          throw new Error('Create error: ' + createError.message)
+          throw new Error('Invite error: ' + inviteError.message)
         }
       } else {
-        profileId = createData.user.id
+        profileId = inviteData.user.id
       }
 
-      // 2. Upsert profile
+      // 2. Upsert profile, then force-update role in case the DB trigger set a wrong default
       const { error: profileError } = await supabaseAdmin.from('profiles').upsert({
         id: profileId,
         full_name: contact_name,
@@ -175,6 +178,9 @@ Deno.serve(async (req) => {
         phone,
       }, { onConflict: 'id' })
       if (profileError) throw new Error('Profile error: ' + profileError.message)
+
+      // Explicit update to guarantee role is 'client' regardless of trigger defaults
+      await supabaseAdmin.from('profiles').update({ role: 'client' }).eq('id', profileId)
 
       // 3. Upsert client record
       const { data: clientData, error: clientError } = await supabaseAdmin
@@ -190,11 +196,6 @@ Deno.serve(async (req) => {
         .select()
         .single()
       if (clientError) throw new Error('Client error: ' + clientError.message)
-
-      // 4. Send password reset email so the client can set their password
-      await supabaseAdmin.auth.resetPasswordForEmail(email, {
-        redirectTo: 'https://c4-lab.vercel.app/change-password',
-      })
 
       return new Response(JSON.stringify({ user: { id: profileId, email }, client: clientData }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200,

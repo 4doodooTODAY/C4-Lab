@@ -4,6 +4,7 @@ import { Upload, CheckCircle, Loader2, X, FileVideo, AlertCircle } from 'lucide-
 import { useClientRequests } from '../../hooks/useContentRequests'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
+import { uploadToR2, fmtSpeed, fmtEta } from '../../lib/r2'
 
 function formatBytes(bytes) {
   if (bytes === 0) return '0 B'
@@ -19,10 +20,12 @@ export default function UploadFootage() {
   const { submitFootage } = useClientRequests()
   const fileInputRef = useRef(null)
   const [clientId, setClientId] = useState(null)
+  const [clientName, setClientName] = useState('')
   const [dragOver, setDragOver] = useState(false)
   const [file, setFile] = useState(null)
   const [form, setForm] = useState({ title: '', notes: '' })
   const [progress, setProgress] = useState(0)
+  const [uploadStats, setUploadStats] = useState(null)
   const [uploading, setUploading] = useState(false)
   const [done, setDone] = useState(false)
   const [error, setError] = useState('')
@@ -31,12 +34,15 @@ export default function UploadFootage() {
     if (!user) return
     supabase
       .from('client_access')
-      .select('client_id')
+      .select('client_id, clients(id, name)')
       .eq('profile_id', user.id)
       .limit(1)
       .single()
       .then(({ data }) => {
-        if (data?.client_id) setClientId(data.client_id)
+        if (data?.client_id) {
+          setClientId(data.client_id)
+          setClientName(data.clients?.name || '')
+        }
       })
   }, [user])
 
@@ -59,36 +65,26 @@ export default function UploadFootage() {
     setProgress(0)
 
     try {
-      // Upload to Supabase Storage
-      const ext = file.name.split('.').pop()
-      const path = `footage/${user.id}/${Date.now()}.${ext}`
+      // Upload directly to R2 with real progress tracking
+      const { publicUrl } = await uploadToR2({
+        file,
+        category:    'footage',
+        clientName:  clientName || '',
+        projectName: form.title || 'upload',
+        folderType:  'shoots',
+        shootDate:   null,
+        onProgress:  setProgress,
+        onStats:     setUploadStats,
+      })
 
-      // Supabase JS v2 doesn't support upload progress natively,
-      // so we simulate progress for UX while the upload runs
-      const progressInterval = setInterval(() => {
-        setProgress((p) => Math.min(p + 8, 85))
-      }, 400)
-
-      const { data: storageData, error: storageError } = await supabase.storage
-        .from('client-footage')
-        .upload(path, file, { cacheControl: '3600', upsert: false })
-
-      clearInterval(progressInterval)
-
-      if (storageError) throw storageError
-      setProgress(95)
-
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('client-footage')
-        .getPublicUrl(path)
+      setProgress(98)
 
       // Save to content_requests
       await submitFootage({
         title: form.title || file.name,
         notes: form.notes,
         client_id: clientId,
-        file_url: urlData.publicUrl,
+        file_url: publicUrl,
         file_name: file.name,
         file_size: file.size,
       })
@@ -194,12 +190,21 @@ export default function UploadFootage() {
         {uploading && (
           <div className="card p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-text-primary">Uploading...</span>
-              <span className="text-xs text-text-muted">{progress}%</span>
+              <span className="text-xs font-medium text-text-primary">Uploading…</span>
+              <div className="flex items-center gap-2 text-xs text-text-muted">
+                {uploadStats && (
+                  <>
+                    <span className="font-medium text-text-secondary">{fmtSpeed(uploadStats.speed)}</span>
+                    {uploadStats.eta != null && <span>{fmtEta(uploadStats.eta)}</span>}
+                    <span>·</span>
+                  </>
+                )}
+                <span>{progress}%</span>
+              </div>
             </div>
             <div className="h-1.5 bg-surface-3 rounded-full overflow-hidden">
               <div
-                className="h-full bg-accent rounded-full transition-all duration-300"
+                className="h-full bg-accent rounded-full transition-all duration-200"
                 style={{ width: `${progress}%` }}
               />
             </div>

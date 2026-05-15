@@ -1,29 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { uploadToR2 } from '../lib/r2'
 
-const STORAGE_BUCKET = 'videos'
-
-function isStorageUrl(url) {
-  return url?.includes('/storage/v1/object/public/')
-}
-
-function storagePathFromUrl(url) {
-  const marker = `/object/public/${STORAGE_BUCKET}/`
-  const idx = url.indexOf(marker)
-  return idx !== -1 ? url.slice(idx + marker.length) : null
-}
-
-export async function uploadMediaFile(file) {
-  const ext = file.name.split('.').pop()
-  const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-  const { data, error } = await supabase.storage
-    .from(STORAGE_BUCKET)
-    .upload(path, file, { cacheControl: '3600', upsert: false })
-  if (error) throw error
-  const { data: { publicUrl } } = supabase.storage
-    .from(STORAGE_BUCKET)
-    .getPublicUrl(data.path)
+export async function uploadMediaFile(file, { category = 'review-videos', clientName = '', projectName = '', onProgress } = {}) {
+  const { publicUrl } = await uploadToR2({ file, category, clientName, projectName, onProgress })
   return publicUrl
 }
 
@@ -60,13 +41,8 @@ export function useMedia(projectId) {
   }
 
   const deleteMedia = async (id) => {
-    const item = media.find((m) => m.id === id)
     const { error } = await supabase.from('media').delete().eq('id', id)
     if (error) throw error
-    if (item && isStorageUrl(item.media_url)) {
-      const path = storagePathFromUrl(item.media_url)
-      if (path) supabase.storage.from(STORAGE_BUCKET).remove([path]) // fire and forget
-    }
     setMedia((prev) => prev.filter((m) => m.id !== id))
   }
 
