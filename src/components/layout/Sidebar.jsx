@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Film, CalendarDays, Settings,
-  LogOut, Users, Building2, Inbox, Home, PenLine, Upload, MessageSquare, Bell, FolderKanban
+  LogOut, Users, Building2, Inbox, Home, PenLine, Upload, MessageSquare, Bell, FolderKanban, ShieldCheck
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useNotifications } from '../../contexts/NotificationContext'
@@ -17,6 +17,7 @@ const NAV = {
     { to: '/videos',        icon: Film,             label: 'Review' },
     { to: '/calendar',      icon: CalendarDays,     label: 'Calendar' },
     { to: '/messages',      icon: MessageSquare,    label: 'Messages' },
+    { to: '/admin/access',  icon: ShieldCheck,      label: 'Access' },
   ],
   creative: [
     { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', end: true },
