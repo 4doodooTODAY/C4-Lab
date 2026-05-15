@@ -9,11 +9,22 @@ import { supabase } from '../lib/supabase'
 import Avatar from '../components/ui/Avatar'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+// Snap a raw float timestamp to the nearest 0.25s increment
+function snapToQuarter(s) {
+  return Math.round(s * 4) / 4
+}
+
+// Format a timestamp; shows fractional quarter-seconds when non-zero
+// e.g. 83.25 → "1:23.25", 83.0 → "1:23"
 function fmtTime(s) {
   if (s == null || isNaN(s)) return '0:00'
-  const m = Math.floor(s / 60)
-  const sec = Math.floor(s % 60)
-  return `${m}:${sec.toString().padStart(2, '0')}`
+  const snapped = snapToQuarter(s)
+  const m   = Math.floor(snapped / 60)
+  const sec = Math.floor(snapped % 60)
+  const frac = Math.round((snapped - Math.floor(snapped)) * 100)
+  const fracStr = frac > 0 ? `.${frac.toString().padStart(2, '0')}` : ''
+  return `${m}:${sec.toString().padStart(2, '0')}${fracStr}`
 }
 
 // ── Comment dot on timeline ───────────────────────────────────────────────────
@@ -215,7 +226,8 @@ export default function VideoRevisionReview() {
     if (!timelineRef.current || !duration) return
     const rect  = timelineRef.current.getBoundingClientRect()
     const ratio = (e.clientX - rect.left) / rect.width
-    const ts    = Math.max(0, Math.min(duration, ratio * duration))
+    const raw   = Math.max(0, Math.min(duration, ratio * duration))
+    const ts    = snapToQuarter(raw) // snap to nearest 0.25s
     if (videoRef.current) videoRef.current.currentTime = ts
     setPopover({ x: e.clientX - rect.left, timestamp: ts })
     setAddingFromPanel(false)
@@ -263,12 +275,14 @@ export default function VideoRevisionReview() {
     setSubmittingAction(true)
     setActionError('')
     try {
-      await supabase.from('project_revisions')
+      const { error: e } = await supabase.from('project_revisions')
         .update({ status: 'pending_client_review' })
         .eq('id', revisionId)
+      if (e) throw new Error(e.message)
       fetchAll()
     } catch (err) {
-      setActionError(err.message)
+      setActionError(err.message || 'Failed — check permissions')
+      console.error('Submit for client review failed:', err)
     } finally {
       setSubmittingAction(false)
     }
@@ -279,15 +293,20 @@ export default function VideoRevisionReview() {
     setSubmittingAction(true)
     setActionError('')
     try {
-      await supabase.from('project_revisions')
+      const { error: e1 } = await supabase.from('project_revisions')
         .update({ status: 'pending_editor' })
         .eq('id', revisionId)
-      await supabase.from('projects')
+      if (e1) throw new Error(e1.message)
+
+      const { error: e2 } = await supabase.from('projects')
         .update({ stage: 'post_production' })
         .eq('id', project.id)
+      if (e2) throw new Error(e2.message)
+
       fetchAll()
     } catch (err) {
-      setActionError(err.message)
+      setActionError(err.message || 'Failed — check permissions (see console)')
+      console.error('Send to editor failed:', err)
     } finally {
       setSubmittingAction(false)
     }
@@ -298,15 +317,20 @@ export default function VideoRevisionReview() {
     setSubmittingAction(true)
     setActionError('')
     try {
-      await supabase.from('project_revisions')
+      const { error: e1 } = await supabase.from('project_revisions')
         .update({ status: 'approved' })
         .eq('id', revisionId)
-      await supabase.from('projects')
+      if (e1) throw new Error(e1.message)
+
+      const { error: e2 } = await supabase.from('projects')
         .update({ stage: 'delivered' })
         .eq('id', project.id)
+      if (e2) throw new Error(e2.message)
+
       fetchAll()
     } catch (err) {
-      setActionError(err.message)
+      setActionError(err.message || 'Failed — check permissions (see console)')
+      console.error('Approve failed:', err)
     } finally {
       setSubmittingAction(false)
     }
