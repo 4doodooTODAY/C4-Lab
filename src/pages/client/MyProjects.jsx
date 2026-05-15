@@ -70,25 +70,31 @@ function StepDots({ activeStep }) {
 function FootageUploader({ project, clientName, onDone }) {
   const { user } = useAuth()
   const fileInputRef = useRef()
-  const [files,       setFiles]      = useState([])
-  const [uploading,   setUploading]  = useState(false)
-  const [progress,    setProgress]   = useState(0)
-  const [stats,       setStats]      = useState(null)
-  const [error,       setError]      = useState('')
-  const [done,        setDone]       = useState(false)
+  const [files,     setFiles]    = useState([])
+  const [uploading, setUploading] = useState(false)
+  const [progress,  setProgress]  = useState(0)   // 0-100, tracks current file
+  const [fileIdx,   setFileIdx]   = useState(0)   // which file is uploading
+  const [stats,     setStats]     = useState(null)
+  const [error,     setError]     = useState('')
+  const [done,      setDone]      = useState(false)
+  const [dragOver,  setDragOver]  = useState(false)
 
-  const handleFiles = (incoming) => {
+  const addFiles = (incoming) =>
     setFiles((prev) => [...prev, ...Array.from(incoming)])
-  }
 
   const handleUpload = async () => {
     if (!files.length) return
     setUploading(true)
     setError('')
+
     try {
-      for (const file of files) {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i]
+        setFileIdx(i)
         setProgress(0)
         setStats(null)
+
+        // 1. Upload to R2
         const { publicUrl } = await uploadToR2({
           file,
           category:    'client-footage',
@@ -98,37 +104,61 @@ function FootageUploader({ project, clientName, onDone }) {
           onProgress:  setProgress,
           onStats:     setStats,
         })
-        await supabase.from('shoot_uploads').insert({
+
+        // 2. Save to DB — check for errors (was silently swallowed before)
+        const { error: dbErr } = await supabase.from('shoot_uploads').insert({
           project_id:  project.id,
           file_url:    publicUrl,
           file_name:   file.name,
           file_size:   file.size,
           uploaded_by: user.id,
         })
+        if (dbErr) throw new Error(dbErr.message)
       }
+
       setDone(true)
       setFiles([])
-      setTimeout(() => { setDone(false); onDone?.() }, 2000)
     } catch (err) {
-      setError(err.message || 'Upload failed')
+      setError(err.message || 'Upload failed. Please try again.')
     } finally {
       setUploading(false)
     }
   }
 
+  // ── Success state ─────────────────────────────────────────────────────────
   if (done) {
     return (
-      <div className="flex items-center gap-2 text-sm text-green-600 font-medium py-2">
-        <CheckCircle2 size={16} /> Footage uploaded! The team has been notified.
+      <div className="mt-4 pt-4 border-t border-gray-100">
+        <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-center">
+          <CheckCircle2 size={24} className="mx-auto text-green-500 mb-2" />
+          <p className="text-sm font-semibold text-green-800">Footage uploaded!</p>
+          <p className="text-xs text-green-600 mt-1">Your team has been notified and will start working on it.</p>
+          <div className="flex gap-2 mt-3">
+            <button
+              onClick={() => setDone(false)}
+              className="flex-1 py-2 rounded-lg text-xs font-semibold border border-green-300 text-green-700 hover:bg-green-100 transition-colors"
+            >
+              Upload more
+            </button>
+            <button
+              onClick={() => { setDone(false); onDone?.() }}
+              className="flex-1 py-2 rounded-lg text-xs font-semibold bg-green-600 text-white hover:bg-green-700 transition-colors"
+            >
+              Done
+            </button>
+          </div>
+        </div>
       </div>
     )
   }
 
+  // ── Uploader ──────────────────────────────────────────────────────────────
   return (
     <div className="mt-4 pt-4 border-t border-gray-100">
       <p className="text-xs font-semibold text-gray-500 mb-3 uppercase tracking-wide">Upload Footage</p>
 
-      {files.length > 0 ? (
+      {/* File list */}
+      {files.length > 0 && (
         <div className="space-y-1.5 mb-3">
           {files.map((f, i) => (
             <div key={i} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
@@ -136,21 +166,42 @@ function FootageUploader({ project, clientName, onDone }) {
               <span className="text-xs text-gray-700 truncate flex-1">{f.name}</span>
               <span className="text-xs text-gray-400">{fmtBytes(f.size)}</span>
               {!uploading && (
-                <button onClick={() => setFiles((prev) => prev.filter((_, j) => j !== i))}>
-                  <X size={12} className="text-gray-400 hover:text-red-400" />
+                <button
+                  onClick={() => setFiles((prev) => prev.filter((_, j) => j !== i))}
+                  className="text-gray-300 hover:text-red-400 transition-colors"
+                >
+                  <X size={12} />
                 </button>
               )}
             </div>
           ))}
         </div>
-      ) : (
+      )}
+
+      {/* Drop zone — always visible so you can add more files */}
+      {!uploading && (
         <div
           onClick={() => fileInputRef.current?.click()}
-          className="border-2 border-dashed border-gray-200 rounded-xl p-5 text-center cursor-pointer hover:border-accent/50 hover:bg-accent/5 transition-all"
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => {
+            e.preventDefault()
+            setDragOver(false)
+            addFiles(e.dataTransfer.files)
+          }}
+          className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all ${
+            dragOver
+              ? 'border-accent bg-accent/5'
+              : files.length > 0
+              ? 'border-gray-100 py-2.5 hover:border-accent/40'
+              : 'border-gray-200 hover:border-accent/50 hover:bg-accent/5'
+          }`}
         >
-          <Upload size={18} className="mx-auto text-gray-300 mb-1.5" />
-          <p className="text-sm text-gray-400">Drop files here or <span className="text-accent font-medium">browse</span></p>
-          <p className="text-xs text-gray-300 mt-0.5">Video, photo, ZIP</p>
+          <Upload size={files.length > 0 ? 13 : 18} className={`mx-auto mb-1 ${files.length > 0 ? 'text-gray-300' : 'text-gray-300'}`} />
+          <p className={`text-gray-400 ${files.length > 0 ? 'text-xs' : 'text-sm'}`}>
+            {files.length > 0 ? 'Add more files' : <>Drop files here or <span className="text-accent font-medium">browse</span></>}
+          </p>
+          {files.length === 0 && <p className="text-xs text-gray-300 mt-0.5">Video, photo, ZIP</p>}
         </div>
       )}
 
@@ -158,28 +209,35 @@ function FootageUploader({ project, clientName, onDone }) {
         ref={fileInputRef}
         type="file"
         multiple
-        accept="video/*,image/*,.zip,.mov,.mp4"
+        accept="video/*,image/*,.zip,.mov,.mp4,.avi,.mkv"
         className="hidden"
-        onChange={(e) => handleFiles(e.target.files)}
+        onChange={(e) => addFiles(e.target.files)}
       />
 
+      {/* Progress bar */}
       {uploading && (
         <div className="mt-2 mb-2">
           <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
-            <span>Uploading…</span>
+            <span>
+              {files.length > 1
+                ? `Uploading file ${fileIdx + 1} of ${files.length}…`
+                : 'Uploading…'}
+            </span>
             <div className="flex gap-2">
               {stats && <span className="font-medium text-gray-600">{fmtSpeed(stats.speed)}</span>}
               {stats?.eta != null && <span>{fmtEta(stats.eta)}</span>}
               <span>{progress}%</span>
             </div>
           </div>
-          <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
-            <div className="h-full bg-accent rounded-full transition-all" style={{ width: `${progress}%` }} />
+          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+            <div className="h-full bg-accent rounded-full transition-all duration-200" style={{ width: `${progress}%` }} />
           </div>
         </div>
       )}
 
-      {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+      {error && (
+        <p className="text-xs text-red-500 mt-2 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
+      )}
 
       {files.length > 0 && (
         <button
@@ -188,7 +246,9 @@ function FootageUploader({ project, clientName, onDone }) {
           className="mt-3 w-full py-2.5 rounded-xl bg-accent text-white text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50 hover:bg-accent/90 transition-colors"
         >
           {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-          {uploading ? 'Uploading…' : `Upload ${files.length} file${files.length !== 1 ? 's' : ''}`}
+          {uploading
+            ? 'Uploading…'
+            : `Upload ${files.length} file${files.length !== 1 ? 's' : ''}`}
         </button>
       )}
     </div>
