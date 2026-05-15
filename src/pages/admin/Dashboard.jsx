@@ -163,7 +163,7 @@ export default function AdminDashboard() {
         supabase.from('clients').select('*', { count: 'exact', head: true }),
         supabase.from('content_requests').select('*', { count: 'exact', head: true })
           .in('status', ['new', 'in_progress']),
-        supabase.from('profiles').select('*', { count: 'exact', head: true }),
+        supabase.from('profiles').select('*', { count: 'exact', head: true }).neq('role', 'client'),
       ])
       setStats({ clientCount, openCount, teamCount })
 
