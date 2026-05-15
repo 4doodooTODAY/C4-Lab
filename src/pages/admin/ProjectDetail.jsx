@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
-  ArrowLeft, Loader2, Check, Trash2, X, Plus, UserMinus,
+  ArrowLeft, Loader2, Check, Trash2, X, Plus,
   CalendarDays, MessageSquare, Film, StickyNote,
   AlertCircle, MapPin, Upload, FileVideo, Eye,
   Camera, Scissors, Pencil
 } from 'lucide-react'
-import { useProject, updateProject, addMember, removeMember } from '../../hooks/useProjects'
+import { useProject, updateProject } from '../../hooks/useProjects'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import Avatar from '../../components/ui/Avatar'
@@ -60,22 +60,6 @@ const STATUS_LABELS = {
   on_hold:   'On Hold',
   completed: 'Completed',
   archived:  'Archived',
-}
-
-const MEMBER_ROLE_LABELS = {
-  lead:         'Lead',
-  photographer: 'Photographer',
-  videographer: 'Videographer',
-  editor:       'Editor',
-  assistant:    'Assistant',
-}
-
-const MEMBER_ROLE_COLORS = {
-  lead:         'bg-accent/10 text-accent',
-  photographer: 'bg-amber-50 text-amber-700',
-  videographer: 'bg-blue-50 text-blue-700',
-  editor:       'bg-green-50 text-green-700',
-  assistant:    'bg-slate-100 text-slate-600',
 }
 
 const REVISION_STATUS_LABELS = {
@@ -179,95 +163,6 @@ function InlineField({ label, value, displayValue, type = 'text', onSave, icon: 
   )
 }
 
-// ── Add Member Modal ──────────────────────────────────────────────────────────
-function AddMemberModal({ projectId, existingIds, onClose, onAdded }) {
-  const [profiles, setProfiles] = useState([])
-  const [role, setRole]         = useState('photographer')
-  const [selected, setSelected] = useState(null)
-  const [saving, setSaving]     = useState(false)
-  const [error, setError]       = useState('')
-
-  useEffect(() => {
-    supabase
-      .from('profiles')
-      .select('id, full_name, role, avatar_url')
-      .in('role', ['admin', 'creative'])
-      .order('full_name')
-      .then(({ data }) => setProfiles((data || []).filter((p) => !existingIds.includes(p.id))))
-  }, [existingIds])
-
-  const handleAdd = async () => {
-    if (!selected) return
-    setSaving(true)
-    try {
-      await addMember(projectId, selected, role)
-      onAdded()
-      onClose()
-    } catch (err) {
-      setError(err.message)
-      setSaving(false)
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 z-10">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-semibold text-text-primary">Add Team Member</h2>
-          <button onClick={onClose} className="btn-ghost p-1.5"><X size={16} /></button>
-        </div>
-
-        <div className="mb-3">
-          <label className="label">Role on project</label>
-          <select className="input" value={role} onChange={(e) => setRole(e.target.value)}>
-            {Object.entries(MEMBER_ROLE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-          </select>
-        </div>
-
-        <div className="space-y-1.5 max-h-64 overflow-y-auto mb-4">
-          {profiles.length === 0 && (
-            <p className="text-sm text-text-muted text-center py-4">No available team members</p>
-          )}
-          {profiles.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => setSelected(p.id)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all ${
-                selected === p.id ? 'border-accent/30 bg-accent/5' : 'border-border hover:border-border-strong'
-              }`}
-            >
-              <Avatar name={p.full_name} url={p.avatar_url} size={8} />
-              <div className="flex-1 text-left">
-                <p className="text-sm font-medium text-text-primary">{p.full_name}</p>
-                <p className="text-xs text-text-muted capitalize">{p.role}</p>
-              </div>
-              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                selected === p.id ? 'bg-accent border-accent' : 'border-border-strong'
-              }`}>
-                {selected === p.id && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-              </div>
-            </button>
-          ))}
-        </div>
-
-        {error && <p className="text-xs text-red-500 mb-3">{error}</p>}
-        <div className="flex gap-2">
-          <button onClick={onClose} className="btn-secondary flex-1">Cancel</button>
-          <button
-            onClick={handleAdd}
-            disabled={!selected || saving}
-            className="btn-primary flex-1 flex items-center justify-center gap-1.5 disabled:opacity-50"
-          >
-            {saving && <Loader2 size={13} className="animate-spin" />}
-            Add
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ── Stage Progress Bar ────────────────────────────────────────────────────────
 function StageBar({ currentStage, isAdmin, onStageClick }) {
   const currentIdx = DISPLAY_STAGES.findIndex((s) => s.key === currentStage)
@@ -338,8 +233,6 @@ export default function ProjectDetail() {
   // Status
   const [status, setStatus]             = useState('')
 
-  // Team modal
-  const [showAddMember, setShowAdd]     = useState(false)
 
   // Danger zone
   const [deleteStep, setDeleteStep]     = useState(0)
@@ -502,15 +395,6 @@ export default function ProjectDetail() {
     }
   }
 
-  const handleRemoveMember = async (profileId) => {
-    try {
-      await removeMember(id, profileId)
-      refetch()
-    } catch (err) {
-      setActionError(err.message)
-    }
-  }
-
   const handleArchive = async () => {
     setArchiving(true)
     try {
@@ -553,8 +437,6 @@ export default function ProjectDetail() {
       <p className="text-sm text-text-muted">{loadError || 'Project not found.'}</p>
     </div>
   )
-
-  const members = project.project_members || []
 
   return (
     <div className="p-8 max-w-5xl">
@@ -899,46 +781,6 @@ export default function ProjectDetail() {
             )}
           </div>
 
-          {/* Team card */}
-          <div className="bg-white rounded-2xl border border-border p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-text-primary">Team</h2>
-              {isAdmin && (
-                <button
-                  onClick={() => setShowAdd(true)}
-                  className="text-xs text-accent hover:text-accent/80 font-medium flex items-center gap-1"
-                >
-                  <Plus size={12} /> Add member
-                </button>
-              )}
-            </div>
-            {members.length === 0 ? (
-              <p className="text-sm text-text-muted">No team members yet.</p>
-            ) : (
-              <div className="space-y-2.5">
-                {members.map((m) => (
-                  <div key={m.id} className="flex items-center gap-3">
-                    <Avatar name={m.profiles?.full_name} url={m.profiles?.avatar_url} size={9} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-text-primary truncate">{m.profiles?.full_name || '—'}</p>
-                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${MEMBER_ROLE_COLORS[m.role] || 'bg-surface-2 text-text-muted'}`}>
-                        {MEMBER_ROLE_LABELS[m.role] || m.role}
-                      </span>
-                    </div>
-                    {isAdmin && (
-                      <button
-                        onClick={() => handleRemoveMember(m.profiles?.id)}
-                        className="text-text-muted hover:text-red-500 transition-colors"
-                        title="Remove member"
-                      >
-                        <UserMinus size={14} />
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
 
         {/* Right column */}
@@ -1061,14 +903,6 @@ export default function ProjectDetail() {
         </div>
       )}
 
-      {showAddMember && (
-        <AddMemberModal
-          projectId={id}
-          existingIds={members.map((m) => m.profiles?.id).filter(Boolean)}
-          onClose={() => setShowAdd(false)}
-          onAdded={refetch}
-        />
-      )}
     </div>
   )
 }

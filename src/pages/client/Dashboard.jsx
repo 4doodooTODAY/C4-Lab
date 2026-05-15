@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { FolderKanban, ArrowRight, MessageSquare, CalendarDays, Loader2 } from 'lucide-react'
+import { FolderKanban, ArrowRight, CalendarDays, Loader2 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { format } from 'date-fns'
@@ -122,19 +122,6 @@ export default function ClientDashboard() {
             <ArrowRight size={16} className="text-gray-300 group-hover:text-accent transition-colors" />
           </Link>
 
-          <Link
-            to="/client/messages"
-            className="flex items-center gap-4 p-5 rounded-2xl border border-gray-100 hover:border-accent/30 hover:bg-accent/5 transition-all group"
-          >
-            <div className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
-              <MessageSquare size={20} className="text-blue-500" />
-            </div>
-            <div className="flex-1">
-              <p className="font-semibold text-gray-900">Messages</p>
-              <p className="text-sm text-gray-400 mt-0.5">Chat with your creative team</p>
-            </div>
-            <ArrowRight size={16} className="text-gray-300 group-hover:text-accent transition-colors" />
-          </Link>
         </div>
       </div>
     </div>

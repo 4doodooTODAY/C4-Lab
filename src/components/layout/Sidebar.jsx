@@ -29,7 +29,6 @@ const NAV = {
     { to: '/client',          icon: Home,           label: 'Home',        end: true },
     { to: '/my-projects',     icon: FolderKanban,   label: 'My Projects' },
     { to: '/client/calendar', icon: CalendarDays,   label: 'Calendar' },
-    { to: '/client/messages', icon: MessageSquare,  label: 'Messages' },
   ],
 }
 

@@ -28,7 +28,6 @@ const Messages               = lazy(() => import('./pages/Messages'))
 const CreativeProjectList    = lazy(() => import('./pages/creative/ProjectList'))
 const CreativeProjectWorkflow = lazy(() => import('./pages/creative/ProjectWorkflow'))
 const ClientMyProjects       = lazy(() => import('./pages/client/MyProjects'))
-const ClientMessages         = lazy(() => import('./pages/client/ClientMessages'))
 const VideoRevisionReview    = lazy(() => import('./pages/VideoRevisionReview'))
 
 function PageLoader() {
@@ -174,9 +173,6 @@ function AppRoutes() {
 
           <Route path="/messages" element={
             <ProtectedRoute roles={['admin', 'creative']}><Messages /></ProtectedRoute>
-          } />
-          <Route path="/client/messages" element={
-            <ProtectedRoute roles={['client']}><ClientMessages /></ProtectedRoute>
           } />
           <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="/" replace />} />
