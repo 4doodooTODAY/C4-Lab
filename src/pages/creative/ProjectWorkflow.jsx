@@ -1337,7 +1337,7 @@ export default function ProjectWorkflow() {
         uploads={uploads}
         revisions={revisions}
         isCreative={isCreative && !pureEditor}
-        isEditor={pureEditor || (isAdmin && isEditor)}
+        isEditor={isEditor}
         navigate={navigate}
       />
 
@@ -1363,16 +1363,16 @@ export default function ProjectWorkflow() {
             />
           )}
 
-          {/* 3a. Source Footage — editor only */}
-          {pureEditor && (
+          {/* 3a. Source Footage — visible to any editor role (incl. creative+editor combo) */}
+          {isEditor && (
             <SourceFootageSection
               uploads={uploads}
               shootNotes={shootNotes}
             />
           )}
 
-          {/* 3b. Upload Revision — editor only */}
-          {(pureEditor || (isAdmin && isEditor)) && (
+          {/* 3b. Upload Revision — visible to any editor role */}
+          {isEditor && (
             <UploadRevisionSection
               project={project}
               revisions={revisions}
