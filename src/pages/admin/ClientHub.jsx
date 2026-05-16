@@ -312,8 +312,8 @@ function OverviewTab({ client, shoots, drafts, projects, requests }) {
         <div className="space-y-2 text-sm">
           <div className="flex gap-2"><span className="text-text-muted w-28">Company</span><span className="font-medium text-text-primary">{client.name || '—'}</span></div>
           <div className="flex gap-2"><span className="text-text-muted w-28">Contact</span><span className="font-medium text-text-primary">{client.contact_name || '—'}</span></div>
-          <div className="flex gap-2"><span className="text-text-muted w-28">Email</span><span className="font-medium text-text-primary">{client.contact_email || '—'}</span></div>
-          <div className="flex gap-2"><span className="text-text-muted w-28">Phone</span><span className="font-medium text-text-primary">{client.contact_phone || '—'}</span></div>
+          <div className="flex gap-2"><span className="text-text-muted w-28">Email</span><span className="font-medium text-text-primary">{client.contact_email || client.email || '—'}</span></div>
+          <div className="flex gap-2"><span className="text-text-muted w-28">Phone</span><span className="font-medium text-text-primary">{client.contact_phone || client.phone || '—'}</span></div>
           {client.notes && <div className="flex gap-2"><span className="text-text-muted w-28">Notes</span><span className="text-text-secondary">{client.notes}</span></div>}
         </div>
       </div>

@@ -118,6 +118,18 @@ create policy "clients can respond to drafts" on content_drafts
   )
   with check (true);
 
+drop policy if exists "creatives can view assigned client drafts" on content_drafts;
+create policy "creatives can view assigned client drafts" on content_drafts
+  for select to authenticated
+  using (
+    exists(
+      select 1 from client_creatives cc
+      where cc.client_id = content_drafts.client_id
+        and cc.profile_id = auth.uid()
+    )
+    or exists(select 1 from profiles where id = auth.uid() and role = 'admin')
+  );
+
 -- ─── 4. Evolve existing tables ──────────────────────────────────────────────────
 
 -- shoot_uploads: link to a specific shoot

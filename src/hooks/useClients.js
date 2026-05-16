@@ -12,7 +12,7 @@ export function useClients() {
     setLoading(true)
     const { data, error } = await supabase
       .from('clients')
-      .select('id, name, contact_name, contact_email, contact_phone, notes, profile_id, created_at, client_access(profile_id, profiles(id, full_name, role, avatar_url))')
+      .select('*, client_access(profile_id, profiles(id, full_name, role, avatar_url))')
       .order('created_at', { ascending: false })
     if (error) setError(error.message)
     else setClients(data || [])

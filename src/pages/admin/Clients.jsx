@@ -143,19 +143,19 @@ function ClientCard({ client, onClick }) {
 
       {/* Contact info */}
       <div className="space-y-1.5">
-        {client.contact_email && (
+        {(client.contact_email || client.email) && (
           <div className="flex items-center gap-2 text-xs text-text-muted">
             <Mail size={11} className="shrink-0" />
-            <span className="truncate">{client.contact_email}</span>
+            <span className="truncate">{client.contact_email || client.email}</span>
           </div>
         )}
-        {client.contact_phone && (
+        {(client.contact_phone || client.phone) && (
           <div className="flex items-center gap-2 text-xs text-text-muted">
             <Phone size={11} className="shrink-0" />
-            <span>{client.contact_phone}</span>
+            <span>{client.contact_phone || client.phone}</span>
           </div>
         )}
-        {!client.contact_email && !client.contact_phone && (
+        {!client.contact_email && !client.email && !client.contact_phone && !client.phone && (
           <p className="text-xs text-text-muted/50 italic">No contact info</p>
         )}
       </div>

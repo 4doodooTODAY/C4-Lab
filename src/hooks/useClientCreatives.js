@@ -21,7 +21,7 @@ export function useClientCreatives(clientId = null) {
     if (clientId) q = q.eq('client_id', clientId)
 
     const { data, error: err } = await q
-    if (err) setError(err.message)
+    if (err) { console.warn('useClientCreatives:', err.message); setAssignments([]) }
     else setAssignments(data || [])
     setLoading(false)
   }, [clientId])

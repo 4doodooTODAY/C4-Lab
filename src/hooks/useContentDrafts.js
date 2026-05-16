@@ -24,7 +24,7 @@ export function useContentDrafts(clientId = null) {
     if (clientId) q = q.eq('client_id', clientId)
 
     const { data, error: err } = await q
-    if (err) setError(err.message)
+    if (err) { console.warn('useContentDrafts:', err.message); setDrafts([]) }
     else setDrafts(data || [])
     setLoading(false)
   }, [clientId])

@@ -23,7 +23,7 @@ export function useShoots(clientId = null) {
     if (clientId) q = q.eq('client_id', clientId)
 
     const { data, error: err } = await q
-    if (err) setError(err.message)
+    if (err) { console.warn('useShoots:', err.message); setShoots([]) }
     else setShoots(data || [])
     setLoading(false)
   }, [clientId])
