@@ -1,21 +1,21 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, X, Loader2, Building2, Check, Mail, Phone, ChevronRight, User } from 'lucide-react'
+import { Plus, X, Loader2, Building2, Check, Mail, Phone, ChevronRight } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
-import { useClients, useCreatives } from '../../hooks/useClients'
+import { useClients } from '../../hooks/useClients'
 import Avatar from '../../components/ui/Avatar'
 
-// ── Invite Modal ─────────────────────────────────────────────────────────────
+// ── Invite Modal ──────────────────────────────────────────────────────────────
 function InviteClientModal({ onClose, onCreated }) {
   const { user } = useAuth()
   const [contactName, setContactName] = useState('')
-  const [business, setBusiness] = useState('')
-  const [email, setEmail] = useState('')
-  const [phone, setPhone] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
-  const [sent, setSent] = useState(false)
+  const [business, setBusiness]       = useState('')
+  const [email, setEmail]             = useState('')
+  const [phone, setPhone]             = useState('')
+  const [saving, setSaving]           = useState(false)
+  const [error, setError]             = useState('')
+  const [sent, setSent]               = useState(false)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -31,12 +31,12 @@ function InviteClientModal({ onClose, onCreated }) {
           apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
         },
         body: JSON.stringify({
-          action: 'invite_client',
+          action:       'invite_client',
           contact_name: contactName.trim(),
-          business: business.trim(),
-          email: email.trim(),
-          phone: phone.trim(),
-          created_by: user?.id,
+          business:     business.trim(),
+          email:        email.trim(),
+          phone:        phone.trim(),
+          created_by:   user?.id,
         }),
       })
       const data = await res.json()
@@ -113,15 +113,72 @@ function InviteClientModal({ onClose, onCreated }) {
   )
 }
 
-// ── Status badge ─────────────────────────────────────────────────────────────
-function StatusBadge({ client }) {
-  // A client is "active" if their profile has logged in (must_change_password = false)
-  const isPending = !client.profile_id || client._profile?.must_change_password
-  if (isPending) return (
-    <span className="text-xs font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">Invite pending</span>
-  )
+// ── Client Card ───────────────────────────────────────────────────────────────
+function ClientCard({ client, onClick }) {
+  const assigned   = (client.client_access || []).map((a) => a.profiles).filter(Boolean)
+  const isPending  = !client.profile_id || client._profile?.must_change_password
+
   return (
-    <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full">Active</span>
+    <div
+      onClick={onClick}
+      className="bg-white rounded-2xl border border-border p-5 hover:shadow-md hover:border-border-strong transition-all cursor-pointer flex flex-col gap-4"
+    >
+      {/* Top: avatar + name + status */}
+      <div className="flex items-start gap-3">
+        <Avatar name={client.contact_name || client.name} size={10} />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-text-primary truncate">
+            {client.contact_name || '—'}
+          </p>
+          <p className="text-xs text-text-muted truncate">{client.name || ''}</p>
+        </div>
+        <span className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+          isPending
+            ? 'bg-amber-50 text-amber-600'
+            : 'bg-green-50 text-green-600'
+        }`}>
+          {isPending ? 'Invite pending' : 'Active'}
+        </span>
+      </div>
+
+      {/* Contact info */}
+      <div className="space-y-1.5">
+        {client.contact_email && (
+          <div className="flex items-center gap-2 text-xs text-text-muted">
+            <Mail size={11} className="shrink-0" />
+            <span className="truncate">{client.contact_email}</span>
+          </div>
+        )}
+        {client.contact_phone && (
+          <div className="flex items-center gap-2 text-xs text-text-muted">
+            <Phone size={11} className="shrink-0" />
+            <span>{client.contact_phone}</span>
+          </div>
+        )}
+        {!client.contact_email && !client.contact_phone && (
+          <p className="text-xs text-text-muted/50 italic">No contact info</p>
+        )}
+      </div>
+
+      {/* Footer: team avatars */}
+      <div className="flex items-center justify-between pt-1 border-t border-border">
+        {assigned.length === 0 ? (
+          <span className="text-xs text-text-muted">No team assigned</span>
+        ) : (
+          <div className="flex -space-x-1.5">
+            {assigned.slice(0, 5).map((p) => (
+              <Avatar key={p.id} name={p.full_name} url={p.avatar_url} size={6} className="border-2 border-white" />
+            ))}
+            {assigned.length > 5 && (
+              <div className="w-6 h-6 rounded-full bg-surface-3 border-2 border-white flex items-center justify-center text-[9px] font-semibold text-text-muted">
+                +{assigned.length - 5}
+              </div>
+            )}
+          </div>
+        )}
+        <ChevronRight size={13} className="text-text-muted" />
+      </div>
+    </div>
   )
 }
 
@@ -156,80 +213,14 @@ export default function Clients() {
           <p className="text-sm text-text-muted">Invite your first client to get started.</p>
         </div>
       ) : (
-        <div className="card overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border bg-surface-2">
-                <th className="text-left text-xs font-semibold text-text-muted px-4 py-2.5">Client</th>
-                <th className="text-left text-xs font-semibold text-text-muted px-4 py-2.5">Business</th>
-                <th className="text-left text-xs font-semibold text-text-muted px-4 py-2.5">Contact</th>
-                <th className="text-left text-xs font-semibold text-text-muted px-4 py-2.5">Status</th>
-                <th className="text-left text-xs font-semibold text-text-muted px-4 py-2.5">Team</th>
-                <th className="px-4 py-2.5" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {clients.map((client) => {
-                const assigned = (client.client_access || []).map((a) => a.profiles).filter(Boolean)
-                return (
-                  <tr
-                    key={client.id}
-                    className="hover:bg-surface-2 transition-colors cursor-pointer"
-                    onClick={() => navigate(`/admin/clients/${client.id}`)}
-                  >
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <Avatar name={client.contact_name || client.name} size={8} />
-                        <div>
-                          <p className="text-sm font-medium text-text-primary">
-                            {client.contact_name || '—'}
-                          </p>
-                          <p className="text-xs text-text-muted truncate max-w-[140px]">
-                            {client.email || '—'}
-                          </p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="text-sm text-text-primary">{client.name || '—'}</p>
-                    </td>
-                    <td className="px-4 py-3">
-                      {client.phone ? (
-                        <div className="flex items-center gap-1.5 text-xs text-text-muted">
-                          <Phone size={11} />
-                          {client.phone}
-                        </div>
-                      ) : (
-                        <span className="text-xs text-text-muted">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge client={client} />
-                    </td>
-                    <td className="px-4 py-3">
-                      {assigned.length === 0 ? (
-                        <span className="text-xs text-text-muted">Unassigned</span>
-                      ) : (
-                        <div className="flex -space-x-1.5">
-                          {assigned.slice(0, 4).map((p) => (
-                            <Avatar key={p.id} name={p.full_name} url={p.avatar_url} size={6} />
-                          ))}
-                          {assigned.length > 4 && (
-                            <div className="w-6 h-6 rounded-full bg-surface-3 border-2 border-white flex items-center justify-center text-[9px] font-semibold text-text-muted">
-                              +{assigned.length - 4}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <ChevronRight size={14} className="text-text-muted ml-auto" />
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {clients.map((client) => (
+            <ClientCard
+              key={client.id}
+              client={client}
+              onClick={() => navigate(`/admin/clients/${client.id}`)}
+            />
+          ))}
         </div>
       )}
 

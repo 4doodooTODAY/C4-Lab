@@ -714,7 +714,7 @@ function RequestsTab({ requests }) {
 const TABS = [
   { id: 'overview', label: 'Overview',  icon: Building2 },
   { id: 'shoots',   label: 'Shoots',    icon: Camera },
-  { id: 'content',  label: 'Content',   icon: FileText },
+  { id: 'content',  label: 'Concepts',  icon: FileText },
   { id: 'projects', label: 'Projects',  icon: FolderKanban },
   { id: 'requests', label: 'Requests',  icon: Inbox },
 ]

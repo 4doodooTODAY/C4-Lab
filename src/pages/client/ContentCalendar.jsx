@@ -231,6 +231,7 @@ export default function ContentCalendar() {
   const [updating, setUpdating] = useState(false)
   const [view, setView] = useState('calendar')   // 'calendar' | 'list'
   const [clientId, setClientId] = useState(null)
+  const [clientResolved, setClientResolved] = useState(false)
 
   // Resolve the client record
   useEffect(() => {
@@ -240,8 +241,11 @@ export default function ContentCalendar() {
       .select('client_id')
       .eq('profile_id', user.id)
       .limit(1)
-      .single()
-      .then(({ data }) => { if (data?.client_id) setClientId(data.client_id) })
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.client_id) setClientId(data.client_id)
+        setClientResolved(true)
+      })
   }, [user])
 
   const loadData = useCallback(async () => {
@@ -325,7 +329,10 @@ export default function ContentCalendar() {
     setLoading(false)
   }, [clientId])
 
-  useEffect(() => { if (clientId) loadData() }, [clientId, loadData])
+  useEffect(() => {
+    if (clientId) loadData()
+    else if (clientResolved) setLoading(false)
+  }, [clientId, clientResolved, loadData])
 
   // ── Actions ──────────────────────────────────────────────────────────────────
   const handleApprove = async (item) => {
@@ -400,6 +407,12 @@ export default function ContentCalendar() {
 
       {loading ? (
         <div className="flex justify-center py-20"><Loader2 size={22} className="animate-spin text-text-muted" /></div>
+      ) : !clientId ? (
+        <div className="card p-12 text-center">
+          <CalendarDays size={36} className="mx-auto text-text-muted/30 mb-3" />
+          <p className="text-sm font-semibold text-text-primary mb-1">No client account linked</p>
+          <p className="text-sm text-text-muted">Ask your admin to link your account to a client.</p>
+        </div>
       ) : view === 'list' ? (
         <ListView allItems={allItems} onApprove={handleApprove} onDecline={handleDecline} updating={updating} />
       ) : (
