@@ -52,8 +52,20 @@ function NewShootModal({ clientId, onClose, onCreated }) {
   const [form, setForm] = useState({
     title: '', description: '', shoot_date: '', shoot_time: '', location: '', status: 'scheduled',
   })
+  const [clientTeam,    setClientTeam]    = useState([])
+  const [selectedMember, setSelectedMember] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
+
+  // Load team members assigned to this client
+  useEffect(() => {
+    if (!clientId) return
+    supabase
+      .from('client_creatives')
+      .select('profile_id, role, profiles(id, full_name, role)')
+      .eq('client_id', clientId)
+      .then(({ data }) => setClientTeam((data || []).map((a) => ({ ...a.profiles, assignedRole: a.role }))))
+  }, [clientId])
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
@@ -79,6 +91,7 @@ function NewShootModal({ clientId, onClose, onCreated }) {
         const timeStr = form.shoot_time || '09:00'
         const startAt = new Date(`${form.shoot_date}T${timeStr}:00`)
         const endAt   = new Date(startAt.getTime() + 4 * 60 * 60 * 1000) // 4hr block
+        const memberIds = selectedMember ? [selectedMember] : []
         const { data: evtData } = await supabase.from('calendar_events').insert({
           title:      `${form.title.trim()} — Shoot`,
           event_type: 'shoot',
@@ -87,10 +100,17 @@ function NewShootModal({ clientId, onClose, onCreated }) {
           all_day:    !form.shoot_time,
           location:   form.location || null,
           shoot_id:   row.id,
+          client_id:  clientId,
           created_by: user?.id,
         }).select('id').single()
         if (evtData?.id) {
           await supabase.from('shoots').update({ calendar_event_id: evtData.id }).eq('id', row.id)
+          // Add selected member to calendar event
+          if (memberIds.length) {
+            await supabase.from('calendar_event_members').insert(
+              memberIds.map((profile_id) => ({ event_id: evtData.id, profile_id }))
+            )
+          }
         }
       }
 
@@ -128,6 +148,21 @@ function NewShootModal({ clientId, onClose, onCreated }) {
             <label className="label">Location</label>
             <input className="input" value={form.location} onChange={set('location')} placeholder="Address or venue name" />
           </div>
+
+          {/* Assign a team member */}
+          <div>
+            <label className="label">Photographer / Videographer</label>
+            <select className="input" value={selectedMember} onChange={(e) => setSelectedMember(e.target.value)}>
+              <option value="">— None —</option>
+              {clientTeam.map((m) => (
+                <option key={m.id} value={m.id}>{m.full_name}</option>
+              ))}
+            </select>
+            {clientTeam.length === 0 && (
+              <p className="text-xs text-text-muted mt-1">No team assigned to this client yet.</p>
+            )}
+          </div>
+
           <div>
             <label className="label">Description</label>
             <textarea className="input resize-none" rows={3} value={form.description} onChange={set('description')} placeholder="What are we shooting?" />

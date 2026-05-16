@@ -20,7 +20,7 @@ export default function EventModal({ date, event, onSave, onDelete, onClose }) {
   // Form state
   const [title,      setTitle]      = useState(event?.title      || '')
   const [type,       setType]       = useState(event?.event_type || 'in_person')
-  const [allDay,     setAllDay]     = useState(event?.all_day    ?? true)
+  const [allDay,     setAllDay]     = useState(event?.all_day    ?? false)
   const [startDate,  setStartDate]  = useState(event?.start_at   ? toDateInput(event.start_at) : format(date, 'yyyy-MM-dd'))
   const [startTime,  setStartTime]  = useState(event?.start_at   ? toTimeInput(event.start_at) : '09:00')
   const [endDate,    setEndDate]    = useState(event?.end_at     ? toDateInput(event.end_at)   : format(date, 'yyyy-MM-dd'))
@@ -31,9 +31,24 @@ export default function EventModal({ date, event, onSave, onDelete, onClose }) {
   const [memberIds,  setMemberIds]  = useState(
     event?.calendar_event_members?.map((m) => m.profile_id) || []
   )
+  const [clientId,   setClientId]   = useState(event?.client_id || '')
+
+  // Clients for picker
+  const [clients, setClients] = useState([])
 
   // Team members for picker
   const [team, setTeam] = useState([])
+
+  // Assigned profile IDs for the selected client
+  const [assignedIds, setAssignedIds] = useState(new Set())
+
+  useEffect(() => {
+    supabase
+      .from('clients')
+      .select('id, name, contact_name')
+      .order('name')
+      .then(({ data }) => setClients(data || []))
+  }, [])
 
   useEffect(() => {
     supabase
@@ -43,6 +58,22 @@ export default function EventModal({ date, event, onSave, onDelete, onClose }) {
       .order('full_name')
       .then(({ data }) => setTeam(data || []))
   }, [])
+
+  useEffect(() => {
+    if (!clientId) {
+      setAssignedIds(new Set())
+      return
+    }
+    supabase
+      .from('client_creatives')
+      .select('profile_id')
+      .eq('client_id', clientId)
+      .then(({ data }) => {
+        setAssignedIds(new Set((data || []).map((r) => r.profile_id)))
+      })
+  }, [clientId])
+
+  const filteredTeam = clientId ? team.filter((m) => assignedIds.has(m.id)) : team
 
   const [saving,  setSaving]  = useState(false)
   const [deleting,setDeleting]= useState(false)
@@ -80,6 +111,7 @@ export default function EventModal({ date, event, onSave, onDelete, onClose }) {
         location:    needsLocation   ? location.trim()   : null,
         meeting_url: needsMeetingUrl ? meetingUrl.trim() : null,
         member_ids:  memberIds,
+        client_id:   clientId || null,
       })
       onClose()
     } catch (err) {
@@ -166,6 +198,23 @@ export default function EventModal({ date, event, onSave, onDelete, onClose }) {
             )}
           </div>
 
+          {/* Client picker */}
+          <div>
+            <label className="label">Client <span className="text-text-muted font-normal">(optional)</span></label>
+            <select
+              value={clientId}
+              onChange={(e) => setClientId(e.target.value)}
+              className="input"
+            >
+              <option value="">— No client —</option>
+              {clients.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}{c.contact_name ? ` — ${c.contact_name}` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* All day toggle + dates */}
           <div>
             <div className="flex items-center justify-between mb-2">
@@ -231,14 +280,14 @@ export default function EventModal({ date, event, onSave, onDelete, onClose }) {
           )}
 
           {/* Assigned people */}
-          {team.length > 0 && (
+          {filteredTeam.length > 0 && (
             <div>
               <label className="label flex items-center gap-1">
                 <Users size={11} /> Who's involved
                 <span className="font-normal text-text-muted">(optional)</span>
               </label>
               <div className="flex flex-wrap gap-2">
-                {team.map((member) => {
+                {filteredTeam.map((member) => {
                   const selected = memberIds.includes(member.id)
                   return (
                     <button

@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Plus, X, Loader2, FolderKanban, Search, ChevronRight,
-  CalendarDays, AlertCircle
+  CalendarDays, AlertCircle, Users
 } from 'lucide-react'
 import { useProjects, createProject } from '../../hooks/useProjects'
 import { useAuth } from '../../contexts/AuthContext'
@@ -70,21 +70,33 @@ const IN_CONTROL = {
 // ── New Project Modal ──────────────────────────────────────────────────────────
 function NewProjectModal({ onClose, onCreated }) {
   const { user } = useAuth()
-  const [clients, setClients]     = useState([])
-  const [clientsLoaded, setCL]    = useState(false)
-  const [form, setForm]           = useState({
-    name: '', client_id: '', admin_review_required: false,
-  })
-  const [saving, setSaving]       = useState(false)
-  const [error, setError]         = useState('')
+  const [clients,       setClients]       = useState([])
+  const [clientTeam,    setClientTeam]    = useState([])   // profiles assigned to selected client
+  const [form, setForm] = useState({ name: '', client_id: '', admin_review_required: false })
+  const [selectedCreative, setSelectedCreative] = useState('')
+  const [selectedEditor,   setSelectedEditor]   = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error,  setError]  = useState('')
 
   // Load clients on mount
-  useState(() => {
-    supabase.from('clients').select('id, name, contact_name').order('name').then(({ data }) => {
-      setClients(data || [])
-      setCL(true)
-    })
-  })
+  useEffect(() => {
+    supabase.from('clients').select('id, name, contact_name').order('name')
+      .then(({ data }) => setClients(data || []))
+  }, [])
+
+  // When client changes, load assigned team from client_creatives
+  useEffect(() => {
+    if (!form.client_id) { setClientTeam([]); setSelectedCreative(''); setSelectedEditor(''); return }
+    supabase
+      .from('client_creatives')
+      .select('profile_id, role, profiles(id, full_name, avatar_url, role)')
+      .eq('client_id', form.client_id)
+      .then(({ data }) => {
+        setClientTeam((data || []).map((a) => ({ ...a.profiles, assignedRole: a.role })))
+        setSelectedCreative('')
+        setSelectedEditor('')
+      })
+  }, [form.client_id])
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
@@ -95,11 +107,14 @@ function NewProjectModal({ onClose, onCreated }) {
     setError('')
     try {
       const payload = {
-        name:                 form.name.trim(),
-        client_id:            form.client_id || null,
-        stage:                'briefing',
-        created_by:           user?.id,
+        name:                  form.name.trim(),
+        client_id:             form.client_id || null,
+        stage:                 'post_production',
+        created_by:            user?.id,
         admin_review_required: form.admin_review_required,
+        creative_id:           selectedCreative || null,
+        editor_id:             selectedEditor   || null,
+        status:                'active',
       }
       const row = await createProject(payload)
       onCreated(row.id)
@@ -112,16 +127,27 @@ function NewProjectModal({ onClose, onCreated }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 z-10">
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 z-10 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-5">
           <div>
             <h2 className="text-base font-semibold text-text-primary">New Project</h2>
-            <p className="text-xs text-text-muted mt-0.5">Fill in the details to create a project.</p>
+            <p className="text-xs text-text-muted mt-0.5">Choose a client first — team members will filter automatically.</p>
           </div>
           <button onClick={onClose} className="btn-ghost p-1.5"><X size={16} /></button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
+          {/* Client first */}
+          <div>
+            <label className="label">Client *</label>
+            <select className="input" value={form.client_id} onChange={set('client_id')} required>
+              <option value="">— Select a client —</option>
+              {clients.map((c) => (
+                <option key={c.id} value={c.id}>{c.contact_name || c.name}</option>
+              ))}
+            </select>
+          </div>
+
           <div>
             <label className="label">Project Name *</label>
             <input
@@ -130,20 +156,41 @@ function NewProjectModal({ onClose, onCreated }) {
               placeholder="e.g. Brand Campaign Q3"
               value={form.name}
               onChange={set('name')}
-              autoFocus
               required
             />
           </div>
 
-          <div>
-            <label className="label">Client</label>
-            <select className="input" value={form.client_id} onChange={set('client_id')}>
-              <option value="">— No client —</option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>{c.contact_name || c.name}</option>
-              ))}
-            </select>
-          </div>
+          {/* Team — only shown after client is selected */}
+          {form.client_id && (
+            <div className="p-3 bg-surface-2/40 rounded-xl border border-border space-y-3">
+              <p className="text-xs font-semibold text-text-primary flex items-center gap-1.5">
+                <Users size={12} /> Assign Team
+                {clientTeam.length === 0 && <span className="font-normal text-text-muted">(no members assigned to this client yet)</span>}
+              </p>
+              {clientTeam.length > 0 && (
+                <>
+                  <div>
+                    <label className="label">Creative / Photographer</label>
+                    <select className="input" value={selectedCreative} onChange={(e) => setSelectedCreative(e.target.value)}>
+                      <option value="">— None —</option>
+                      {clientTeam.map((m) => (
+                        <option key={m.id} value={m.id}>{m.full_name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">Editor</label>
+                    <select className="input" value={selectedEditor} onChange={(e) => setSelectedEditor(e.target.value)}>
+                      <option value="">— None —</option>
+                      {clientTeam.map((m) => (
+                        <option key={m.id} value={m.id}>{m.full_name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
 
           {/* Admin review gate */}
           <label className="flex items-start gap-3 p-3 rounded-xl border border-border hover:border-accent/40 cursor-pointer transition-colors bg-surface-2/40">
@@ -156,7 +203,7 @@ function NewProjectModal({ onClose, onCreated }) {
             <div>
               <p className="text-sm font-semibold text-text-primary">Admin must approve first edit</p>
               <p className="text-xs text-text-muted mt-0.5">
-                The first cut goes to you for approval before the client ever sees it. If you reject it, the editor revises and it goes straight to the client — no revision count added.
+                The first cut goes to you for approval before the client ever sees it.
               </p>
             </div>
           </label>
@@ -167,7 +214,7 @@ function NewProjectModal({ onClose, onCreated }) {
 
           <div className="flex gap-2 justify-end pt-1">
             <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
-            <button type="submit" disabled={saving} className="btn-primary disabled:opacity-50 flex items-center gap-1.5">
+            <button type="submit" disabled={saving || !form.client_id} className="btn-primary disabled:opacity-50 flex items-center gap-1.5">
               {saving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
               Create Project
             </button>

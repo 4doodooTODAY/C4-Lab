@@ -39,11 +39,11 @@ export function useCalendarEvents(year, month) {
 
   useEffect(() => { fetchEvents() }, [fetchEvents])
 
-  const addEvent = async ({ title, description, event_type, start_at, end_at, all_day, location, meeting_url, member_ids = [] }) => {
+  const addEvent = async ({ title, description, event_type, start_at, end_at, all_day, location, meeting_url, client_id, member_ids = [] }) => {
     const { data: { user: authUser } } = await supabase.auth.getUser()
     const { data, error } = await supabase
       .from('calendar_events')
-      .insert([{ title, description, event_type, start_at, end_at, all_day, location, meeting_url, created_by: authUser.id }])
+      .insert([{ title, description, event_type, start_at, end_at, all_day, location, meeting_url, client_id: client_id || null, created_by: authUser.id }])
       .select()
       .single()
     if (error) throw error
@@ -59,10 +59,10 @@ export function useCalendarEvents(year, month) {
     return data
   }
 
-  const updateEvent = async (id, { title, description, event_type, start_at, end_at, all_day, location, meeting_url, member_ids }) => {
+  const updateEvent = async (id, { title, description, event_type, start_at, end_at, all_day, location, meeting_url, client_id, member_ids }) => {
     const { data, error } = await supabase
       .from('calendar_events')
-      .update({ title, description, event_type, start_at, end_at, all_day, location, meeting_url })
+      .update({ title, description, event_type, start_at, end_at, all_day, location, meeting_url, client_id: client_id || null })
       .eq('id', id)
       .select()
       .single()

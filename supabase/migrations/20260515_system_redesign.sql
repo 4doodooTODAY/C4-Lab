@@ -149,6 +149,7 @@ alter table content_requests add column if not exists target_date       date;
 -- projects: link to a shoot
 alter table projects add column if not exists shoot_id uuid references shoots(id);
 
--- calendar_events: link to shoots and drafts
-alter table calendar_events add column if not exists shoot_id uuid references shoots(id);
-alter table calendar_events add column if not exists draft_id uuid references content_drafts(id);
+-- calendar_events: link to shoots, drafts, and clients
+alter table calendar_events add column if not exists shoot_id  uuid references shoots(id);
+alter table calendar_events add column if not exists draft_id  uuid references content_drafts(id);
+alter table calendar_events add column if not exists client_id uuid references clients(id);
