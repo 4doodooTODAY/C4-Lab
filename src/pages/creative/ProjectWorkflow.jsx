@@ -1395,15 +1395,18 @@ export default function ProjectWorkflow() {
       // 1. Fetch project base data
       const { data: projData, error: projErr } = await supabase
         .from('projects')
-        .select('id, name, stage, shoot_date, location, creative_id, editor_id, revision_count, notes, clients(id, name, contact_name)')
+        .select('id, name, stage, shoot_date, shoot_id, location, creative_id, editor_id, revision_count, notes, clients(id, name, contact_name)')
         .eq('id', id)
         .single()
       if (projErr) throw projErr
 
       // 2. Fetch everything else in parallel
-      const [shootsRes, uploadsRes, notesRes, revsRes] = await Promise.all([
+      const [shootsRes, uploadsRes, shootUploadsRes, notesRes, revsRes] = await Promise.all([
         supabase.from('project_shoots').select('*').eq('project_id', id).order('shoot_date'),
         supabase.from('shoot_uploads').select('*, profiles(id, full_name, role)').eq('project_id', id).order('created_at'),
+        projData.shoot_id
+          ? supabase.from('shoot_uploads').select('*, profiles(id, full_name, role)').eq('shoot_id', projData.shoot_id).order('created_at')
+          : Promise.resolve({ data: [] }),
         supabase.from('shoot_notes').select('*').eq('project_id', id).order('created_at'),
         supabase.from('project_revisions').select('*').eq('project_id', id).order('revision_number'),
       ])
@@ -1439,9 +1442,20 @@ export default function ProjectWorkflow() {
         )
       }
 
+      const allUploads = [
+        ...(uploadsRes.data || []),
+        ...(shootUploadsRes.data || []),
+      ]
+      const seen = new Set()
+      const dedupedUploads = allUploads.filter((u) => {
+        if (seen.has(u.id)) return false
+        seen.add(u.id)
+        return true
+      })
+
       setProject(projData)
       setProjectShoots(shootsRes.data || [])
-      setUploads(uploadsRes.data || [])
+      setUploads(dedupedUploads)
       setShootNotes(notesRes.data || [])
       setRevisions(revData)
       setCommentCounts(counts)

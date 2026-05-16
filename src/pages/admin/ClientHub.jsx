@@ -14,6 +14,7 @@ import { useClientCreatives, assignCreative, removeCreativeAssignment } from '..
 import { useShoots, createShoot, updateShoot } from '../../hooks/useShoots'
 import { useContentDrafts, createDraft, updateDraft } from '../../hooks/useContentDrafts'
 import { fmtTime } from '../../lib/time'
+import ShootDetailModal from '../../components/shoots/ShootDetailModal'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 const DRAFT_TYPE_LABELS = {
@@ -414,6 +415,7 @@ function ShootsTab({ clientId, client }) {
   const { shoots, loading, refetch } = useShoots(clientId)
   const [showNew, setShowNew] = useState(false)
   const [uploadCounts, setUploadCounts] = useState({})
+  const [detailShoot, setDetailShoot] = useState(null)
 
   useEffect(() => {
     if (!clientId) return
@@ -435,7 +437,7 @@ function ShootsTab({ clientId, client }) {
   const past     = shoots.filter((s) => !s.shoot_date || isBefore(parseISO(s.shoot_date), today))
 
   const ShootCard = ({ shoot }) => (
-    <div className="card p-4 hover:shadow-md transition-shadow">
+    <div className="card p-4 hover:shadow-md transition-shadow cursor-pointer" onClick={() => setDetailShoot(shoot)}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-text-primary">{shoot.title}</p>
@@ -518,6 +520,15 @@ function ShootsTab({ clientId, client }) {
           clientId={clientId}
           onClose={() => setShowNew(false)}
           onCreated={() => { setShowNew(false); refetch() }}
+        />
+      )}
+
+      {detailShoot && (
+        <ShootDetailModal
+          shoot={detailShoot}
+          clientId={clientId}
+          clientName={client?.name || ''}
+          onClose={() => setDetailShoot(null)}
         />
       )}
     </div>

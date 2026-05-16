@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import {
   X, CalendarDays, MapPin, Camera, Upload, Send,
   Loader2, MessageSquare, StickyNote, ChevronDown,
+  ExternalLink, Film, Image, File, HardDrive,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -158,10 +159,64 @@ function NotesThread({ shootId }) {
   )
 }
 
+// ── Shoot files list ──────────────────────────────────────────────────────────
+function ShootFiles({ shootId }) {
+  const [files, setFiles]     = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!shootId) return
+    supabase
+      .from('shoot_uploads')
+      .select('id, file_name, file_url, file_size, created_at, profiles(full_name)')
+      .eq('shoot_id', shootId)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => { setFiles(data || []); setLoading(false) })
+  }, [shootId])
+
+  if (loading) return <div className="flex justify-center py-3"><Loader2 size={14} className="animate-spin text-text-muted" /></div>
+  if (!files.length) return (
+    <div className="text-center py-4 text-xs text-text-muted bg-surface-2/40 rounded-xl">
+      No files uploaded yet for this shoot.
+    </div>
+  )
+
+  return (
+    <div className="space-y-1.5">
+      {files.map((f) => {
+        const ext = f.file_name?.split('.').pop()?.toLowerCase()
+        const isVideo = ['mp4','mov','avi','mkv','webm','m4v'].includes(ext)
+        const isImage = ['jpg','jpeg','png','gif','webp','heic','raw','cr2','arw'].includes(ext)
+        return (
+          <div key={f.id} className="flex items-center gap-3 px-3 py-2.5 bg-surface-2/40 rounded-xl hover:bg-surface-2 transition-colors">
+            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${isVideo ? 'bg-blue-50' : isImage ? 'bg-purple-50' : 'bg-surface-3'}`}>
+              {isVideo ? <Film size={12} className="text-blue-500" /> : isImage ? <Image size={12} className="text-purple-500" /> : <File size={12} className="text-text-muted" />}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-text-primary truncate">{f.file_name}</p>
+              <p className="text-[10px] text-text-muted">
+                {f.file_size ? (f.file_size >= 1_048_576 ? (f.file_size/1_048_576).toFixed(1)+' MB' : (f.file_size/1024).toFixed(1)+' KB') : ''}
+                {f.profiles?.full_name ? ` · by ${f.profiles.full_name}` : ''}
+              </p>
+            </div>
+            {f.file_url && (
+              <a href={f.file_url} target="_blank" rel="noreferrer"
+                className="p-1.5 text-text-muted hover:text-accent transition-colors rounded-lg hover:bg-accent/5"
+                onClick={(e) => e.stopPropagation()}>
+                <ExternalLink size={12} />
+              </a>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ── Main modal ────────────────────────────────────────────────────────────────
 export default function ShootDetailModal({ shoot, clientId, clientName, onClose }) {
   const [showUpload,   setShowUpload]   = useState(false)
-  const [activeSection, setSection]    = useState('details') // 'details' | 'notes'
+  const [activeSection, setSection]    = useState('files') // 'files' | 'notes'
 
   if (!shoot) return null
 
@@ -226,27 +281,28 @@ export default function ShootDetailModal({ shoot, clientId, clientName, onClose 
               <Upload size={14} /> Upload Clips
             </button>
 
-            {/* Section toggle */}
-            <div className="flex gap-2">
+            {/* Section tabs */}
+            <div className="flex gap-1 border-b border-border -mx-6 px-6">
               {[
+                { id: 'files', label: 'Files', icon: HardDrive },
                 { id: 'notes', label: 'Notes & Messages', icon: MessageSquare },
               ].map(({ id, label, icon: Icon }) => (
                 <button
                   key={id}
                   onClick={() => setSection(id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors -mb-px ${
                     activeSection === id
-                      ? 'bg-accent/10 text-accent'
-                      : 'text-text-muted hover:text-text-primary hover:bg-surface-2'
+                      ? 'border-accent text-accent'
+                      : 'border-transparent text-text-muted hover:text-text-primary'
                   }`}
                 >
-                  <Icon size={12} /> {label}
+                  <Icon size={11} /> {label}
                 </button>
               ))}
             </div>
 
-            {/* Notes thread */}
-            <NotesThread shootId={shoot.id} />
+            {activeSection === 'files' && <ShootFiles shootId={shoot.id} />}
+            {activeSection === 'notes' && <NotesThread shootId={shoot.id} />}
           </div>
         </div>
       </div>

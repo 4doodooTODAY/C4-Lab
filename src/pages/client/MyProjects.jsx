@@ -255,6 +255,64 @@ function FootageUploader({ project, clientName, onDone }) {
   )
 }
 
+// ── Shoot files list (client view) ────────────────────────────────────────────
+function ShootFilesList({ project }) {
+  const [files,   setFiles]   = useState([])
+  const [loading, setLoading] = useState(true)
+  const [open,    setOpen]    = useState(false)
+
+  useEffect(() => {
+    if (!project?.id) return
+    // Load uploads linked to this project OR its shoot
+    const queries = [
+      supabase.from('shoot_uploads').select('id, file_name, file_url, file_size, created_at').eq('project_id', project.id),
+    ]
+    if (project.shoot_id) {
+      queries.push(supabase.from('shoot_uploads').select('id, file_name, file_url, file_size, created_at').eq('shoot_id', project.shoot_id))
+    }
+    Promise.all(queries).then((results) => {
+      const all = results.flatMap((r) => r.data || [])
+      const seen = new Set()
+      setFiles(all.filter((f) => { if (seen.has(f.id)) return false; seen.add(f.id); return true }))
+      setLoading(false)
+    })
+  }, [project?.id, project?.shoot_id])
+
+  if (loading || !files.length) return null
+
+  return (
+    <div className="mt-3 pt-3 border-t border-gray-100">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-2 text-xs text-gray-400 hover:text-accent transition-colors font-medium w-full"
+      >
+        <Film size={12} />
+        {files.length} footage file{files.length !== 1 ? 's' : ''} available
+        <span className="ml-auto text-[10px]">{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div className="mt-2 space-y-1.5">
+          {files.map((f) => {
+            const ext = f.file_name?.split('.').pop()?.toLowerCase()
+            const isVideo = ['mp4','mov','avi','mkv','webm'].includes(ext)
+            return (
+              <div key={f.id} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
+                {isVideo ? <Film size={12} className="text-blue-400 shrink-0" /> : <Film size={12} className="text-gray-300 shrink-0" />}
+                <span className="text-xs text-gray-600 truncate flex-1">{f.file_name}</span>
+                {f.file_url && (
+                  <a href={f.file_url} target="_blank" rel="noreferrer" className="text-xs text-accent hover:underline shrink-0">
+                    View
+                  </a>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Project Card ──────────────────────────────────────────────────────────────
 function ProjectCard({ project, revisions, clientName }) {
   const navigate = useNavigate()
@@ -322,6 +380,8 @@ function ProjectCard({ project, revisions, clientName }) {
           )}
         </>
       )}
+
+      <ShootFilesList project={project} />
     </div>
   )
 }
@@ -348,7 +408,7 @@ export default function MyProjects() {
         setClientName(client.name || '')
         const projRes = await supabase
           .from('projects')
-          .select('id, name, stage, revision_count')
+          .select('id, name, stage, revision_count, shoot_id')
           .eq('client_id', client.id)
           .neq('stage', 'archived')
           .order('created_at', { ascending: false })
