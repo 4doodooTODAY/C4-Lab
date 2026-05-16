@@ -233,17 +233,16 @@ export default function ContentCalendar() {
   const [clientId, setClientId] = useState(null)
   const [clientResolved, setClientResolved] = useState(false)
 
-  // Resolve the client record
+  // Resolve the client record — clients.profile_id is the client user link
   useEffect(() => {
     if (!user) return
     supabase
-      .from('client_access')
-      .select('client_id')
+      .from('clients')
+      .select('id')
       .eq('profile_id', user.id)
-      .limit(1)
       .maybeSingle()
       .then(({ data }) => {
-        if (data?.client_id) setClientId(data.client_id)
+        if (data?.id) setClientId(data.id)
         setClientResolved(true)
       })
   }, [user])

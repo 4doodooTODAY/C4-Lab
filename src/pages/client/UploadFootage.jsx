@@ -33,15 +33,14 @@ export default function UploadFootage() {
   useEffect(() => {
     if (!user) return
     supabase
-      .from('client_access')
-      .select('client_id, clients(id, name)')
+      .from('clients')
+      .select('id, name')
       .eq('profile_id', user.id)
-      .limit(1)
-      .single()
+      .maybeSingle()
       .then(({ data }) => {
-        if (data?.client_id) {
-          setClientId(data.client_id)
-          setClientName(data.clients?.name || '')
+        if (data?.id) {
+          setClientId(data.id)
+          setClientName(data.name || '')
         }
       })
   }, [user])
