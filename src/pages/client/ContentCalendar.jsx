@@ -344,7 +344,7 @@ export default function ContentCalendar() {
   const handleDecline = async (item) => {
     setUpdating(true)
     try {
-      await updateDraft(item.rawId, { status: 'declined' })
+      await updateDraft(item.rawId, { status: 'scrapped' })
       await loadData()
       setDetailItem(null)
     } catch (err) {

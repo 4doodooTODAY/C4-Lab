@@ -1,36 +1,161 @@
-import { useState } from 'react'
-import { format, addMonths, subMonths } from 'date-fns'
-import { ChevronLeft, ChevronRight, Loader2, Plus } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { format, addMonths, subMonths, parseISO } from 'date-fns'
+import { ChevronLeft, ChevronRight, Loader2, Plus, Camera, FileText, X, MapPin, Clock } from 'lucide-react'
 import CalendarGrid from '../components/calendar/CalendarGrid'
 import EventModal from '../components/calendar/EventModal'
 import { useCalendarEvents } from '../hooks/useCalendarEvents'
 import { EVENT_TYPES } from '../components/calendar/EventChip'
 import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../lib/supabase'
+
+// ── Shoot / Draft detail panel ─────────────────────────────────────────────────
+function ShootDraftPanel({ item, onClose }) {
+  if (!item) return null
+  const isShoot = item._isShoot
+  const isDraft = item._isDraft
+
+  return (
+    <div className="fixed bottom-6 right-6 z-40 w-80 bg-white rounded-2xl border border-border shadow-2xl overflow-hidden">
+      <div className={`h-1 ${isShoot ? 'bg-violet-500' : 'bg-amber-500'}`} />
+      <div className="p-4">
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <div className="flex items-center gap-2">
+            {isShoot ? <Camera size={14} className="text-violet-600 shrink-0" /> : <FileText size={14} className="text-amber-600 shrink-0" />}
+            <span className={`text-xs font-semibold uppercase tracking-wide ${isShoot ? 'text-violet-600' : 'text-amber-600'}`}>
+              {isShoot ? 'Shoot Day' : `Content Draft — ${item._type || 'Post'}`}
+            </span>
+          </div>
+          <button onClick={onClose} className="text-text-muted hover:text-text-primary p-0.5">
+            <X size={13} />
+          </button>
+        </div>
+        <p className="text-sm font-semibold text-text-primary">{item.title}</p>
+        {item.location && (
+          <p className="text-xs text-text-muted mt-1 flex items-center gap-1"><MapPin size={10} /> {item.location}</p>
+        )}
+        {!item.all_day && item.start_at && (
+          <p className="text-xs text-text-muted mt-1 flex items-center gap-1">
+            <Clock size={10} /> {format(new Date(item.start_at), 'h:mm a')}
+          </p>
+        )}
+        {item._concept && <p className="text-xs text-text-secondary mt-2 line-clamp-3">{item._concept}</p>}
+        {item._clientName && <p className="text-xs text-text-muted mt-1">Client: {item._clientName}</p>}
+      </div>
+    </div>
+  )
+}
 
 export default function CalendarPage() {
   const { profile, user } = useAuth()
-  const isAdmin = profile?.role === 'admin'
+  const isAdmin   = profile?.role === 'admin'
+  const isCreative = profile?.role === 'creative'
+
   const [currentDate, setCurrentDate] = useState(new Date())
-  const [modalState,  setModalState]  = useState(null) // { date, event? }
+  const [modalState,  setModalState]  = useState(null)
+  const [shoots,      setShoots]      = useState([])
+  const [drafts,      setDrafts]      = useState([])
+  const [auxLoading,  setAuxLoading]  = useState(false)
+  const [selectedAux, setSelectedAux] = useState(null) // selected shoot/draft for panel
 
   const year  = currentDate.getFullYear()
   const month = currentDate.getMonth() + 1
 
   const { events: allEvents, loading, addEvent, updateEvent, deleteEvent } = useCalendarEvents(year, month)
 
-  // Admins see everything; creatives only see events they're a member of
-  const events = isAdmin
+  // Load shoots + drafts for the current month
+  useEffect(() => {
+    if (!user) return
+    setAuxLoading(true)
+
+    const monthStr    = format(currentDate, 'yyyy-MM')
+    const monthStart  = `${monthStr}-01`
+    const nextMonth   = format(addMonths(currentDate, 1), 'yyyy-MM-01')
+
+    Promise.all([
+      // Shoots in this month
+      supabase
+        .from('shoots')
+        .select('id, title, description, shoot_date, shoot_time, location, status, clients(name, contact_name)')
+        .neq('status', 'cancelled')
+        .gte('shoot_date', monthStart)
+        .lt('shoot_date', nextMonth),
+
+      // Drafts with target_date in this month
+      supabase
+        .from('content_drafts')
+        .select('id, type, title, concept, target_date, status, clients(name, contact_name)')
+        .not('status', 'in', '("scrapped")')
+        .gte('target_date', monthStart)
+        .lt('target_date', nextMonth),
+    ]).then(([shootsRes, draftsRes]) => {
+      // Convert shoots to synthetic calendar events
+      const shootEvents = (shootsRes.data || []).map((s) => {
+        const dateStr  = s.shoot_date
+        const timeStr  = s.shoot_time ? s.shoot_time.slice(0, 5) : '09:00'
+        const startAt  = new Date(`${dateStr}T${timeStr}:00`)
+        const endAt    = new Date(startAt.getTime() + 4 * 60 * 60 * 1000)
+        return {
+          id:          `_shoot_${s.id}`,
+          title:       s.title,
+          event_type:  'shoot',
+          start_at:    startAt.toISOString(),
+          end_at:      endAt.toISOString(),
+          all_day:     !s.shoot_time,
+          location:    s.location,
+          _isShoot:    true,
+          _concept:    s.description,
+          _clientName: s.clients?.contact_name || s.clients?.name,
+        }
+      })
+
+      // Convert drafts to synthetic calendar events
+      const draftEvents = (draftsRes.data || []).map((d) => {
+        const startAt = new Date(`${d.target_date}T12:00:00`)
+        return {
+          id:          `_draft_${d.id}`,
+          title:       d.title || `${(d.type || 'Content').charAt(0).toUpperCase() + (d.type || 'content').slice(1)} Draft`,
+          event_type:  'draft',
+          start_at:    startAt.toISOString(),
+          end_at:      startAt.toISOString(),
+          all_day:     true,
+          _isDraft:    true,
+          _type:       d.type,
+          _concept:    d.concept,
+          _status:     d.status,
+          _clientName: d.clients?.contact_name || d.clients?.name,
+        }
+      })
+
+      setShoots(shootEvents)
+      setDrafts(draftEvents)
+      setAuxLoading(false)
+    })
+  }, [user, currentDate])
+
+  // Filter real events by role
+  const roleEvents = isAdmin
     ? allEvents
     : allEvents.filter((e) =>
         (e.calendar_event_members || []).some((m) => m.profile_id === user?.id)
       )
 
-  const prevMonth = () => setCurrentDate((d) => subMonths(d, 1))
-  const nextMonth = () => setCurrentDate((d) => addMonths(d, 1))
-  const goToday   = () => setCurrentDate(new Date())
+  // Merge real events + synthetic shoot/draft events
+  const events = [...roleEvents, ...shoots, ...drafts]
 
-  const handleDayClick   = (date)  => setModalState({ date, event: null })
-  const handleEventClick = (event) => setModalState({ date: new Date(event.start_at), event })
+  const prevMonth = () => { setCurrentDate((d) => subMonths(d, 1)); setSelectedAux(null) }
+  const nextMonth = () => { setCurrentDate((d) => addMonths(d, 1)); setSelectedAux(null) }
+  const goToday   = () => { setCurrentDate(new Date()); setSelectedAux(null) }
+
+  const handleDayClick   = (date)  => { setModalState({ date, event: null }); setSelectedAux(null) }
+  const handleEventClick = (event) => {
+    // Synthetic events: show detail panel, don't open modal
+    if (event._isShoot || event._isDraft) {
+      setSelectedAux(event)
+      return
+    }
+    setSelectedAux(null)
+    setModalState({ date: new Date(event.start_at), event })
+  }
 
   const handleSave = async (data) => {
     if (modalState?.event) {
@@ -60,16 +185,18 @@ export default function CalendarPage() {
           Today
         </button>
 
-        {loading && <Loader2 size={13} className="animate-spin text-text-muted ml-1" />}
+        {(loading || auxLoading) && <Loader2 size={13} className="animate-spin text-text-muted ml-1" />}
 
-        <div className="ml-auto">
-          <button
-            onClick={() => setModalState({ date: new Date(), event: null })}
-            className="btn-primary flex items-center gap-1.5 text-xs"
-          >
-            <Plus size={13} /> Add Event
-          </button>
-        </div>
+        {isAdmin && (
+          <div className="ml-auto">
+            <button
+              onClick={() => setModalState({ date: new Date(), event: null })}
+              className="btn-primary flex items-center gap-1.5 text-xs"
+            >
+              <Plus size={13} /> Add Event
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Header row 2 — color legend */}
@@ -90,7 +217,12 @@ export default function CalendarPage() {
         onEventClick={handleEventClick}
       />
 
-      {/* Event modal */}
+      {/* Shoot / Draft detail panel */}
+      {selectedAux && (
+        <ShootDraftPanel item={selectedAux} onClose={() => setSelectedAux(null)} />
+      )}
+
+      {/* Event modal (only for real calendar events) */}
       {modalState && (
         <EventModal
           date={modalState.date}

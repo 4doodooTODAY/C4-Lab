@@ -131,3 +131,12 @@ alter table projects add column if not exists target_date date;
 -- content_requests: add inspiration links and optional target date
 alter table content_requests add column if not exists inspiration_links text[];
 alter table content_requests add column if not exists target_date       date;
+
+-- ─── 5. Additional columns ──────────────────────────────────────────────────────
+
+-- projects: link to a shoot
+alter table projects add column if not exists shoot_id uuid references shoots(id);
+
+-- calendar_events: link to shoots and drafts
+alter table calendar_events add column if not exists shoot_id uuid references shoots(id);
+alter table calendar_events add column if not exists draft_id uuid references content_drafts(id);

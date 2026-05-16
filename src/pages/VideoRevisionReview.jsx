@@ -558,6 +558,12 @@ export default function VideoRevisionReview() {
             {/* Client: send to editor or approve */}
             {(isClient || isAdmin) && revStatus === 'pending_client_review' && (
               <>
+                {!canRevise && (
+                  <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-3 mb-1">
+                    <p className="text-xs text-orange-300 font-semibold mb-0.5">Maximum revisions reached</p>
+                    <p className="text-xs text-white/40">You've used all 3 revision rounds. Please approve to finalize this project.</p>
+                  </div>
+                )}
                 {canRevise && (
                   <button
                     onClick={handleSendToEditor}
@@ -574,7 +580,7 @@ export default function VideoRevisionReview() {
                   className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-green-600 hover:bg-green-500 text-white text-sm font-semibold transition-all disabled:opacity-50"
                 >
                   {submittingAction ? <Loader2 size={14} className="animate-spin" /> : <ThumbsUp size={14} />}
-                  Approve Final
+                  {canRevise ? 'Approve Final' : 'Approve & Finalize'}
                 </button>
               </>
             )}

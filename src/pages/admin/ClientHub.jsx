@@ -73,6 +73,27 @@ function NewShootModal({ clientId, onClose, onCreated }) {
         created_by:  user?.id,
       }
       const row = await createShoot(payload)
+
+      // Auto-create a calendar event for the shoot
+      if (form.shoot_date) {
+        const timeStr = form.shoot_time || '09:00'
+        const startAt = new Date(`${form.shoot_date}T${timeStr}:00`)
+        const endAt   = new Date(startAt.getTime() + 4 * 60 * 60 * 1000) // 4hr block
+        const { data: evtData } = await supabase.from('calendar_events').insert({
+          title:      `${form.title.trim()} — Shoot`,
+          event_type: 'shoot',
+          start_at:   startAt.toISOString(),
+          end_at:     endAt.toISOString(),
+          all_day:    !form.shoot_time,
+          location:   form.location || null,
+          shoot_id:   row.id,
+          created_by: user?.id,
+        }).select('id').single()
+        if (evtData?.id) {
+          await supabase.from('shoots').update({ calendar_event_id: evtData.id }).eq('id', row.id)
+        }
+      }
+
       onCreated(row)
     } catch (err) {
       setError(err.message)
@@ -473,10 +494,28 @@ function ContentTab({ clientId, shoots }) {
   const [showNew, setShowNew]   = useState(false)
   const [updating, setUpdating] = useState(null)
 
-  const handleStatus = async (id, status) => {
-    setUpdating(id)
+  const handleStatus = async (draftId, status) => {
+    setUpdating(draftId)
     try {
-      await updateDraft(id, { status })
+      await updateDraft(draftId, { status })
+
+      // Auto-create a project when client approves a draft
+      if (status === 'approved') {
+        const draft = drafts.find((d) => d.id === draftId)
+        if (draft) {
+          const { error: projErr } = await supabase.from('projects').insert({
+            name:        draft.title || `${DRAFT_TYPE_LABELS[draft.type] || 'Content'} Project`,
+            client_id:   draft.client_id,
+            draft_id:    draft.id,
+            stage:       'post_production',
+            target_date: draft.target_date || null,
+            concept:     draft.concept || null,
+            status:      'active',
+          })
+          if (projErr) console.error('Auto-project creation failed:', projErr.message)
+        }
+      }
+
       await refetch()
     } catch (err) {
       alert(err.message)
@@ -539,7 +578,7 @@ function ContentTab({ clientId, shoots }) {
             {updating === draft.id ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />}
             Approve
           </button>
-          <button onClick={() => handleStatus(draft.id, 'declined')} disabled={!!updating}
+          <button onClick={() => handleStatus(draft.id, 'scrapped')} disabled={!!updating}
             className="btn-secondary text-xs flex-1">
             Decline
           </button>

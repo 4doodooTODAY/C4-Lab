@@ -14,18 +14,15 @@ import { format, parseISO } from 'date-fns'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const DISPLAY_STAGES = [
-  { key: 'briefing',        label: 'Planning' },
-  { key: 'production',      label: 'Shooting' },
   { key: 'post_production', label: 'Editing' },
   { key: 'review',          label: 'In Review' },
-  { key: 'revisions',       label: 'Revisions' },
   { key: 'delivered',       label: 'Delivered' },
 ]
 
 const STAGE_CURRENT_LABELS = {
-  briefing:        'Planning & Briefing',
-  pre_production:  'Pre-Production',
-  production:      'Shooting',
+  briefing:        'Editing',
+  pre_production:  'Editing',
+  production:      'Editing',
   post_production: 'Editing',
   review:          'In Review',
   revisions:       'Revisions',
@@ -167,8 +164,8 @@ function InlineField({ label, value, displayValue, type = 'text', onSave, icon: 
 
 // ── Stage Progress Bar ────────────────────────────────────────────────────────
 function StageBar({ currentStage, isAdmin, onStageClick }) {
-  const currentIdx = DISPLAY_STAGES.findIndex((s) => s.key === currentStage)
-  const effectiveIdx = currentStage === 'pre_production' ? 0 : currentIdx
+  const stageToIdx = { post_production: 0, review: 1, revisions: 1, delivered: 2 }
+  const effectiveIdx = stageToIdx[currentStage] ?? 0
 
   return (
     <div className="bg-white rounded-2xl border border-border p-5 mb-4">
@@ -516,21 +513,6 @@ export default function ProjectDetail() {
       {/* Stage progress */}
       <StageBar currentStage={project.stage} isAdmin={isAdmin} onStageClick={handleStageClick} />
 
-      {/* Advance from Planning — admin must do this manually */}
-      {isAdmin && project.stage === 'briefing' && (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 mb-2 flex items-center justify-between gap-4">
-          <div>
-            <p className="text-sm font-semibold text-amber-800">Project is in Planning</p>
-            <p className="text-xs text-amber-600 mt-0.5">Shoot dates and team are set. Ready to move to production?</p>
-          </div>
-          <button
-            onClick={() => handleStageClick('production')}
-            className="shrink-0 text-sm font-semibold px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white transition-colors"
-          >
-            Advance to Production →
-          </button>
-        </div>
-      )}
 
       {/* Project info — inline editable */}
       <div className="bg-white rounded-2xl border border-border p-5 mb-6">

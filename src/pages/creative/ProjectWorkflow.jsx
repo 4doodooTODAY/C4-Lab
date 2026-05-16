@@ -27,32 +27,26 @@ function fmtBytes(bytes) {
 }
 
 const STAGES = [
-  { key: 'planning',       label: 'Planning' },
-  { key: 'production',     label: 'Shooting' },
-  { key: 'post_production',label: 'Editing' },
-  { key: 'review',         label: 'In Review' },
-  { key: 'revisions',      label: 'Revisions' },
-  { key: 'delivered',      label: 'Delivered' },
+  { key: 'post_production', label: 'Editing' },
+  { key: 'review',          label: 'In Review' },
+  { key: 'delivered',       label: 'Delivered' },
 ]
 
-// map legacy/alternate stage keys to our STAGES keys
+// Normalize all legacy/planning/production stages → post_production
 const STAGE_KEY_MAP = {
-  briefing:        'planning',
-  pre_production:  'planning',
-  planning:        'planning',
-  production:      'production',
+  briefing:        'post_production',
+  pre_production:  'post_production',
+  planning:        'post_production',
+  production:      'post_production',
   post_production: 'post_production',
   review:          'review',
-  revisions:       'revisions',
+  revisions:       'review',
   delivered:       'delivered',
 }
 
 const STAGE_DESCRIPTIONS = {
-  planning:        'Getting ready for the shoot.',
-  production:      'Shoot day — go get those shots!',
-  post_production: 'Footage uploaded — time to edit.',
+  post_production: 'Footage is ready — time to edit.',
   review:          'Revision is under review.',
-  revisions:       'Revision sent back with feedback.',
   delivered:       'Project complete!',
 }
 
@@ -154,29 +148,8 @@ function ActionBanner({ project, uploads, revisions, isCreative, isEditor, navig
 
   let banner = null
 
-  if (isCreative) {
-    if (stage === 'production') {
-      banner = {
-        variant: 'amber',
-        icon: <Zap size={18} />,
-        title: 'Shoot day!',
-        body: 'Upload your footage when you\'re done shooting.',
-      }
-    } else if (stage === 'post_production' && !hasUploads) {
-      banner = {
-        variant: 'red',
-        icon: <AlertCircle size={18} />,
-        title: 'Footage needed',
-        body: 'Upload your footage to get started with editing.',
-      }
-    } else if (stage === 'post_production' && hasUploads && !project._shootNotes?.length) {
-      banner = {
-        variant: 'blue',
-        icon: <StickyNote size={18} />,
-        title: 'Add shoot notes',
-        body: 'Leave notes for the editor — what to keep, key moments, any context.',
-      }
-    } else if (pendingReview) {
+  if (isCreative && !isEditor) {
+    if (pendingReview) {
       banner = {
         variant: 'accent',
         icon: <FileVideo size={18} />,
@@ -1377,10 +1350,7 @@ function ProjectStatusCard({ project, revisions, creativeProfile, editorProfile 
   })()
 
   const controlMap = {
-    planning:        { label: 'Admin', detail: 'Waiting for shoot setup.' },
-    production:      { label: creativeProfile?.full_name || 'Shooter', detail: 'Out on the shoot.' },
     post_production: { label: editorProfile?.full_name || 'Editor', detail: 'Working on the edit.' },
-    revisions:       { label: editorProfile?.full_name || 'Editor', detail: 'Addressing revision feedback.' },
     delivered:       { label: 'Complete', detail: 'Project has been delivered.' },
   }
 
@@ -1511,12 +1481,6 @@ export default function ProjectWorkflow() {
   const isAdmin    = profile?.role === 'admin'
   const isCreative = project.creative_id === profile?.id || isAdmin
   const isEditor   = project.editor_id   === profile?.id || isAdmin
-  // Pure editor: only editor assigned, not also creative
-  const pureEditor = isEditor && project.editor_id === profile?.id && project.creative_id !== profile?.id && !isAdmin
-
-  // Attach shootNotes count to project for ActionBanner heuristic
-  const projectWithMeta = { ...project, _shootNotes: shootNotes }
-
   return (
     <div className="p-8 max-w-4xl">
       {/* Back link */}
@@ -1539,9 +1503,9 @@ export default function ProjectWorkflow() {
             )}
           </div>
           <div className="flex gap-2 flex-wrap">
-            {isCreative && !pureEditor && (
+            {isCreative && !isEditor && (
               <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 font-semibold px-2.5 py-0.5 rounded-full">
-                Shooter
+                Creative
               </span>
             )}
             {isEditor && !isCreative && (
@@ -1568,10 +1532,10 @@ export default function ProjectWorkflow() {
 
       {/* Action banner */}
       <ActionBanner
-        project={projectWithMeta}
+        project={project}
         uploads={uploads}
         revisions={revisions}
-        isCreative={isCreative && !pureEditor}
+        isCreative={isCreative}
         isEditor={isEditor}
         navigate={navigate}
       />
@@ -1587,16 +1551,6 @@ export default function ProjectWorkflow() {
             creativeProfile={creativeProfile}
             editorProfile={editorProfile}
           />
-
-          {/* 2. Shoot Delivery — creative (footage + notes in one flow) */}
-          {isCreative && !pureEditor && (
-            <ShootDeliverySection
-              project={project}
-              uploads={uploads}
-              shootNotes={shootNotes}
-              onRefresh={fetchAll}
-            />
-          )}
 
           {/* Admin Review Gate — shown to admin when first edit is pending their approval */}
           {isAdmin && (() => {

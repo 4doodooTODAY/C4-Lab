@@ -57,18 +57,6 @@ const STAGE_DOT = {
   delivered:       'bg-green-500',
 }
 
-const PAYMENT_COLORS = {
-  unpaid:       'bg-red-50 text-red-600',
-  deposit_paid: 'bg-amber-50 text-amber-600',
-  paid:         'bg-green-50 text-green-600',
-}
-
-const PAYMENT_LABELS = {
-  unpaid:       'Unpaid',
-  deposit_paid: 'Deposit Paid',
-  paid:         'Paid',
-}
-
 const IN_CONTROL = {
   briefing:        'Admin',
   pre_production:  'Admin',
@@ -229,21 +217,16 @@ function ProjectCard({ project, onClick }) {
         </span>
       </div>
 
-      {/* Due date + payment */}
-      <div className="flex items-center justify-between gap-2">
-        {due ? (
-          <div className={`flex items-center gap-1 text-xs font-medium ${isOD ? 'text-red-600' : isSoon ? 'text-amber-600' : 'text-text-muted'}`}>
-            {isOD && <AlertCircle size={11} />}
-            <CalendarDays size={11} />
-            {isOD ? 'Overdue · ' : ''}{format(due, 'MMM d')}
-          </div>
-        ) : (
-          <span className="text-xs text-text-muted">No due date</span>
-        )}
-        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${PAYMENT_COLORS[project.payment_status] || 'bg-surface-2 text-text-muted'}`}>
-          {PAYMENT_LABELS[project.payment_status] || project.payment_status}
-        </span>
-      </div>
+      {/* Due date */}
+      {due ? (
+        <div className={`flex items-center gap-1 text-xs font-medium ${isOD ? 'text-red-600' : isSoon ? 'text-amber-600' : 'text-text-muted'}`}>
+          {isOD && <AlertCircle size={11} />}
+          <CalendarDays size={11} />
+          {isOD ? 'Overdue · ' : ''}{format(due, 'MMM d')}
+        </div>
+      ) : (
+        <span className="text-xs text-text-muted">No due date</span>
+      )}
 
       {/* Team avatars + in-control */}
       <div className="flex items-center justify-between gap-2 pt-0.5 border-t border-border">
@@ -280,7 +263,6 @@ export default function Projects() {
   const [search, setSearch]     = useState('')
   const [filterType, setFT]     = useState('')
   const [filterStage, setFS]    = useState('')
-  const [filterPayment, setFP]  = useState('')
 
   const today = startOfDay(new Date())
   const nextWeek = addDays(today, 7)
@@ -293,14 +275,12 @@ export default function Projects() {
     const d = new Date(p.due_date)
     return !isBefore(d, today) && isBefore(d, nextWeek)
   }).length
-  const unpaidCount = projects.filter((p) => p.payment_status === 'unpaid').length
 
   // Filter
   const filtered = projects.filter((p) => {
     if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false
     if (filterType && p.type !== filterType) return false
     if (filterStage && p.stage !== filterStage) return false
-    if (filterPayment && p.payment_status !== filterPayment) return false
     return true
   })
 
@@ -318,12 +298,11 @@ export default function Projects() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-3 gap-4 mb-6">
         {[
           { label: 'Total',        value: total,       color: 'text-text-primary' },
           { label: 'Active',       value: activeCount, color: 'text-green-600' },
           { label: 'Due This Week',value: dueThisWeek, color: 'text-amber-600' },
-          { label: 'Unpaid',       value: unpaidCount, color: 'text-red-600' },
         ].map(({ label, value, color }) => (
           <div key={label} className="bg-white rounded-2xl border border-border p-4">
             <p className="text-xs text-text-muted mb-1">{label}</p>
@@ -351,10 +330,6 @@ export default function Projects() {
         <select className="input w-auto" value={filterStage} onChange={(e) => setFS(e.target.value)}>
           <option value="">All stages</option>
           {Object.entries(STAGE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-        </select>
-        <select className="input w-auto" value={filterPayment} onChange={(e) => setFP(e.target.value)}>
-          <option value="">All payments</option>
-          {Object.entries(PAYMENT_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
       </div>
 

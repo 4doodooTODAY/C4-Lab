@@ -4,8 +4,10 @@ export const EVENT_TYPES = {
   in_person:   { label: 'In Person',   color: '#3b82f6' },  // blue
   virtual:     { label: 'Virtual',     color: '#ca8a04' },  // yellow
   travel:      { label: 'Travel',      color: '#16a34a' },  // green
-  real_estate: { label: 'Real Estate', color: '#9333ea' },  // purple  ← overrides all
+  real_estate: { label: 'Real Estate', color: '#9333ea' },  // purple
   personal:    { label: 'Personal',    color: '#ea580c' },  // orange
+  shoot:       { label: 'Shoot Day',   color: '#8b5cf6' },  // violet
+  draft:       { label: 'Content',     color: '#f59e0b' },  // amber
 }
 
 export default function EventChip({ event, onClick }) {
