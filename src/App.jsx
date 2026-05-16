@@ -34,6 +34,7 @@ const CreativeProjectWorkflow = lazy(() => import('./pages/creative/ProjectWorkf
 const ClientMyProjects       = lazy(() => import('./pages/client/MyProjects'))
 const ClientMyConcepts       = lazy(() => import('./pages/client/MyConcepts'))
 const VideoRevisionReview    = lazy(() => import('./pages/VideoRevisionReview'))
+const AdminFileSystem        = lazy(() => import('./pages/admin/FileSystem'))
 
 function PageLoader() {
   return (
@@ -124,6 +125,9 @@ function AppRoutes() {
           } />
           <Route path="/admin/inbox" element={
             <ProtectedRoute roles={['admin']}><AdminInbox /></ProtectedRoute>
+          } />
+          <Route path="/admin/files" element={
+            <ProtectedRoute roles={['admin']}><AdminFileSystem /></ProtectedRoute>
           } />
           <Route path="/projects" element={
             <ProtectedRoute roles={['admin', 'creative']}>

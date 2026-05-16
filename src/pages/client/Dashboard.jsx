@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   FolderKanban, ArrowRight, CalendarDays, Loader2,
-  FileText, CheckCircle2, Camera, Clock, Film,
-  Upload, Scissors, MapPin, Star,
+  FileText, Camera, Scissors, MapPin,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
@@ -19,7 +18,6 @@ export default function ClientDashboard() {
   const [pendingReview,  setPendingReview]  = useState(null)
   const [pendingConcepts,setPendingConcepts]= useState(0)
   const [upcomingShoots, setUpcomingShoots] = useState([])
-  const [recentFiles,    setRecentFiles]    = useState([])
   const [loading,        setLoading]        = useState(true)
 
   useEffect(() => {
@@ -35,19 +33,17 @@ export default function ClientDashboard() {
 
         const today = new Date().toISOString().split('T')[0]
 
-        const [projRes, revRes, conceptsRes, shootsRes, filesRes] = await Promise.all([
+        const [projRes, revRes, conceptsRes, shootsRes] = await Promise.all([
           supabase.from('projects').select('id, name, stage').eq('client_id', client.id).neq('stage', 'archived').order('created_at', { ascending: false }),
           supabase.from('project_revisions').select('id, project_id, revision_number, status').eq('status', 'pending_client_review'),
           supabase.from('content_drafts').select('id').eq('client_id', client.id).eq('status', 'pending_client'),
           supabase.from('shoots').select('id, title, shoot_date, shoot_time, location, status').eq('client_id', client.id).gte('shoot_date', today).neq('status', 'cancelled').order('shoot_date', { ascending: true }).limit(3),
-          supabase.from('shoot_uploads').select('id, file_name, file_url, file_size, created_at').eq('client_id', client.id).order('created_at', { ascending: false }).limit(4),
         ])
 
         const projData = projRes.data || []
         setProjects(projData)
         setPendingConcepts((conceptsRes.data || []).length)
         setUpcomingShoots(shootsRes.data || [])
-        setRecentFiles(filesRes.data || [])
 
         const rev = (revRes.data || []).find((r) => projData.some((p) => p.id === r.project_id))
         if (rev) {
@@ -151,33 +147,6 @@ export default function ClientDashboard() {
                       <p className="text-xs text-gray-400 shrink-0 mt-0.5">
                         {formatDistanceToNow(shootDate, { addSuffix: true })}
                       </p>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Recent files */}
-        {recentFiles.length > 0 && (
-          <div className="mb-5">
-            <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2.5">Recent Files</h2>
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-50">
-              {recentFiles.map((f) => {
-                const ext = f.file_name?.split('.').pop()?.toLowerCase()
-                const isVideo = ['mp4','mov','avi','mkv','webm'].includes(ext)
-                return (
-                  <div key={f.id} className="flex items-center gap-3 px-4 py-3">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isVideo ? 'bg-blue-50' : 'bg-gray-50'}`}>
-                      <Film size={13} className={isVideo ? 'text-blue-400' : 'text-gray-400'} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-700 truncate">{f.file_name}</p>
-                      <p className="text-xs text-gray-400">{formatDistanceToNow(new Date(f.created_at), { addSuffix: true })}</p>
-                    </div>
-                    {f.file_url && (
-                      <a href={f.file_url} target="_blank" rel="noreferrer" className="text-xs text-accent hover:underline shrink-0">Open</a>
                     )}
                   </div>
                 )

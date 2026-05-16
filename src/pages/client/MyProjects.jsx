@@ -3,9 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import {
   Loader2, FolderKanban, ArrowRight, CheckCircle2, Upload,
   Film, X, Check, CalendarDays, MapPin, Users, Clock,
-  MessageSquare, ChevronDown, ChevronUp, ExternalLink,
-  Image, File as FileIcon, Scissors, Camera, StickyNote,
-  Star, AlertCircle,
+  ChevronDown, ChevronUp, Scissors, Camera, StickyNote,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
@@ -19,10 +17,6 @@ function fmtBytes(bytes) {
   if (bytes >= 1_048_576)     return (bytes / 1_048_576).toFixed(1) + ' MB'
   return (bytes / 1024).toFixed(1) + ' KB'
 }
-
-function fileExt(name = '') { return name.split('.').pop()?.toLowerCase() }
-function isVideoExt(ext)    { return ['mp4','mov','avi','mkv','webm','m4v'].includes(ext) }
-function isImageExt(ext)    { return ['jpg','jpeg','png','gif','webp','heic','raw','cr2','arw'].includes(ext) }
 
 // ── Stage config ──────────────────────────────────────────────────────────────
 const STAGE_STEPS = ['Planning', 'Shoot', 'Editing', 'Review', 'Done']
@@ -214,39 +208,10 @@ function FootageUploader({ project, clientName, onDone }) {
   )
 }
 
-// ── File row ──────────────────────────────────────────────────────────────────
-function FileRow({ file }) {
-  const ext = fileExt(file.file_name)
-  const isVideo = isVideoExt(ext)
-  const isImage = isImageExt(ext)
-  return (
-    <div className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2.5 group">
-      <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${isVideo ? 'bg-blue-50' : isImage ? 'bg-purple-50' : 'bg-gray-100'}`}>
-        {isVideo ? <Film size={11} className="text-blue-400" /> : isImage ? <Image size={11} className="text-purple-400" /> : <FileIcon size={11} className="text-gray-400" />}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-xs font-medium text-gray-700 truncate">{file.file_name}</p>
-        <p className="text-[10px] text-gray-400">
-          {fmtBytes(file.file_size)}
-          {file.created_at && ` · ${formatDistanceToNow(new Date(file.created_at), { addSuffix: true })}`}
-        </p>
-      </div>
-      {file.file_url && (
-        <a href={file.file_url} target="_blank" rel="noreferrer" className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-gray-400 hover:text-accent">
-          <ExternalLink size={12} />
-        </a>
-      )}
-    </div>
-  )
-}
-
 // ── Project Card ──────────────────────────────────────────────────────────────
 function ProjectCard({ project, revisions, clientName }) {
   const navigate    = useNavigate()
   const [showUpload, setShowUpload] = useState(false)
-  const [showFiles,  setShowFiles]  = useState(false)
-  const [files,      setFiles]      = useState([])
-  const [filesLoaded, setFilesLoaded] = useState(false)
 
   const pendingRevision = [...revisions]
     .sort((a, b) => b.revision_number - a.revision_number)[0]
@@ -254,23 +219,6 @@ function ProjectCard({ project, revisions, clientName }) {
   const { text, sub, color, emoji } = getStatusInfo(project.stage, pendingRevision)
   const canReview   = pendingRevision?.status === 'pending_client_review'
   const isDelivered = project.stage === 'delivered'
-
-  // Load files on mount
-  useEffect(() => {
-    if (!project?.id) return
-    const queries = [
-      supabase.from('shoot_uploads').select('id, file_name, file_url, file_size, created_at').eq('project_id', project.id),
-    ]
-    if (project.shoot_id) {
-      queries.push(supabase.from('shoot_uploads').select('id, file_name, file_url, file_size, created_at').eq('shoot_id', project.shoot_id))
-    }
-    Promise.all(queries).then((results) => {
-      const all  = results.flatMap((r) => r.data || [])
-      const seen = new Set()
-      setFiles(all.filter((f) => { if (seen.has(f.id)) return false; seen.add(f.id); return true }))
-      setFilesLoaded(true)
-    })
-  }, [project?.id, project?.shoot_id])
 
   const completedRevisions = revisions.filter((r) => r.status === 'approved').length
   const shoot = project.shoot
@@ -375,7 +323,7 @@ function ProjectCard({ project, revisions, clientName }) {
         </div>
 
         {/* Stats row */}
-        {(completedRevisions > 0 || files.length > 0 || revisions.length > 0) && (
+        {(completedRevisions > 0 || revisions.length > 0) && (
           <div className="flex items-center gap-4 text-xs text-gray-400 mb-4 pb-4 border-b border-gray-100">
             {revisions.length > 0 && (
               <span className="flex items-center gap-1">
@@ -387,12 +335,6 @@ function ProjectCard({ project, revisions, clientName }) {
               <span className="flex items-center gap-1 text-green-500">
                 <CheckCircle2 size={10} />
                 {completedRevisions} approved
-              </span>
-            )}
-            {filesLoaded && files.length > 0 && (
-              <span className="flex items-center gap-1">
-                <Upload size={10} />
-                {files.length} file{files.length !== 1 ? 's' : ''} uploaded
               </span>
             )}
           </div>
@@ -420,37 +362,15 @@ function ProjectCard({ project, revisions, clientName }) {
           </div>
         )}
 
-        {/* Secondary actions */}
-        <div className="flex gap-2 flex-wrap">
-          {/* Uploaded footage */}
-          {filesLoaded && files.length > 0 && (
-            <button
-              onClick={() => setShowFiles((v) => !v)}
-              className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-accent font-medium transition-colors"
-            >
-              <Film size={11} />
-              {showFiles ? 'Hide footage' : `View ${files.length} footage file${files.length !== 1 ? 's' : ''}`}
-              {showFiles ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
-            </button>
-          )}
-
-          {/* Upload more */}
-          {!isDelivered && (
-            <button
-              onClick={() => setShowUpload((v) => !v)}
-              className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-accent font-medium transition-colors ml-auto"
-            >
-              <Upload size={11} />
-              {showUpload ? 'Hide uploader' : 'Upload footage'}
-            </button>
-          )}
-        </div>
-
-        {/* Files list */}
-        {showFiles && files.length > 0 && (
-          <div className="mt-3 space-y-1.5">
-            {files.map((f) => <FileRow key={f.id} file={f} />)}
-          </div>
+        {/* Upload footage */}
+        {!isDelivered && (
+          <button
+            onClick={() => setShowUpload((v) => !v)}
+            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-accent font-medium transition-colors"
+          >
+            <Upload size={11} />
+            {showUpload ? 'Hide uploader' : 'Send footage to your team'}
+          </button>
         )}
 
         {/* Footage uploader */}
