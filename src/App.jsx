@@ -32,6 +32,7 @@ const Messages               = lazy(() => import('./pages/Messages'))
 const CreativeProjectList    = lazy(() => import('./pages/creative/ProjectList'))
 const CreativeProjectWorkflow = lazy(() => import('./pages/creative/ProjectWorkflow'))
 const ClientMyProjects       = lazy(() => import('./pages/client/MyProjects'))
+const ClientMyConcepts       = lazy(() => import('./pages/client/MyConcepts'))
 const VideoRevisionReview    = lazy(() => import('./pages/VideoRevisionReview'))
 
 function PageLoader() {
@@ -162,6 +163,9 @@ function AppRoutes() {
           } />
           <Route path="/client/calendar" element={
             <ProtectedRoute roles={['client']}><ContentCalendar /></ProtectedRoute>
+          } />
+          <Route path="/client/concepts" element={
+            <ProtectedRoute roles={['client']}><ClientMyConcepts /></ProtectedRoute>
           } />
           <Route path="/client/request" element={
             <ProtectedRoute roles={['client']}><RequestPost /></ProtectedRoute>

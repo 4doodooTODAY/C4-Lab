@@ -11,6 +11,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import Avatar from '../../components/ui/Avatar'
 import { format, parseISO } from 'date-fns'
+import { fmtTime } from '../../lib/time'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const DISPLAY_STAGES = [
@@ -550,7 +551,7 @@ export default function ProjectDetail() {
                   <div className="flex-1 min-w-0">
                     <span className="text-sm font-medium text-text-primary">
                       {format(parseISO(s.shoot_date), 'MMM d, yyyy')}
-                      {s.shoot_time && ` · ${s.shoot_time.slice(0, 5)}`}
+                      {s.shoot_time && ` · ${fmtTime(s.shoot_time)}`}
                     </span>
                     {s.location && <p className="text-xs text-text-muted truncate">{s.location}</p>}
                   </div>

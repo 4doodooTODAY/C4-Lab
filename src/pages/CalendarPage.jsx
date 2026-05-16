@@ -7,6 +7,7 @@ import { useCalendarEvents } from '../hooks/useCalendarEvents'
 import { EVENT_TYPES } from '../components/calendar/EventChip'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import { fmtTime } from '../lib/time'
 
 // ── Shoot / Draft detail panel ─────────────────────────────────────────────────
 function ShootDraftPanel({ item, onClose }) {
@@ -91,7 +92,7 @@ export default function CalendarPage() {
       // Convert shoots to synthetic calendar events
       const shootEvents = (shootsRes.data || []).map((s) => {
         const dateStr  = s.shoot_date
-        const timeStr  = s.shoot_time ? s.shoot_time.slice(0, 5) : '09:00'
+        const timeStr  = s.shoot_time ? s.shoot_time.slice(0, 5) : '09:00' // kept as HH:MM for Date parsing only
         const startAt  = new Date(`${dateStr}T${timeStr}:00`)
         const endAt    = new Date(startAt.getTime() + 4 * 60 * 60 * 1000)
         return {

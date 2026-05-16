@@ -13,6 +13,7 @@ import {
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { updateDraft } from '../../hooks/useContentDrafts'
+import { fmtTime } from '../../lib/time'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const ITEM_STYLES = {
@@ -284,9 +285,9 @@ export default function ContentCalendar() {
         kind:        'shoot',
         title:       s.title,
         date:        parseISO(s.shoot_date),
-        dateLabel:   format(parseISO(s.shoot_date), 'EEE, MMM d yyyy') + (s.shoot_time ? ` at ${s.shoot_time.slice(0, 5)}` : ''),
+        dateLabel:   format(parseISO(s.shoot_date), 'EEE, MMM d yyyy') + (s.shoot_time ? ` at ${fmtTime(s.shoot_time)}` : ''),
         location:    s.location,
-        time:        s.shoot_time ? s.shoot_time.slice(0, 5) : null,
+        time:        s.shoot_time ? fmtTime(s.shoot_time) : null,
         description: s.description,
       })
     })

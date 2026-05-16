@@ -153,3 +153,75 @@ alter table projects add column if not exists shoot_id uuid references shoots(id
 alter table calendar_events add column if not exists shoot_id  uuid references shoots(id);
 alter table calendar_events add column if not exists draft_id  uuid references content_drafts(id);
 alter table calendar_events add column if not exists client_id uuid references clients(id);
+
+-- ─── 6. shoot_notes — per-shoot notes/messages thread ──────────────────────────
+
+create table if not exists shoot_notes (
+  id         uuid default gen_random_uuid() primary key,
+  shoot_id   uuid not null references shoots(id) on delete cascade,
+  profile_id uuid references profiles(id),
+  content    text not null,
+  created_at timestamptz default now()
+);
+
+alter table shoot_notes enable row level security;
+
+drop policy if exists "admins manage shoot_notes" on shoot_notes;
+create policy "admins manage shoot_notes" on shoot_notes
+  for all to authenticated
+  using  (exists(select 1 from profiles where id = auth.uid() and role = 'admin'))
+  with check (exists(select 1 from profiles where id = auth.uid() and role = 'admin'));
+
+drop policy if exists "creatives can manage shoot_notes" on shoot_notes;
+create policy "creatives can manage shoot_notes" on shoot_notes
+  for all to authenticated
+  using (
+    exists(
+      select 1 from client_creatives cc
+      join shoots s on s.client_id = cc.client_id
+      where s.id = shoot_notes.shoot_id and cc.profile_id = auth.uid()
+    )
+  )
+  with check (
+    exists(
+      select 1 from client_creatives cc
+      join shoots s on s.client_id = cc.client_id
+      where s.id = shoot_notes.shoot_id and cc.profile_id = auth.uid()
+    )
+  );
+
+-- ─── 7. Fix client RLS — use clients.profile_id (not client_access) ────────────
+-- clients.profile_id is how client users are linked, client_access is for creatives
+
+-- Fix shoots visibility for client portal users
+drop policy if exists "clients can view own shoots" on shoots;
+create policy "clients can view own shoots" on shoots
+  for select to authenticated
+  using (
+    exists(
+      select 1 from clients c
+      where c.id = shoots.client_id and c.profile_id = auth.uid()
+    )
+  );
+
+-- Fix content_drafts visibility for client portal users
+drop policy if exists "clients can view own drafts" on content_drafts;
+create policy "clients can view own drafts" on content_drafts
+  for select to authenticated
+  using (
+    exists(
+      select 1 from clients c
+      where c.id = content_drafts.client_id and c.profile_id = auth.uid()
+    )
+  );
+
+drop policy if exists "clients can respond to drafts" on content_drafts;
+create policy "clients can respond to drafts" on content_drafts
+  for update to authenticated
+  using (
+    exists(
+      select 1 from clients c
+      where c.id = content_drafts.client_id and c.profile_id = auth.uid()
+    )
+  )
+  with check (true);

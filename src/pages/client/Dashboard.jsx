@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { FolderKanban, ArrowRight, CalendarDays, Loader2 } from 'lucide-react'
+import { FolderKanban, ArrowRight, CalendarDays, Loader2, FileText, CheckCircle2 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { format } from 'date-fns'
@@ -10,6 +10,7 @@ export default function ClientDashboard() {
   const navigate = useNavigate()
   const [projects,        setProjects]        = useState([])
   const [pendingReview,   setPendingReview]   = useState(null)
+  const [pendingConcepts, setPendingConcepts] = useState(0)
   const [loading,         setLoading]         = useState(true)
 
   useEffect(() => {
@@ -22,7 +23,7 @@ export default function ClientDashboard() {
       .then(async ({ data: client }) => {
         if (!client) { setLoading(false); return }
 
-        const [projRes, revRes] = await Promise.all([
+        const [projRes, revRes, conceptsRes] = await Promise.all([
           supabase
             .from('projects')
             .select('id, name, stage')
@@ -33,9 +34,15 @@ export default function ClientDashboard() {
             .from('project_revisions')
             .select('id, project_id, revision_number, status')
             .eq('status', 'pending_client_review'),
+          supabase
+            .from('content_drafts')
+            .select('id')
+            .eq('client_id', client.id)
+            .eq('status', 'pending_client'),
         ])
 
         setProjects(projRes.data || [])
+        setPendingConcepts((conceptsRes.data || []).length)
         // Find a revision waiting on this client
         const rev = (revRes.data || []).find((r) =>
           (projRes.data || []).some((p) => p.id === r.project_id)
@@ -106,6 +113,36 @@ export default function ClientDashboard() {
               </p>
             </div>
             <ArrowRight size={16} className="text-gray-300 group-hover:text-accent transition-colors" />
+          </Link>
+
+          {/* Concepts — highlighted if pending review */}
+          <Link
+            to="/client/concepts"
+            className={`flex items-center gap-4 p-5 rounded-2xl border transition-all group ${
+              pendingConcepts > 0
+                ? 'border-amber-200 bg-amber-50/50 hover:border-amber-300'
+                : 'border-gray-100 hover:border-accent/30 hover:bg-accent/5'
+            }`}
+          >
+            <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 relative ${
+              pendingConcepts > 0 ? 'bg-amber-100' : 'bg-purple-50'
+            }`}>
+              <FileText size={20} className={pendingConcepts > 0 ? 'text-amber-600' : 'text-purple-600'} />
+              {pendingConcepts > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 text-white text-[9px] font-bold flex items-center justify-center">
+                  {pendingConcepts}
+                </span>
+              )}
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-gray-900">Content Concepts</p>
+              <p className={`text-sm mt-0.5 ${pendingConcepts > 0 ? 'text-amber-600 font-medium' : 'text-gray-400'}`}>
+                {pendingConcepts > 0
+                  ? `${pendingConcepts} concept${pendingConcepts !== 1 ? 's' : ''} waiting for your approval`
+                  : 'Review and approve content ideas'}
+              </p>
+            </div>
+            <ArrowRight size={16} className={`transition-colors ${pendingConcepts > 0 ? 'text-amber-400' : 'text-gray-300 group-hover:text-accent'}`} />
           </Link>
 
           <Link

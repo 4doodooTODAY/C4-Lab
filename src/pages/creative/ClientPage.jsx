@@ -10,7 +10,8 @@ import { supabase } from '../../lib/supabase'
 import { useShoots } from '../../hooks/useShoots'
 import { useContentDrafts } from '../../hooks/useContentDrafts'
 import { format, parseISO, isBefore, startOfDay } from 'date-fns'
-import ShootUploadModal from '../../components/shoots/ShootUploadModal'
+import { fmtTime } from '../../lib/time'
+import ShootDetailModal from '../../components/shoots/ShootDetailModal'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function fmtBytes(bytes) {
@@ -43,7 +44,7 @@ const STAGE_LABELS = {
 function ShootsTab({ clientId, clientName }) {
   const { shoots, loading, refetch } = useShoots(clientId)
   const today = startOfDay(new Date())
-  const [uploadShoot, setUploadShoot] = useState(null)
+  const [detailShoot, setDetailShoot] = useState(null)
   const [uploadCounts, setUploadCounts] = useState({})
 
   useEffect(() => {
@@ -86,7 +87,7 @@ function ShootsTab({ clientId, clientName }) {
                 <span className="flex items-center gap-1 text-xs text-text-muted">
                   <CalendarDays size={11} />
                   {format(parseISO(shoot.shoot_date), 'EEE, MMM d yyyy')}
-                  {shoot.shoot_time && ` · ${shoot.shoot_time.slice(0, 5)}`}
+                  {shoot.shoot_time && ` · ${fmtTime(shoot.shoot_time)}`}
                 </span>
               )}
               {shoot.location && (
@@ -111,10 +112,10 @@ function ShootsTab({ clientId, clientName }) {
               {shoot.status}
             </span>
             <button
-              onClick={() => setUploadShoot(shoot)}
+              onClick={() => setDetailShoot(shoot)}
               className="text-xs flex items-center gap-1 text-accent hover:underline font-medium"
             >
-              <Upload size={10} /> Upload clips
+              <Upload size={10} /> Details & Upload
             </button>
           </div>
         </div>
@@ -137,15 +138,14 @@ function ShootsTab({ clientId, clientName }) {
         </div>
       )}
 
-      {uploadShoot && (
-        <ShootUploadModal
-          shoot={uploadShoot}
+      {detailShoot && (
+        <ShootDetailModal
+          shoot={detailShoot}
           clientId={clientId}
           clientName={clientName}
-          onClose={() => setUploadShoot(null)}
-          onUploaded={() => {
-            setUploadShoot(null)
-            // Refresh upload counts
+          onClose={() => {
+            setDetailShoot(null)
+            // Refresh upload counts after closing
             supabase
               .from('shoot_uploads')
               .select('shoot_id')

@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Loader2, Camera, Scissors, CalendarDays, MapPin, ArrowRight, Upload } from 'lucide-react'
+import { Loader2, Camera, Scissors, CalendarDays, MapPin, ArrowRight, Upload, MessageSquare } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { format, parseISO } from 'date-fns'
-import ShootUploadModal from '../../components/shoots/ShootUploadModal'
+import ShootDetailModal from '../../components/shoots/ShootDetailModal'
+import { fmtTime } from '../../lib/time'
 
 const STAGE_COLORS = {
   post_production: 'bg-purple-50 text-purple-600',
@@ -20,9 +21,12 @@ const STAGE_LABELS = {
 }
 
 // ── Shoot Card ────────────────────────────────────────────────────────────────
-function ShootCard({ shoot, onUpload }) {
+function ShootCard({ shoot, onOpen }) {
   return (
-    <div className="bg-white rounded-2xl border border-border p-5 hover:shadow-md hover:border-border-strong transition-all flex flex-col gap-3">
+    <div
+      onClick={() => onOpen(shoot)}
+      className="bg-white rounded-2xl border border-border p-5 hover:shadow-md hover:border-border-strong transition-all flex flex-col gap-3 cursor-pointer"
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-text-primary truncate">{shoot.title}</p>
@@ -44,7 +48,7 @@ function ShootCard({ shoot, onUpload }) {
           <div className="flex items-center gap-1.5 text-xs text-text-muted">
             <CalendarDays size={11} />
             {format(parseISO(shoot.shoot_date), 'EEE, MMM d yyyy')}
-            {shoot.shoot_time && ` · ${shoot.shoot_time.slice(0, 5)}`}
+            {shoot.shoot_time && ` · ${fmtTime(shoot.shoot_time)}`}
           </div>
         )}
         {shoot.location && (
@@ -58,10 +62,10 @@ function ShootCard({ shoot, onUpload }) {
       </div>
 
       <button
-        onClick={() => onUpload(shoot)}
+        onClick={(e) => { e.stopPropagation(); onOpen(shoot) }}
         className="mt-auto btn-primary flex items-center justify-center gap-2 text-sm w-full"
       >
-        <Upload size={13} /> Upload Clips
+        <Upload size={13} /> View Details & Upload
       </button>
     </div>
   )
@@ -123,7 +127,7 @@ export default function CreativeProjectList() {
   const [edits,        setEdits]        = useState([])
   const [revisions,    setRevisions]    = useState([])
   const [loading,      setLoading]      = useState(true)
-  const [uploadShoot,  setUploadShoot]  = useState(null)  // shoot being uploaded to
+  const [detailShoot, setDetailShoot] = useState(null)  // shoot detail modal
 
   useEffect(() => {
     if (!myId) return
@@ -195,20 +199,19 @@ export default function CreativeProjectList() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {shoots.map((s) => (
-              <ShootCard key={s.id} shoot={s} onUpload={setUploadShoot} />
+              <ShootCard key={s.id} shoot={s} onOpen={setDetailShoot} />
             ))}
           </div>
         )}
       </section>
 
-      {/* Upload modal */}
-      {uploadShoot && (
-        <ShootUploadModal
-          shoot={uploadShoot}
-          clientId={uploadShoot.client_id}
-          clientName={uploadShoot.clients?.name || ''}
-          onClose={() => setUploadShoot(null)}
-          onUploaded={() => {}}
+      {/* Shoot detail modal */}
+      {detailShoot && (
+        <ShootDetailModal
+          shoot={detailShoot}
+          clientId={detailShoot.client_id}
+          clientName={detailShoot.clients?.name || detailShoot.clients?.contact_name || ''}
+          onClose={() => setDetailShoot(null)}
         />
       )}
 

@@ -13,6 +13,7 @@ import { format, parseISO, isBefore, startOfDay } from 'date-fns'
 import { useClientCreatives, assignCreative, removeCreativeAssignment } from '../../hooks/useClientCreatives'
 import { useShoots, createShoot, updateShoot } from '../../hooks/useShoots'
 import { useContentDrafts, createDraft, updateDraft } from '../../hooks/useContentDrafts'
+import { fmtTime } from '../../lib/time'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 const DRAFT_TYPE_LABELS = {
@@ -443,7 +444,7 @@ function ShootsTab({ clientId, client }) {
               <span className="flex items-center gap-1 text-xs text-text-muted">
                 <CalendarDays size={11} />
                 {format(parseISO(shoot.shoot_date), 'EEE, MMM d yyyy')}
-                {shoot.shoot_time && ` at ${shoot.shoot_time.slice(0, 5)}`}
+                {shoot.shoot_time && ` at ${fmtTime(shoot.shoot_time)}`}
               </span>
             )}
             {shoot.location && (
