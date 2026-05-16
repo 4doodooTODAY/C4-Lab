@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Loader2, Camera, Scissors, CalendarDays, MapPin, ArrowRight, FolderKanban } from 'lucide-react'
+import { Loader2, Camera, Scissors, CalendarDays, MapPin, ArrowRight, Upload } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { format, parseISO } from 'date-fns'
+import ShootUploadModal from '../../components/shoots/ShootUploadModal'
 
 const STAGE_COLORS = {
   post_production: 'bg-purple-50 text-purple-600',
@@ -19,10 +20,10 @@ const STAGE_LABELS = {
 }
 
 // ── Shoot Card ────────────────────────────────────────────────────────────────
-function ShootCard({ shoot }) {
+function ShootCard({ shoot, onUpload }) {
   return (
-    <div className="bg-white rounded-2xl border border-border p-5 hover:shadow-md hover:border-border-strong transition-all">
-      <div className="flex items-start justify-between gap-2 mb-3">
+    <div className="bg-white rounded-2xl border border-border p-5 hover:shadow-md hover:border-border-strong transition-all flex flex-col gap-3">
+      <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-text-primary truncate">{shoot.title}</p>
           <p className="text-xs text-text-muted mt-0.5 truncate">
@@ -38,7 +39,7 @@ function ShootCard({ shoot }) {
         </span>
       </div>
 
-      <div className="space-y-1.5">
+      <div className="space-y-1">
         {shoot.shoot_date && (
           <div className="flex items-center gap-1.5 text-xs text-text-muted">
             <CalendarDays size={11} />
@@ -52,9 +53,16 @@ function ShootCard({ shoot }) {
           </div>
         )}
         {shoot.description && (
-          <p className="text-xs text-text-secondary line-clamp-2 mt-1">{shoot.description}</p>
+          <p className="text-xs text-text-secondary line-clamp-2">{shoot.description}</p>
         )}
       </div>
+
+      <button
+        onClick={() => onUpload(shoot)}
+        className="mt-auto btn-primary flex items-center justify-center gap-2 text-sm w-full"
+      >
+        <Upload size={13} /> Upload Clips
+      </button>
     </div>
   )
 }
@@ -111,10 +119,11 @@ export default function CreativeProjectList() {
   const navigate    = useNavigate()
   const myId        = profile?.id
 
-  const [shoots,    setShoots]    = useState([])
-  const [edits,     setEdits]     = useState([])
-  const [revisions, setRevisions] = useState([])
-  const [loading,   setLoading]   = useState(true)
+  const [shoots,       setShoots]       = useState([])
+  const [edits,        setEdits]        = useState([])
+  const [revisions,    setRevisions]    = useState([])
+  const [loading,      setLoading]      = useState(true)
+  const [uploadShoot,  setUploadShoot]  = useState(null)  // shoot being uploaded to
 
   useEffect(() => {
     if (!myId) return
@@ -185,10 +194,23 @@ export default function CreativeProjectList() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {shoots.map((s) => <ShootCard key={s.id} shoot={s} />)}
+            {shoots.map((s) => (
+              <ShootCard key={s.id} shoot={s} onUpload={setUploadShoot} />
+            ))}
           </div>
         )}
       </section>
+
+      {/* Upload modal */}
+      {uploadShoot && (
+        <ShootUploadModal
+          shoot={uploadShoot}
+          clientId={uploadShoot.client_id}
+          clientName={uploadShoot.clients?.name || ''}
+          onClose={() => setUploadShoot(null)}
+          onUploaded={() => {}}
+        />
+      )}
 
       {/* My Edits */}
       <section>

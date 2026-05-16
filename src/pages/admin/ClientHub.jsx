@@ -4,7 +4,7 @@ import {
   ArrowLeft, Building2, Users2, CalendarDays, FolderKanban,
   Inbox, Plus, X, Loader2, Edit2, MapPin, Clock, Check,
   Camera, Film, ExternalLink, Trash2, ChevronRight, AlertCircle,
-  Link as LinkIcon, FileText, LayoutList,
+  Link as LinkIcon, FileText, LayoutList, HardDrive, Image, File,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -745,12 +745,149 @@ function RequestsTab({ requests }) {
   )
 }
 
+// ── Files Tab (Storage Browser) ────────────────────────────────────────────────
+function fmtBytes(bytes) {
+  if (!bytes) return ''
+  if (bytes >= 1_073_741_824) return (bytes / 1_073_741_824).toFixed(1) + ' GB'
+  if (bytes >= 1_048_576)     return (bytes / 1_048_576).toFixed(1) + ' MB'
+  return (bytes / 1024).toFixed(1) + ' KB'
+}
+
+function fileIconAdmin(name = '') {
+  const ext = name.split('.').pop()?.toLowerCase()
+  if (['mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v'].includes(ext)) return Film
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'raw', 'cr2', 'arw'].includes(ext)) return Image
+  return File
+}
+
+function FilesTab({ clientId }) {
+  const { shoots, loading: shootsLoading } = useShoots(clientId)
+  const [uploads, setUploads]   = useState([])
+  const [loading, setLoading]   = useState(true)
+  const [expanded, setExpanded] = useState({})
+
+  useEffect(() => {
+    if (!clientId) return
+    supabase
+      .from('shoot_uploads')
+      .select('id, file_name, file_url, file_size, shoot_id, created_at, notes, uploaded_by')
+      .eq('client_id', clientId)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => { setUploads(data || []); setLoading(false) })
+  }, [clientId])
+
+  if (shootsLoading || loading) return (
+    <div className="flex justify-center py-10"><Loader2 size={20} className="animate-spin text-text-muted" /></div>
+  )
+
+  // Group uploads by shoot_id
+  const byShoot = {}
+  uploads.forEach((u) => {
+    const key = u.shoot_id || 'unlinked'
+    if (!byShoot[key]) byShoot[key] = []
+    byShoot[key].push(u)
+  })
+
+  const groups = [
+    ...shoots.map((s) => ({ key: s.id, label: s.title, date: s.shoot_date, files: byShoot[s.id] || [] })),
+    ...(byShoot['unlinked']?.length ? [{ key: 'unlinked', label: 'Other Uploads', date: null, files: byShoot['unlinked'] }] : []),
+  ].filter((g) => g.files.length > 0)
+
+  const totalFiles = uploads.length
+  const totalSize  = uploads.reduce((sum, u) => sum + (u.file_size || 0), 0)
+
+  if (!groups.length) return (
+    <div className="card p-10 text-center">
+      <HardDrive size={32} className="mx-auto text-text-muted/30 mb-3" />
+      <p className="text-sm font-semibold text-text-primary">No files uploaded yet</p>
+      <p className="text-sm text-text-muted mt-1">Creative team members upload footage after shoots.</p>
+    </div>
+  )
+
+  const toggleGroup = (key) => setExpanded((p) => ({ ...p, [key]: !p[key] }))
+
+  return (
+    <div className="space-y-4">
+      {/* Summary bar */}
+      <div className="flex items-center gap-4 text-xs text-text-muted bg-surface-2/60 rounded-xl px-4 py-3">
+        <span><span className="font-semibold text-text-primary">{totalFiles}</span> file{totalFiles !== 1 ? 's' : ''}</span>
+        <span className="text-border">·</span>
+        <span><span className="font-semibold text-text-primary">{fmtBytes(totalSize)}</span> total</span>
+        <span className="text-border">·</span>
+        <span><span className="font-semibold text-text-primary">{groups.length}</span> shoot{groups.length !== 1 ? 's' : ''}</span>
+      </div>
+
+      {/* Shoot folders */}
+      {groups.map(({ key, label, date, files }) => {
+        const isOpen = expanded[key] !== false // default open
+        return (
+          <div key={key} className="card overflow-hidden">
+            <button
+              onClick={() => toggleGroup(key)}
+              className="w-full flex items-center justify-between p-4 hover:bg-surface-2/50 transition-colors text-left"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-accent/10 flex items-center justify-center shrink-0">
+                  <Camera size={15} className="text-accent" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-text-primary">{label}</p>
+                  <p className="text-xs text-text-muted">
+                    {files.length} file{files.length !== 1 ? 's' : ''}
+                    {' · '}{fmtBytes(files.reduce((s, f) => s + (f.file_size || 0), 0))}
+                    {date && ` · ${format(parseISO(date), 'MMM d, yyyy')}`}
+                  </p>
+                </div>
+              </div>
+              <ChevronRight size={14} className={`text-text-muted transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+            </button>
+
+            {isOpen && (
+              <div className="border-t border-border divide-y divide-border/50">
+                {files.map((file) => {
+                  const Icon = fileIconAdmin(file.file_name)
+                  return (
+                    <div key={file.id} className="flex items-center gap-3 px-4 py-3 hover:bg-surface-2/30 transition-colors">
+                      <Icon size={14} className="text-text-muted shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-text-primary truncate">{file.file_name || 'Unnamed file'}</p>
+                        <p className="text-xs text-text-muted">
+                          {fmtBytes(file.file_size)}
+                          {' · '}
+                          {format(new Date(file.created_at), 'MMM d, h:mm a')}
+                        </p>
+                        {file.notes && <p className="text-xs text-text-secondary italic mt-0.5">"{file.notes}"</p>}
+                      </div>
+                      {file.file_url && (
+                        <a
+                          href={file.file_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="p-1.5 text-text-muted hover:text-accent transition-colors rounded-lg hover:bg-accent/5"
+                          title="Open file"
+                        >
+                          <ExternalLink size={13} />
+                        </a>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ── Main Page ──────────────────────────────────────────────────────────────────
 const TABS = [
   { id: 'overview', label: 'Overview',  icon: Building2 },
   { id: 'shoots',   label: 'Shoots',    icon: Camera },
   { id: 'content',  label: 'Concepts',  icon: FileText },
   { id: 'projects', label: 'Projects',  icon: FolderKanban },
+  { id: 'files',    label: 'Files',     icon: HardDrive },
   { id: 'requests', label: 'Requests',  icon: Inbox },
 ]
 
@@ -834,9 +971,10 @@ export default function ClientHub() {
       {tab === 'overview' && (
         <OverviewTab client={client} shoots={shoots} drafts={drafts} projects={projects} requests={requests} />
       )}
-      {tab === 'shoots' && <ShootsTab clientId={id} client={client} />}
-      {tab === 'content' && <ContentTab clientId={id} shoots={shoots} />}
+      {tab === 'shoots'   && <ShootsTab   clientId={id} client={client} />}
+      {tab === 'content'  && <ContentTab  clientId={id} shoots={shoots} />}
       {tab === 'projects' && <ProjectsTab clientId={id} projects={projects} />}
+      {tab === 'files'    && <FilesTab    clientId={id} />}
       {tab === 'requests' && <RequestsTab requests={requests} />}
     </div>
   )

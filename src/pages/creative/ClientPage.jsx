@@ -4,12 +4,13 @@ import {
   ArrowLeft, Camera, FolderKanban, HardDrive, Loader2,
   CalendarDays, MapPin, Film, ExternalLink,
   ChevronRight, Building2, FileVideo, Image, File,
-  FileText, Link as LinkIcon,
+  FileText, Link as LinkIcon, Upload, FolderOpen, Folder,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useShoots } from '../../hooks/useShoots'
 import { useContentDrafts } from '../../hooks/useContentDrafts'
 import { format, parseISO, isBefore, startOfDay } from 'date-fns'
+import ShootUploadModal from '../../components/shoots/ShootUploadModal'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function fmtBytes(bytes) {
@@ -39,9 +40,26 @@ const STAGE_LABELS = {
 }
 
 // ── Shoots Tab ─────────────────────────────────────────────────────────────────
-function ShootsTab({ clientId }) {
-  const { shoots, loading } = useShoots(clientId)
+function ShootsTab({ clientId, clientName }) {
+  const { shoots, loading, refetch } = useShoots(clientId)
   const today = startOfDay(new Date())
+  const [uploadShoot, setUploadShoot] = useState(null)
+  const [uploadCounts, setUploadCounts] = useState({})
+
+  useEffect(() => {
+    if (!clientId) return
+    supabase
+      .from('shoot_uploads')
+      .select('shoot_id')
+      .eq('client_id', clientId)
+      .then(({ data }) => {
+        const counts = {}
+        ;(data || []).forEach(({ shoot_id }) => {
+          if (shoot_id) counts[shoot_id] = (counts[shoot_id] || 0) + 1
+        })
+        setUploadCounts(counts)
+      })
+  }, [clientId])
 
   const upcoming = shoots.filter((s) => s.shoot_date && !isBefore(parseISO(s.shoot_date), today))
   const past     = shoots.filter((s) => !s.shoot_date || isBefore(parseISO(s.shoot_date), today))
@@ -56,37 +74,53 @@ function ShootsTab({ clientId }) {
     </div>
   )
 
-  const ShootRow = ({ shoot }) => (
-    <div className="card p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1">
-          <p className="text-sm font-semibold text-text-primary">{shoot.title}</p>
-          <div className="flex flex-wrap gap-3 mt-1.5">
-            {shoot.shoot_date && (
-              <span className="flex items-center gap-1 text-xs text-text-muted">
-                <CalendarDays size={11} />
-                {format(parseISO(shoot.shoot_date), 'EEE, MMM d yyyy')}
-                {shoot.shoot_time && ` · ${shoot.shoot_time.slice(0, 5)}`}
-              </span>
-            )}
-            {shoot.location && (
-              <span className="flex items-center gap-1 text-xs text-text-muted">
-                <MapPin size={11} /> {shoot.location}
-              </span>
-            )}
+  const ShootRow = ({ shoot }) => {
+    const count = uploadCounts[shoot.id] || 0
+    return (
+      <div className="card p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-text-primary">{shoot.title}</p>
+            <div className="flex flex-wrap gap-3 mt-1.5">
+              {shoot.shoot_date && (
+                <span className="flex items-center gap-1 text-xs text-text-muted">
+                  <CalendarDays size={11} />
+                  {format(parseISO(shoot.shoot_date), 'EEE, MMM d yyyy')}
+                  {shoot.shoot_time && ` · ${shoot.shoot_time.slice(0, 5)}`}
+                </span>
+              )}
+              {shoot.location && (
+                <span className="flex items-center gap-1 text-xs text-text-muted">
+                  <MapPin size={11} /> {shoot.location}
+                </span>
+              )}
+              {count > 0 && (
+                <span className="flex items-center gap-1 text-xs text-accent font-medium">
+                  <Film size={11} /> {count} file{count !== 1 ? 's' : ''} uploaded
+                </span>
+              )}
+            </div>
+            {shoot.description && <p className="text-xs text-text-secondary mt-1.5 line-clamp-2">{shoot.description}</p>}
           </div>
-          {shoot.description && <p className="text-xs text-text-secondary mt-1.5 line-clamp-2">{shoot.description}</p>}
+          <div className="flex flex-col items-end gap-2 shrink-0">
+            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+              shoot.status === 'completed' ? 'bg-green-50 text-green-700' :
+              shoot.status === 'cancelled' ? 'bg-red-50 text-red-600' :
+              'bg-blue-50 text-blue-700'
+            }`}>
+              {shoot.status}
+            </span>
+            <button
+              onClick={() => setUploadShoot(shoot)}
+              className="text-xs flex items-center gap-1 text-accent hover:underline font-medium"
+            >
+              <Upload size={10} /> Upload clips
+            </button>
+          </div>
         </div>
-        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-          shoot.status === 'completed' ? 'bg-green-50 text-green-700' :
-          shoot.status === 'cancelled' ? 'bg-red-50 text-red-600' :
-          'bg-blue-50 text-blue-700'
-        }`}>
-          {shoot.status}
-        </span>
       </div>
-    </div>
-  )
+    )
+  }
 
   return (
     <div className="space-y-5">
@@ -101,6 +135,30 @@ function ShootsTab({ clientId }) {
           <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Past</h3>
           <div className="space-y-3">{past.map((s) => <ShootRow key={s.id} shoot={s} />)}</div>
         </div>
+      )}
+
+      {uploadShoot && (
+        <ShootUploadModal
+          shoot={uploadShoot}
+          clientId={clientId}
+          clientName={clientName}
+          onClose={() => setUploadShoot(null)}
+          onUploaded={() => {
+            setUploadShoot(null)
+            // Refresh upload counts
+            supabase
+              .from('shoot_uploads')
+              .select('shoot_id')
+              .eq('client_id', clientId)
+              .then(({ data }) => {
+                const counts = {}
+                ;(data || []).forEach(({ shoot_id }) => {
+                  if (shoot_id) counts[shoot_id] = (counts[shoot_id] || 0) + 1
+                })
+                setUploadCounts(counts)
+              })
+          }}
+        />
       )}
     </div>
   )
@@ -383,7 +441,7 @@ export default function CreativeClientPage() {
         ))}
       </div>
 
-      {tab === 'shoots'   && <ShootsTab   clientId={id} />}
+      {tab === 'shoots'   && <ShootsTab   clientId={id} clientName={client?.name} />}
       {tab === 'concepts' && <ConceptsTab clientId={id} />}
       {tab === 'projects' && <ProjectsTab clientId={id} />}
       {tab === 'files'    && <FilesTab    clientId={id} />}
