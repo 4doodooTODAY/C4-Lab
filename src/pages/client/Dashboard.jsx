@@ -1,17 +1,26 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { FolderKanban, ArrowRight, CalendarDays, Loader2, FileText, CheckCircle2 } from 'lucide-react'
+import {
+  FolderKanban, ArrowRight, CalendarDays, Loader2,
+  FileText, CheckCircle2, Camera, Clock, Film,
+  Upload, Scissors, MapPin, Star,
+} from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
-import { format } from 'date-fns'
+import { format, parseISO, formatDistanceToNow, isFuture, isToday } from 'date-fns'
+import { fmtTime } from '../../lib/time'
 
 export default function ClientDashboard() {
   const { profile, user } = useAuth()
   const navigate = useNavigate()
-  const [projects,        setProjects]        = useState([])
-  const [pendingReview,   setPendingReview]   = useState(null)
-  const [pendingConcepts, setPendingConcepts] = useState(0)
-  const [loading,         setLoading]         = useState(true)
+
+  const [clientId,       setClientId]       = useState(null)
+  const [projects,       setProjects]       = useState([])
+  const [pendingReview,  setPendingReview]  = useState(null)
+  const [pendingConcepts,setPendingConcepts]= useState(0)
+  const [upcomingShoots, setUpcomingShoots] = useState([])
+  const [recentFiles,    setRecentFiles]    = useState([])
+  const [loading,        setLoading]        = useState(true)
 
   useEffect(() => {
     if (!user?.id) return
@@ -22,143 +31,204 @@ export default function ClientDashboard() {
       .maybeSingle()
       .then(async ({ data: client }) => {
         if (!client) { setLoading(false); return }
+        setClientId(client.id)
 
-        const [projRes, revRes, conceptsRes] = await Promise.all([
-          supabase
-            .from('projects')
-            .select('id, name, stage')
-            .eq('client_id', client.id)
-            .neq('stage', 'archived')
-            .order('created_at', { ascending: false }),
-          supabase
-            .from('project_revisions')
-            .select('id, project_id, revision_number, status')
-            .eq('status', 'pending_client_review'),
-          supabase
-            .from('content_drafts')
-            .select('id')
-            .eq('client_id', client.id)
-            .eq('status', 'pending_client'),
+        const today = new Date().toISOString().split('T')[0]
+
+        const [projRes, revRes, conceptsRes, shootsRes, filesRes] = await Promise.all([
+          supabase.from('projects').select('id, name, stage').eq('client_id', client.id).neq('stage', 'archived').order('created_at', { ascending: false }),
+          supabase.from('project_revisions').select('id, project_id, revision_number, status').eq('status', 'pending_client_review'),
+          supabase.from('content_drafts').select('id').eq('client_id', client.id).eq('status', 'pending_client'),
+          supabase.from('shoots').select('id, title, shoot_date, shoot_time, location, status').eq('client_id', client.id).gte('shoot_date', today).neq('status', 'cancelled').order('shoot_date', { ascending: true }).limit(3),
+          supabase.from('shoot_uploads').select('id, file_name, file_url, file_size, created_at').eq('client_id', client.id).order('created_at', { ascending: false }).limit(4),
         ])
 
-        setProjects(projRes.data || [])
+        const projData = projRes.data || []
+        setProjects(projData)
         setPendingConcepts((conceptsRes.data || []).length)
-        // Find a revision waiting on this client
-        const rev = (revRes.data || []).find((r) =>
-          (projRes.data || []).some((p) => p.id === r.project_id)
-        )
+        setUpcomingShoots(shootsRes.data || [])
+        setRecentFiles(filesRes.data || [])
+
+        const rev = (revRes.data || []).find((r) => projData.some((p) => p.id === r.project_id))
         if (rev) {
-          const proj = (projRes.data || []).find((p) => p.id === rev.project_id)
+          const proj = projData.find((p) => p.id === rev.project_id)
           setPendingReview({ revision: rev, project: proj })
         }
         setLoading(false)
       })
   }, [user])
 
-  const firstName = profile?.full_name?.split(' ')[0] || 'there'
+  const firstName      = profile?.full_name?.split(' ')[0] || 'there'
   const activeProjects = projects.filter((p) => p.stage !== 'delivered')
+  const inEdit         = projects.filter((p) => ['post_production','review','revisions'].includes(p.stage)).length
 
   if (loading) return (
     <div className="flex justify-center py-24">
-      <Loader2 size={22} className="animate-spin text-gray-300" />
+      <Loader2 size={22} className="animate-spin text-gray-200" />
     </div>
   )
 
   return (
-    <div className="min-h-screen bg-white">
-      <div className="max-w-[560px] mx-auto px-6 py-14">
+    <div className="min-h-screen bg-gray-50/30">
+      <div className="max-w-[580px] mx-auto px-6 py-12">
 
         {/* Greeting */}
-        <div className="mb-10">
-          <p className="text-sm text-gray-400 mb-1">{format(new Date(), 'EEEE, MMMM d')}</p>
-          <h1 className="text-3xl font-bold text-gray-900">
-            Hey, {firstName} 👋
-          </h1>
-          <p className="text-gray-400 mt-2">
+        <div className="mb-8">
+          <p className="text-sm text-gray-400 mb-0.5">{format(new Date(), 'EEEE, MMMM d')}</p>
+          <h1 className="text-3xl font-bold text-gray-900">Hey, {firstName} 👋</h1>
+          <p className="text-gray-400 mt-1.5">
             {activeProjects.length > 0
-              ? `You have ${activeProjects.length} active project${activeProjects.length !== 1 ? 's' : ''}.`
-              : "Welcome to your project portal."}
+              ? `${activeProjects.length} active project${activeProjects.length !== 1 ? 's' : ''}${inEdit > 0 ? ` · ${inEdit} in the edit` : ''}`
+              : 'Welcome to your project portal.'}
           </p>
         </div>
 
-        {/* Video ready to review — highest priority */}
+        {/* Stats strip */}
+        {projects.length > 0 && (
+          <div className="grid grid-cols-3 gap-3 mb-6">
+            {[
+              { label: 'Active',    value: activeProjects.length, icon: FolderKanban, color: 'text-accent',      bg: 'bg-accent/10' },
+              { label: 'In Edit',  value: inEdit,                 icon: Scissors,     color: 'text-purple-600',  bg: 'bg-purple-50' },
+              { label: 'Concepts', value: pendingConcepts,        icon: FileText,     color: pendingConcepts > 0 ? 'text-amber-600' : 'text-gray-400', bg: pendingConcepts > 0 ? 'bg-amber-50' : 'bg-gray-50' },
+            ].map(({ label, value, icon: Icon, color, bg }) => (
+              <div key={label} className="bg-white rounded-2xl border border-gray-100 p-4 text-center shadow-sm">
+                <div className={`w-8 h-8 rounded-xl ${bg} flex items-center justify-center mx-auto mb-2`}>
+                  <Icon size={15} className={color} />
+                </div>
+                <p className={`text-xl font-bold ${color}`}>{value}</p>
+                <p className="text-[10px] text-gray-400 mt-0.5 font-medium">{label}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 🎬 Video ready — highest priority alert */}
         {pendingReview && (
-          <div className="mb-6 bg-accent rounded-2xl p-5 text-white">
-            <p className="text-sm font-semibold opacity-80 mb-1">🎬 Video ready for your review</p>
-            <p className="text-xl font-bold mb-4">{pendingReview.project?.name}</p>
+          <div className="mb-5 bg-accent rounded-2xl p-5 text-white shadow-lg shadow-accent/20">
+            <p className="text-xs font-semibold opacity-70 mb-1 uppercase tracking-wide">Action Required</p>
+            <p className="text-sm font-semibold opacity-80 mb-0.5">🎬 Your video is ready for review</p>
+            <p className="text-lg font-bold mb-4">{pendingReview.project?.name}</p>
             <button
               onClick={() => navigate(`/projects/${pendingReview.project.id}/revision/${pendingReview.revision.id}`)}
-              className="bg-white text-accent font-bold text-sm px-5 py-2.5 rounded-xl hover:bg-white/90 transition-colors flex items-center gap-2 w-fit"
+              className="bg-white text-accent font-bold text-sm px-5 py-2.5 rounded-xl hover:bg-white/90 transition-colors flex items-center gap-2 w-fit shadow-sm"
             >
-              Watch & Review <ArrowRight size={15} />
+              Watch & Leave Feedback <ArrowRight size={14} />
             </button>
           </div>
         )}
 
-        {/* Quick links */}
-        <div className="space-y-3">
-          <Link
-            to="/my-projects"
-            className="flex items-center gap-4 p-5 rounded-2xl border border-gray-100 hover:border-accent/30 hover:bg-accent/5 transition-all group"
-          >
-            <div className="w-11 h-11 rounded-xl bg-accent/10 flex items-center justify-center shrink-0">
-              <FolderKanban size={20} className="text-accent" />
+        {/* Upcoming shoots */}
+        {upcomingShoots.length > 0 && (
+          <div className="mb-5">
+            <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2.5">Upcoming Shoots</h2>
+            <div className="space-y-2">
+              {upcomingShoots.map((shoot) => {
+                const shootDate = parseISO(shoot.shoot_date)
+                const isShootToday = isToday(shootDate)
+                return (
+                  <div key={shoot.id} className={`flex items-start gap-3 p-4 rounded-2xl border ${isShootToday ? 'border-amber-200 bg-amber-50' : 'border-gray-100 bg-white'} shadow-sm`}>
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isShootToday ? 'bg-amber-100' : 'bg-purple-50'}`}>
+                      <Camera size={18} className={isShootToday ? 'text-amber-600' : 'text-purple-500'} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-gray-900 truncate">{shoot.title}</p>
+                        {isShootToday && (
+                          <span className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500 text-white uppercase tracking-wide">Today</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {isShootToday ? 'Today' : format(shootDate, 'EEEE, MMMM d')}
+                        {shoot.shoot_time && ` · ${fmtTime(shoot.shoot_time)}`}
+                      </p>
+                      {shoot.location && (
+                        <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+                          <MapPin size={9} /> {shoot.location}
+                        </p>
+                      )}
+                    </div>
+                    {!isShootToday && (
+                      <p className="text-xs text-gray-400 shrink-0 mt-0.5">
+                        {formatDistanceToNow(shootDate, { addSuffix: true })}
+                      </p>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Recent files */}
+        {recentFiles.length > 0 && (
+          <div className="mb-5">
+            <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2.5">Recent Files</h2>
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-50">
+              {recentFiles.map((f) => {
+                const ext = f.file_name?.split('.').pop()?.toLowerCase()
+                const isVideo = ['mp4','mov','avi','mkv','webm'].includes(ext)
+                return (
+                  <div key={f.id} className="flex items-center gap-3 px-4 py-3">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isVideo ? 'bg-blue-50' : 'bg-gray-50'}`}>
+                      <Film size={13} className={isVideo ? 'text-blue-400' : 'text-gray-400'} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-700 truncate">{f.file_name}</p>
+                      <p className="text-xs text-gray-400">{formatDistanceToNow(new Date(f.created_at), { addSuffix: true })}</p>
+                    </div>
+                    {f.file_url && (
+                      <a href={f.file_url} target="_blank" rel="noreferrer" className="text-xs text-accent hover:underline shrink-0">Open</a>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Nav links */}
+        <div className="space-y-2.5">
+          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Quick Access</h2>
+
+          <Link to="/my-projects" className="flex items-center gap-4 p-4 rounded-2xl border border-gray-100 bg-white hover:border-accent/30 hover:bg-accent/5 transition-all group shadow-sm">
+            <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center shrink-0">
+              <FolderKanban size={18} className="text-accent" />
             </div>
             <div className="flex-1">
               <p className="font-semibold text-gray-900">Your Projects</p>
-              <p className="text-sm text-gray-400 mt-0.5">
-                {activeProjects.length > 0
-                  ? `${activeProjects.length} in progress`
-                  : 'View all your projects'}
-              </p>
+              <p className="text-xs text-gray-400 mt-0.5">{activeProjects.length > 0 ? `${activeProjects.length} in progress` : 'View all projects'}</p>
             </div>
-            <ArrowRight size={16} className="text-gray-300 group-hover:text-accent transition-colors" />
+            <ArrowRight size={15} className="text-gray-300 group-hover:text-accent transition-colors" />
           </Link>
 
-          {/* Concepts — highlighted if pending review */}
-          <Link
-            to="/client/concepts"
-            className={`flex items-center gap-4 p-5 rounded-2xl border transition-all group ${
-              pendingConcepts > 0
-                ? 'border-amber-200 bg-amber-50/50 hover:border-amber-300'
-                : 'border-gray-100 hover:border-accent/30 hover:bg-accent/5'
-            }`}
-          >
-            <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 relative ${
-              pendingConcepts > 0 ? 'bg-amber-100' : 'bg-purple-50'
-            }`}>
-              <FileText size={20} className={pendingConcepts > 0 ? 'text-amber-600' : 'text-purple-600'} />
+          <Link to="/client/concepts" className={`flex items-center gap-4 p-4 rounded-2xl border transition-all group shadow-sm ${pendingConcepts > 0 ? 'border-amber-200 bg-amber-50/60 hover:border-amber-300' : 'border-gray-100 bg-white hover:border-accent/30 hover:bg-accent/5'}`}>
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 relative ${pendingConcepts > 0 ? 'bg-amber-100' : 'bg-purple-50'}`}>
+              <FileText size={18} className={pendingConcepts > 0 ? 'text-amber-600' : 'text-purple-600'} />
               {pendingConcepts > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 text-white text-[9px] font-bold flex items-center justify-center">
-                  {pendingConcepts}
-                </span>
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 text-white text-[9px] font-bold flex items-center justify-center">{pendingConcepts}</span>
               )}
             </div>
             <div className="flex-1">
               <p className="font-semibold text-gray-900">Content Concepts</p>
-              <p className={`text-sm mt-0.5 ${pendingConcepts > 0 ? 'text-amber-600 font-medium' : 'text-gray-400'}`}>
-                {pendingConcepts > 0
-                  ? `${pendingConcepts} concept${pendingConcepts !== 1 ? 's' : ''} waiting for your approval`
-                  : 'Review and approve content ideas'}
+              <p className={`text-xs mt-0.5 ${pendingConcepts > 0 ? 'text-amber-600 font-medium' : 'text-gray-400'}`}>
+                {pendingConcepts > 0 ? `${pendingConcepts} waiting for your approval` : 'Review and approve ideas'}
               </p>
             </div>
-            <ArrowRight size={16} className={`transition-colors ${pendingConcepts > 0 ? 'text-amber-400' : 'text-gray-300 group-hover:text-accent'}`} />
+            <ArrowRight size={15} className={`transition-colors ${pendingConcepts > 0 ? 'text-amber-400' : 'text-gray-300 group-hover:text-accent'}`} />
           </Link>
 
-          <Link
-            to="/client/calendar"
-            className="flex items-center gap-4 p-5 rounded-2xl border border-gray-100 hover:border-accent/30 hover:bg-accent/5 transition-all group"
-          >
-            <div className="w-11 h-11 rounded-xl bg-green-50 flex items-center justify-center shrink-0">
-              <CalendarDays size={20} className="text-green-600" />
+          <Link to="/client/calendar" className="flex items-center gap-4 p-4 rounded-2xl border border-gray-100 bg-white hover:border-accent/30 hover:bg-accent/5 transition-all group shadow-sm">
+            <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center shrink-0">
+              <CalendarDays size={18} className="text-green-600" />
             </div>
             <div className="flex-1">
               <p className="font-semibold text-gray-900">Calendar</p>
-              <p className="text-sm text-gray-400 mt-0.5">Shoot dates and upcoming meetings</p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {upcomingShoots.length > 0 ? `${upcomingShoots.length} upcoming shoot${upcomingShoots.length !== 1 ? 's' : ''}` : 'Shoot dates and events'}
+              </p>
             </div>
-            <ArrowRight size={16} className="text-gray-300 group-hover:text-accent transition-colors" />
+            <ArrowRight size={15} className="text-gray-300 group-hover:text-accent transition-colors" />
           </Link>
-
         </div>
       </div>
     </div>
