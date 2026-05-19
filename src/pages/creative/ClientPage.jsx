@@ -127,9 +127,9 @@ function ShootsTab({ clientId, clientName }) {
                   await supabase.from('shoots').update({ status: 'completed' }).eq('id', shoot.id)
                   refetch()
                 }}
-                className="text-xs flex items-center gap-1 text-green-700 hover:text-green-900 font-medium"
+                className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 transition-colors flex items-center gap-1"
               >
-                <Check size={10} /> Mark Done
+                <Check size={11} /> Mark Done
               </button>
             )}
           </div>

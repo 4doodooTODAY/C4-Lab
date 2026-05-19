@@ -500,9 +500,13 @@ function ShootsTab({ clientId, client }) {
                 updateShoot(shoot.id, { status: next })
                 refetch()
               }}
-              className="text-[10px] text-text-muted hover:text-accent transition-colors"
+              className={`text-xs font-semibold px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 ${
+                shoot.status === 'scheduled'
+                  ? 'bg-green-50 text-green-700 hover:bg-green-100'
+                  : 'bg-surface-2 text-text-muted hover:bg-surface-3'
+              }`}
             >
-              {shoot.status === 'scheduled' ? 'Mark done' : 'Reopen'}
+              {shoot.status === 'scheduled' ? <><Check size={11} /> Mark Done</> : 'Reopen'}
             </button>
           </div>
         </div>
