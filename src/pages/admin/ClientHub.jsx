@@ -416,6 +416,8 @@ function ShootsTab({ clientId, client }) {
   const [showNew, setShowNew] = useState(false)
   const [uploadCounts, setUploadCounts] = useState({})
   const [detailShoot, setDetailShoot] = useState(null)
+  const [deleteShootConfirm, setDeleteShootConfirm] = useState(null)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     if (!clientId) return
@@ -431,6 +433,19 @@ function ShootsTab({ clientId, client }) {
         setUploadCounts(counts)
       })
   }, [clientId, shoots])
+
+  const handleHardDeleteShoot = async (shootId) => {
+    setDeleting(true)
+    try {
+      await supabase.from('shoots').delete().eq('id', shootId)
+      await refetch()
+      setDeleteShootConfirm(null)
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   const today = startOfDay(new Date())
   const upcoming = shoots.filter((s) => s.shoot_date && !isBefore(parseISO(s.shoot_date), today))
@@ -466,16 +481,29 @@ function ShootsTab({ clientId, client }) {
           <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${SHOOT_STATUS_COLORS[shoot.status] || 'bg-surface-2 text-text-muted'}`}>
             {shoot.status}
           </span>
-          <button
-            onClick={async () => {
-              const next = shoot.status === 'scheduled' ? 'completed' : 'scheduled'
-              await updateShoot(shoot.id, { status: next })
-              refetch()
-            }}
-            className="text-[10px] text-text-muted hover:text-accent transition-colors"
-          >
-            {shoot.status === 'scheduled' ? 'Mark done' : 'Reopen'}
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                setDeleteShootConfirm(shoot.id)
+              }}
+              className="text-[10px] text-text-muted hover:text-red-500 transition-colors p-1"
+              title="Delete shoot"
+            >
+              <Trash2 size={12} />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                const next = shoot.status === 'scheduled' ? 'completed' : 'scheduled'
+                updateShoot(shoot.id, { status: next })
+                refetch()
+              }}
+              className="text-[10px] text-text-muted hover:text-accent transition-colors"
+            >
+              {shoot.status === 'scheduled' ? 'Mark done' : 'Reopen'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -530,6 +558,33 @@ function ShootsTab({ clientId, client }) {
           clientName={client?.name || ''}
           onClose={() => setDetailShoot(null)}
         />
+      )}
+
+      {/* Delete shoot confirmation modal */}
+      {deleteShootConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDeleteShootConfirm(null)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 z-10">
+            <div className="w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
+              <Trash2 size={22} className="text-red-500" />
+            </div>
+            <h2 className="text-base font-bold text-text-primary text-center mb-1">Delete shoot?</h2>
+            <p className="text-xs text-text-muted text-center mb-5">
+              This will permanently delete the shoot and cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setDeleteShootConfirm(null)} disabled={deleting} className="flex-1 btn-secondary">Cancel</button>
+              <button
+                onClick={() => handleHardDeleteShoot(deleteShootConfirm)}
+                disabled={deleting}
+                className="flex-1 py-2 px-4 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {deleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                Delete permanently
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
