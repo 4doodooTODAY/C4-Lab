@@ -4,7 +4,7 @@ import {
   ArrowLeft, Camera, FolderKanban, HardDrive, Loader2,
   CalendarDays, MapPin, Film, ExternalLink,
   ChevronRight, Building2, FileVideo, Image, File,
-  FileText, Link as LinkIcon, Upload, FolderOpen, Folder,
+  FileText, Link as LinkIcon, Upload, FolderOpen, Folder, Check,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useShoots } from '../../hooks/useShoots'
@@ -104,19 +104,34 @@ function ShootsTab({ clientId, clientName }) {
             {shoot.creative_notes && <p className="text-xs text-text-secondary mt-1.5 line-clamp-2">{shoot.creative_notes}</p>}
           </div>
           <div className="flex flex-col items-end gap-2 shrink-0">
-            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-              shoot.status === 'completed' ? 'bg-green-50 text-green-700' :
-              shoot.status === 'cancelled' ? 'bg-red-50 text-red-600' :
-              'bg-blue-50 text-blue-700'
-            }`}>
-              {shoot.status}
-            </span>
+            {shoot.status === 'completed' ? (
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-50 text-green-700 flex items-center gap-1">
+                <Check size={9} /> Completed
+              </span>
+            ) : (
+              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                shoot.status === 'cancelled' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-700'
+              }`}>
+                {shoot.status}
+              </span>
+            )}
             <button
               onClick={() => setDetailShoot(shoot)}
               className="text-xs flex items-center gap-1 text-accent hover:underline font-medium"
             >
               <Upload size={10} /> Details & Upload
             </button>
+            {shoot.status !== 'completed' && (
+              <button
+                onClick={async () => {
+                  await supabase.from('shoots').update({ status: 'completed' }).eq('id', shoot.id)
+                  refetch()
+                }}
+                className="text-xs flex items-center gap-1 text-green-700 hover:text-green-900 font-medium"
+              >
+                <Check size={10} /> Mark Done
+              </button>
+            )}
           </div>
         </div>
       </div>

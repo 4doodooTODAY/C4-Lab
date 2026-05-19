@@ -115,7 +115,10 @@ function InviteClientModal({ onClose, onCreated }) {
 
 // ── Client Card ───────────────────────────────────────────────────────────────
 function ClientCard({ client, onClick }) {
-  const assigned   = (client.client_access || []).map((a) => a.profiles).filter(Boolean)
+  const assigned = (client.client_creatives || []).map((a) => ({
+    ...a.profiles,
+    assignedRole: a.role,
+  })).filter((a) => a.id)
   const isPending  = !client.profile_id || client._profile?.must_change_password
 
   return (
@@ -160,23 +163,27 @@ function ClientCard({ client, onClick }) {
         )}
       </div>
 
-      {/* Footer: team avatars */}
-      <div className="flex items-center justify-between pt-1 border-t border-border">
+      {/* Footer: team */}
+      <div className="flex items-start justify-between pt-2 border-t border-border">
         {assigned.length === 0 ? (
-          <span className="text-xs text-text-muted">No team assigned</span>
+          <span className="text-xs text-text-muted italic">No team assigned</span>
         ) : (
-          <div className="flex -space-x-1.5">
-            {assigned.slice(0, 5).map((p) => (
-              <Avatar key={p.id} name={p.full_name} url={p.avatar_url} size={6} className="border-2 border-white" />
-            ))}
-            {assigned.length > 5 && (
-              <div className="w-6 h-6 rounded-full bg-surface-3 border-2 border-white flex items-center justify-center text-[9px] font-semibold text-text-muted">
-                +{assigned.length - 5}
+          <div className="flex flex-col gap-1 flex-1">
+            {assigned.slice(0, 3).map((p) => (
+              <div key={p.id} className="flex items-center gap-1.5">
+                <Avatar name={p.full_name} url={p.avatar_url} size={5} />
+                <span className="text-xs text-text-primary font-medium truncate">{p.full_name}</span>
+                {p.assignedRole && (
+                  <span className="text-[10px] text-text-muted capitalize shrink-0">· {p.assignedRole}</span>
+                )}
               </div>
+            ))}
+            {assigned.length > 3 && (
+              <span className="text-[10px] text-text-muted">+{assigned.length - 3} more</span>
             )}
           </div>
         )}
-        <ChevronRight size={13} className="text-text-muted" />
+        <ChevronRight size={13} className="text-text-muted shrink-0 mt-0.5" />
       </div>
     </div>
   )

@@ -610,6 +610,19 @@ function ContentTab({ clientId, shoots, projects, onRefetchProjects }) {
       status:      'active',
     }).select('id').single()
     if (projErr) { console.error('Project creation failed:', projErr.message); throw projErr }
+
+    // Auto-assign first available editor for this client
+    const { data: team } = await supabase
+      .from('client_creatives')
+      .select('profile_id, role')
+      .eq('client_id', draft.client_id || clientId)
+      .in('role', ['editor', 'creative'])
+      .limit(1)
+
+    if (team?.length) {
+      await supabase.from('projects').update({ editor_id: team[0].profile_id }).eq('id', proj.id)
+    }
+
     return proj
   }
 

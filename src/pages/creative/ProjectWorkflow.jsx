@@ -495,6 +495,12 @@ function ShootDeliverySection({ project, uploads, shootNotes, onRefresh }) {
           onProgress: (pct) => setProgress((p) => ({ ...p, [file.name]: pct })),
           onStats:    (s)   => setUploadStats(s),
         })
+        // Run in Supabase SQL Editor if creative uploads fail:
+        // create policy "creatives can insert shoot_uploads" on shoot_uploads
+        //   for insert to authenticated
+        //   with check (
+        //     exists(select 1 from profiles where id = auth.uid() and role in ('admin','creative'))
+        //   );
         await supabase.from('shoot_uploads').insert({
           project_id:  project.id,
           file_url:    publicUrl,

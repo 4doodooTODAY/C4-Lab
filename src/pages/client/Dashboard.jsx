@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
-import { format, parseISO, formatDistanceToNow, isToday } from 'date-fns'
+import { format, parseISO, isToday } from 'date-fns'
 import { fmtTime } from '../../lib/time'
 
 const STAGE_MAP = {
@@ -215,11 +215,6 @@ export default function ClientDashboard() {
                         </p>
                       )}
                     </div>
-                    {!isShootToday && (
-                      <p className="text-xs text-gray-400 shrink-0 mt-0.5">
-                        {formatDistanceToNow(shootDate, { addSuffix: true })}
-                      </p>
-                    )}
                   </div>
                 )
               })}

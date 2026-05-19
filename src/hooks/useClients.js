@@ -12,7 +12,7 @@ export function useClients() {
     setLoading(true)
     const { data, error } = await supabase
       .from('clients')
-      .select('*, client_access(profile_id, profiles(id, full_name, role, avatar_url))')
+      .select('*, client_creatives(role, profiles(id, full_name, role, avatar_url))')
       .order('created_at', { ascending: false })
     if (error) setError(error.message)
     else setClients(data || [])
@@ -28,7 +28,7 @@ export function useClients() {
       .select('id, name, created_at')
       .single()
     if (error) throw error
-    setClients((prev) => [{ ...data, client_access: [] }, ...prev])
+    setClients((prev) => [{ ...data, client_creatives: [] }, ...prev])
     return data
   }
 
