@@ -9,5 +9,15 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <script>
+      // Load Google Maps API when key is available
+      if (import.meta.env.VITE_GOOGLE_MAPS_API_KEY) {
+        const script = document.createElement('script')
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}&libraries=places`
+        script.async = true
+        script.defer = true
+        document.head.appendChild(script)
+      }
+    </script>
   </body>
 </html>

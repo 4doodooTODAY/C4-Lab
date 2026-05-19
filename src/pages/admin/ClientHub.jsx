@@ -9,6 +9,7 @@ import {
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import Avatar from '../../components/ui/Avatar'
+import LocationAutocomplete from '../../components/ui/LocationAutocomplete'
 import { format, parseISO, isBefore, startOfDay } from 'date-fns'
 import { useClientCreatives, assignCreative, removeCreativeAssignment } from '../../hooks/useClientCreatives'
 import { useShoots, createShoot, updateShoot } from '../../hooks/useShoots'
@@ -148,7 +149,7 @@ function NewShootModal({ clientId, onClose, onCreated }) {
           </div>
           <div>
             <label className="label">Location</label>
-            <input className="input" value={form.location} onChange={set('location')} placeholder="Address or venue name" />
+            <LocationAutocomplete value={form.location} onChange={set('location')} />
           </div>
 
           {/* Assign a team member */}
