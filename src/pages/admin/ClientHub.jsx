@@ -592,37 +592,58 @@ function ShootsTab({ clientId, client }) {
 }
 
 // ── Tab: Content Drafts ────────────────────────────────────────────────────────
-function ContentTab({ clientId, shoots }) {
+function ContentTab({ clientId, shoots, projects, onRefetchProjects }) {
   const { drafts, loading, refetch } = useContentDrafts(clientId)
+  const navigate = useNavigate()
   const [showNew, setShowNew]   = useState(false)
   const [updating, setUpdating] = useState(null)
-  const [deleteConfirm, setDeleteConfirm] = useState(null) // draft id to hard delete
+  const [deleteConfirm, setDeleteConfirm] = useState(null)
+
+  const createProjectFromDraft = async (draft) => {
+    const { data: proj, error: projErr } = await supabase.from('projects').insert({
+      name:        draft.title || `${DRAFT_TYPE_LABELS[draft.type] || 'Content'} Project`,
+      client_id:   draft.client_id || clientId,
+      draft_id:    draft.id,
+      stage:       'briefing',
+      target_date: draft.target_date || null,
+      concept:     draft.concept || null,
+      status:      'active',
+    }).select('id').single()
+    if (projErr) { console.error('Project creation failed:', projErr.message); throw projErr }
+    return proj
+  }
 
   const handleStatus = async (draftId, status) => {
     setUpdating(draftId)
     try {
       await updateDraft(draftId, { status })
-
-      // Auto-create a project when client approves a draft
       if (status === 'approved') {
         const draft = drafts.find((d) => d.id === draftId)
         if (draft) {
-          const { error: projErr } = await supabase.from('projects').insert({
-            name:        draft.title || `${DRAFT_TYPE_LABELS[draft.type] || 'Content'} Project`,
-            client_id:   draft.client_id,
-            draft_id:    draft.id,
-            stage:       'post_production',
-            target_date: draft.target_date || null,
-            concept:     draft.concept || null,
-            status:      'active',
-          })
-          if (projErr) console.error('Auto-project creation failed:', projErr.message)
+          const proj = await createProjectFromDraft(draft)
+          await onRefetchProjects?.()
+          await refetch()
+          // Navigate straight to the new project
+          navigate(`/projects/${proj.id}`)
+          return
         }
       }
-
       await refetch()
     } catch (err) {
       alert(err.message)
+    } finally {
+      setUpdating(null)
+    }
+  }
+
+  const handleCreateProject = async (draft) => {
+    setUpdating(draft.id)
+    try {
+      const proj = await createProjectFromDraft(draft)
+      await onRefetchProjects?.()
+      navigate(`/projects/${proj.id}`)
+    } catch (err) {
+      alert('Could not create project: ' + err.message)
     } finally {
       setUpdating(null)
     }
@@ -700,7 +721,7 @@ function ContentTab({ clientId, shoots }) {
           <button onClick={() => handleStatus(draft.id, 'approved')} disabled={!!updating}
             className="btn-primary text-xs flex-1 flex items-center justify-center gap-1">
             {updating === draft.id ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />}
-            Approve
+            Approve & Create Project
           </button>
           <button onClick={() => handleStatus(draft.id, 'scrapped')} disabled={!!updating}
             className="btn-secondary text-xs flex-1">
@@ -708,6 +729,25 @@ function ContentTab({ clientId, shoots }) {
           </button>
         </div>
       )}
+      {draft.status === 'approved' && (() => {
+        const linkedProject = projects?.find((p) => p.draft_id === draft.id)
+        return (
+          <div className="flex gap-2 mt-2 pt-2 border-t border-border">
+            {linkedProject ? (
+              <button onClick={() => navigate(`/projects/${linkedProject.id}`)}
+                className="btn-secondary text-xs flex-1 flex items-center justify-center gap-1">
+                <ChevronRight size={11} /> View Project
+              </button>
+            ) : (
+              <button onClick={() => handleCreateProject(draft)} disabled={!!updating}
+                className="btn-primary text-xs flex-1 flex items-center justify-center gap-1">
+                {updating === draft.id ? <Loader2 size={11} className="animate-spin" /> : <FolderKanban size={11} />}
+                Create Project
+              </button>
+            )}
+          </div>
+        )
+      })()}
     </div>
   )
 
@@ -1180,7 +1220,7 @@ export default function ClientHub() {
         <OverviewTab client={client} shoots={shoots} drafts={drafts} projects={projects} requests={requests} />
       )}
       {tab === 'shoots'   && <ShootsTab   clientId={id} client={client} />}
-      {tab === 'content'  && <ContentTab  clientId={id} shoots={shoots} />}
+      {tab === 'content'  && <ContentTab  clientId={id} shoots={shoots} projects={projects} onRefetchProjects={refetchProjects} />}
       {tab === 'projects' && <ProjectsTab clientId={id} projects={projects} onRefetch={refetchProjects} />}
       {tab === 'files'    && <FilesTab    clientId={id} />}
       {tab === 'requests' && <RequestsTab requests={requests} />}

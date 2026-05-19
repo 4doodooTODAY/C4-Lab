@@ -166,23 +166,7 @@ export default function MyConcepts() {
   const update = async (id, status) => {
     setUpdating(id)
     await supabase.from('content_drafts').update({ status }).eq('id', id)
-
-    // Auto-create project when client approves
-    if (status === 'approved' && clientId) {
-      const draft = drafts.find((d) => d.id === id)
-      if (draft) {
-        await supabase.from('projects').insert({
-          name:        draft.title || `${TYPE_LABELS_LOCAL[draft.type] || 'Content'} Project`,
-          client_id:   clientId,
-          draft_id:    draft.id,
-          stage:       'post_production',
-          target_date: draft.target_date || null,
-          concept:     draft.concept || null,
-          status:      'active',
-        })
-      }
-    }
-
+    // Project creation is handled by admin after client approves
     setDrafts((prev) => prev.map((d) => d.id === id ? { ...d, status } : d))
     setUpdating(null)
   }
