@@ -327,7 +327,7 @@ function OverviewTab({ client, shoots, drafts, projects, requests }) {
 
   const stats = [
     { label: 'Shoots',   value: shoots.length,                                 color: 'text-blue-600' },
-    { label: 'Drafts',   value: drafts.filter((d) => d.status !== 'scrapped').length, color: 'text-amber-600' },
+    { label: 'Drafts',   value: drafts.filter((d) => d.status !== 'scrapped' && d.status !== 'approved').length, color: 'text-amber-600' },
     { label: 'Projects', value: projects.length,                               color: 'text-purple-600' },
     { label: 'Requests', value: requests.length,                               color: 'text-green-600' },
   ]
