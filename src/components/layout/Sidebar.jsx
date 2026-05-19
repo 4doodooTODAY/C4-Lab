@@ -30,6 +30,7 @@ const NAV = {
   ],
   client: [
     { to: '/client',          icon: Home,           label: 'Home',        end: true },
+    { to: '/my-projects',     icon: FolderKanban,   label: 'Projects' },
     { to: '/client/calendar', icon: CalendarDays,   label: 'Calendar' },
   ],
 }

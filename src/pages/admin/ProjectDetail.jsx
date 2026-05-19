@@ -250,6 +250,12 @@ export default function ProjectDetail() {
   const [newShootLocation, setNewShootLocation] = useState('')
   const [addingShoot, setAddingShoot]       = useState(false)
 
+  // Link existing shoot
+  const [clientShoots, setClientShoots]     = useState([])
+  const [showLinkShoot, setShowLinkShoot]   = useState(false)
+  const [linkingShoot, setLinkingShoot]     = useState(false)
+  const [selectedLinkShoot, setSelectedLinkShoot] = useState('')
+
   // Shoot uploads + notes + revisions
   const [shootUploads, setShootUploads] = useState([])
   const [shootNotes, setShootNotes]     = useState([])
@@ -351,6 +357,24 @@ export default function ProjectDetail() {
     await supabase.from('project_shoots').delete().eq('id', shootId)
     fetchShoots()
   }
+
+  const handleLinkShoot = async () => {
+    if (!selectedLinkShoot) return
+    setLinkingShoot(true)
+    await updateProject(id, { shoot_id: selectedLinkShoot })
+    setShowLinkShoot(false)
+    setSelectedLinkShoot('')
+    setLinkingShoot(false)
+    refetch()
+  }
+
+  useEffect(() => {
+    if (!project?.client_id) return
+    supabase.from('shoots').select('id, title, shoot_date, shoot_time, location, status')
+      .eq('client_id', project.client_id)
+      .order('shoot_date', { ascending: false })
+      .then(({ data }) => setClientShoots(data || []))
+  }, [project?.client_id])
 
   useEffect(() => {
     if (!project) return
@@ -541,6 +565,30 @@ export default function ProjectDetail() {
           <p className="text-xs text-text-muted mb-2 flex items-center gap-1">
             <CalendarDays size={11} /> Shoot Dates
           </p>
+          {project.shoot_id && (() => {
+            const linked = clientShoots.find(s => s.id === project.shoot_id)
+            if (!linked) return null
+            return (
+              <div className="flex items-center gap-2 py-1.5 mb-2 bg-accent/5 rounded-lg px-2">
+                <Camera size={13} className="text-accent shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-accent">{linked.title}</p>
+                  {linked.shoot_date && (
+                    <p className="text-xs text-text-muted">
+                      {format(parseISO(linked.shoot_date), 'MMM d, yyyy')}
+                      {linked.shoot_time && ` · ${fmtTime(linked.shoot_time)}`}
+                    </p>
+                  )}
+                </div>
+                {isAdmin && (
+                  <button onClick={() => updateProject(id, { shoot_id: null }).then(refetch)}
+                    className="text-text-muted hover:text-red-500 transition-colors" title="Unlink">
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+            )
+          })()}
           {shoots.length === 0 ? (
             <p className="text-sm text-text-muted/60 italic mb-2">No shoot dates added yet.</p>
           ) : (
@@ -612,12 +660,39 @@ export default function ProjectDetail() {
                 </div>
               </div>
             ) : (
-              <button
-                onClick={() => setShowAddShoot(true)}
-                className="text-xs text-accent hover:text-accent/80 font-medium flex items-center gap-1 mt-1"
-              >
-                <Plus size={12} /> Add Shoot
-              </button>
+              <div>
+                <button
+                  onClick={() => setShowAddShoot(true)}
+                  className="text-xs text-accent hover:text-accent/80 font-medium flex items-center gap-1 mt-1"
+                >
+                  <Plus size={12} /> Add Shoot
+                </button>
+                {!showLinkShoot && (
+                  <button onClick={() => setShowLinkShoot(true)}
+                    className="text-xs text-text-muted hover:text-accent font-medium flex items-center gap-1 mt-1">
+                    <Camera size={12} /> Link Existing Shoot
+                  </button>
+                )}
+                {showLinkShoot && (
+                  <div className="flex gap-2 mt-2">
+                    <select className="input text-sm py-1 flex-1" value={selectedLinkShoot}
+                      onChange={e => setSelectedLinkShoot(e.target.value)}>
+                      <option value="">— Select a shoot —</option>
+                      {clientShoots.map(s => (
+                        <option key={s.id} value={s.id}>
+                          {s.title}{s.shoot_date ? ` · ${format(parseISO(s.shoot_date), 'MMM d, yyyy')}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    <button onClick={handleLinkShoot} disabled={!selectedLinkShoot || linkingShoot}
+                      className="btn-primary text-xs px-3 shrink-0 disabled:opacity-50">
+                      {linkingShoot ? <Loader2 size={12} className="animate-spin" /> : 'Link'}
+                    </button>
+                    <button onClick={() => { setShowLinkShoot(false); setSelectedLinkShoot('') }}
+                      className="btn-ghost p-1.5 shrink-0"><X size={13} /></button>
+                  </div>
+                )}
+              </div>
             )
           )}
         </div>

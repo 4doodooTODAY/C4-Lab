@@ -9,6 +9,16 @@ import { supabase } from '../../lib/supabase'
 import { format, parseISO, formatDistanceToNow, isFuture, isToday } from 'date-fns'
 import { fmtTime } from '../../lib/time'
 
+const STAGE_MAP = {
+  briefing:        { label: 'Getting Started', color: 'bg-gray-100 text-gray-500' },
+  pre_production:  { label: 'Planning',         color: 'bg-blue-50 text-blue-600' },
+  production:      { label: 'In Production',    color: 'bg-amber-50 text-amber-700' },
+  post_production: { label: 'Editing',          color: 'bg-purple-50 text-purple-600' },
+  review:          { label: 'Ready to Review',  color: 'bg-orange-50 text-orange-600' },
+  revisions:       { label: 'Revisions',        color: 'bg-red-50 text-red-600' },
+  delivered:       { label: 'Complete',         color: 'bg-green-50 text-green-700' },
+}
+
 export default function ClientDashboard() {
   const { profile, user } = useAuth()
   const navigate = useNavigate()
@@ -34,7 +44,7 @@ export default function ClientDashboard() {
         const today = new Date().toISOString().split('T')[0]
 
         const [projRes, revRes, conceptsRes, shootsRes] = await Promise.all([
-          supabase.from('projects').select('id, name, stage').eq('client_id', client.id).neq('stage', 'archived').order('created_at', { ascending: false }),
+          supabase.from('projects').select('id, name, stage, status, due_date').eq('client_id', client.id).neq('stage', 'archived').order('created_at', { ascending: false }),
           supabase.from('project_revisions').select('id, project_id, revision_number, status').eq('status', 'pending_client_review'),
           supabase.from('content_drafts').select('id').eq('client_id', client.id).eq('status', 'pending_client'),
           supabase.from('shoots').select('id, title, shoot_date, shoot_time, location, status').eq('client_id', client.id).gte('shoot_date', today).neq('status', 'cancelled').order('shoot_date', { ascending: true }).limit(3),
@@ -152,6 +162,48 @@ export default function ClientDashboard() {
                 )
               })}
             </div>
+          </div>
+        )}
+
+        {/* Your Projects */}
+        {projects.length > 0 && (
+          <div className="mb-5">
+            <div className="flex items-center justify-between mb-2.5">
+              <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Your Projects</h2>
+              <Link to="/my-projects" className="text-xs text-accent font-medium hover:underline">View all →</Link>
+            </div>
+            <div className="space-y-2">
+              {projects.slice(0, 3).map((proj) => {
+                const stage = STAGE_MAP[proj.stage] || { label: proj.stage, color: 'bg-gray-100 text-gray-500' }
+                return (
+                  <Link key={proj.id} to={`/my-projects/${proj.id}`}
+                    className="flex items-center gap-3 p-4 rounded-2xl border border-gray-100 bg-white hover:border-accent/30 hover:bg-accent/5 transition-all group shadow-sm">
+                    <div className="w-8 h-8 rounded-xl bg-accent/10 flex items-center justify-center shrink-0">
+                      <FolderKanban size={15} className="text-accent" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 truncate">{proj.name}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${stage.color}`}>
+                          {stage.label}
+                        </span>
+                        {proj.due_date && (
+                          <span className="text-[10px] text-gray-400">
+                            Due {format(parseISO(proj.due_date), 'MMM d')}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <ArrowRight size={13} className="text-gray-300 group-hover:text-accent transition-colors shrink-0" />
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        )}
+        {projects.length === 0 && !loading && (
+          <div className="mb-5 p-4 rounded-2xl border border-dashed border-gray-200 text-center">
+            <p className="text-sm text-gray-400">No active projects yet.</p>
           </div>
         )}
 
