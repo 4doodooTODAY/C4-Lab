@@ -687,32 +687,114 @@ function ContentTab({ clientId, shoots }) {
 }
 
 // ── Tab: Projects ──────────────────────────────────────────────────────────────
-function ProjectsTab({ clientId, projects }) {
+function ProjectsTab({ clientId, projects, onRefetch }) {
   const navigate = useNavigate()
+  const [teamMembers, setTeamMembers] = useState([])
+  const [assigningTo, setAssigningTo] = useState(null) // project id being assigned
+  const [selectedEditor, setSelectedEditor] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (!clientId) return
+    supabase
+      .from('client_creatives')
+      .select('profile_id, profiles(id, full_name, role)')
+      .eq('client_id', clientId)
+      .then(({ data }) => setTeamMembers((data || []).map((d) => d.profiles).filter(Boolean)))
+  }, [clientId])
+
+  const handleAssign = async (projectId) => {
+    if (!selectedEditor) return
+    setSaving(true)
+    await supabase.from('projects').update({ editor_id: selectedEditor }).eq('id', projectId)
+    setAssigningTo(null)
+    setSelectedEditor('')
+    setSaving(false)
+    onRefetch?.()
+  }
+
   if (!projects.length) return (
     <div className="card p-10 text-center">
       <FolderKanban size={32} className="mx-auto text-text-muted/30 mb-3" />
       <p className="text-sm font-semibold text-text-primary">No projects yet</p>
-      <p className="text-sm text-text-muted mt-1">Projects are created from approved drafts or manually via the Projects page.</p>
+      <p className="text-sm text-text-muted mt-1">Projects are created automatically when a concept is approved.</p>
     </div>
   )
+
   return (
     <div className="space-y-3">
-      {projects.map((p) => (
-        <div key={p.id} onClick={() => navigate(`/projects/${p.id}`)}
-          className="card p-4 hover:shadow-md transition-shadow cursor-pointer flex items-center gap-4">
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-text-primary">{p.name}</p>
-            {p.due_date && (
-              <p className="text-xs text-text-muted mt-0.5">Due {format(parseISO(p.due_date), 'MMM d, yyyy')}</p>
+      {projects.map((p) => {
+        const editorName = p.profiles?.full_name
+        const isAssigning = assigningTo === p.id
+        return (
+          <div key={p.id} className="card p-4">
+            <div
+              onClick={() => navigate(`/projects/${p.id}`)}
+              className="flex items-center gap-4 cursor-pointer hover:opacity-80 transition-opacity"
+            >
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-text-primary">{p.name}</p>
+                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                  {p.due_date && (
+                    <p className="text-xs text-text-muted">Due {format(parseISO(p.due_date), 'MMM d, yyyy')}</p>
+                  )}
+                  {editorName ? (
+                    <p className="text-xs text-text-muted flex items-center gap-1">
+                      <Users2 size={10} /> {editorName}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-amber-600 font-medium">No editor assigned</p>
+                  )}
+                </div>
+              </div>
+              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${STAGE_COLORS[p.stage] || 'bg-surface-2 text-text-muted'}`}>
+                {STAGE_LABELS[p.stage] || p.stage}
+              </span>
+              <ChevronRight size={14} className="text-text-muted shrink-0" />
+            </div>
+
+            {/* Assign editor row */}
+            {!isAssigning ? (
+              <div className="mt-3 pt-3 border-t border-border flex items-center justify-between">
+                <p className="text-xs text-text-muted">
+                  {editorName ? `Editor: ${editorName}` : 'No editor assigned yet'}
+                </p>
+                <button
+                  onClick={() => { setAssigningTo(p.id); setSelectedEditor(p.editor_id || '') }}
+                  className="text-xs text-accent hover:underline font-medium"
+                >
+                  {editorName ? 'Change editor' : 'Assign editor'}
+                </button>
+              </div>
+            ) : (
+              <div className="mt-3 pt-3 border-t border-border flex items-center gap-2">
+                <select
+                  className="input text-sm flex-1"
+                  value={selectedEditor}
+                  onChange={(e) => setSelectedEditor(e.target.value)}
+                  autoFocus
+                >
+                  <option value="">— Select editor —</option>
+                  {teamMembers.map((m) => (
+                    <option key={m.id} value={m.id}>{m.full_name} ({m.role})</option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => handleAssign(p.id)}
+                  disabled={!selectedEditor || saving}
+                  className="btn-primary text-sm px-3 disabled:opacity-50 flex items-center gap-1"
+                >
+                  {saving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                  Save
+                </button>
+                <button onClick={() => setAssigningTo(null)} className="btn-ghost p-2">
+                  <X size={14} />
+                </button>
+              </div>
             )}
           </div>
-          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${STAGE_COLORS[p.stage] || 'bg-surface-2 text-text-muted'}`}>
-            {STAGE_LABELS[p.stage] || p.stage}
-          </span>
-          <ChevronRight size={14} className="text-text-muted shrink-0" />
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
@@ -920,7 +1002,7 @@ export default function ClientHub() {
     setLoading(true)
     Promise.all([
       supabase.from('clients').select('*').eq('id', id).single(),
-      supabase.from('projects').select('id, name, stage, due_date, created_at').eq('client_id', id).order('created_at', { ascending: false }),
+      supabase.from('projects').select('id, name, stage, due_date, created_at, editor_id, profiles!projects_editor_id_fkey(full_name)').eq('client_id', id).order('created_at', { ascending: false }),
       supabase.from('content_requests').select('*').eq('client_id', id).order('created_at', { ascending: false }),
     ]).then(([clientRes, projRes, reqRes]) => {
       setClient(clientRes.data)
@@ -928,6 +1010,11 @@ export default function ClientHub() {
       setRequests(reqRes.data || [])
       setLoading(false)
     })
+  }, [id])
+
+  const refetchProjects = useCallback(async () => {
+    const { data } = await supabase.from('projects').select('id, name, stage, due_date, created_at, editor_id, profiles!projects_editor_id_fkey(full_name)').eq('client_id', id).order('created_at', { ascending: false })
+    setProjects(data || [])
   }, [id])
 
   if (loading) return (
@@ -985,7 +1072,7 @@ export default function ClientHub() {
       )}
       {tab === 'shoots'   && <ShootsTab   clientId={id} client={client} />}
       {tab === 'content'  && <ContentTab  clientId={id} shoots={shoots} />}
-      {tab === 'projects' && <ProjectsTab clientId={id} projects={projects} />}
+      {tab === 'projects' && <ProjectsTab clientId={id} projects={projects} onRefetch={refetchProjects} />}
       {tab === 'files'    && <FilesTab    clientId={id} />}
       {tab === 'requests' && <RequestsTab requests={requests} />}
     </div>

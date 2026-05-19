@@ -138,6 +138,7 @@ export default function MyConcepts() {
   const [loading,  setLoading]  = useState(true)
   const [tab,      setTab]      = useState('pending')
   const [updating, setUpdating] = useState(null) // draft id being updated
+  const [clientId, setClientId] = useState(null)
 
   useEffect(() => {
     if (!user?.id) return
@@ -148,9 +149,10 @@ export default function MyConcepts() {
       .maybeSingle()
       .then(async ({ data: client }) => {
         if (!client) { setLoading(false); return }
+        setClientId(client.id)
         const { data } = await supabase
           .from('content_drafts')
-          .select('id, type, title, concept, target_date, inspiration_links, status, shoots(title)')
+          .select('id, type, title, concept, target_date, inspiration_links, status, client_id, shoots(title)')
           .eq('client_id', client.id)
           .neq('status', 'scrapped')
           .order('created_at', { ascending: false })
@@ -159,9 +161,28 @@ export default function MyConcepts() {
       })
   }, [user])
 
+  const TYPE_LABELS_LOCAL = { post: 'Post', reel: 'Reel', story: 'Story', carousel: 'Carousel', other: 'Content' }
+
   const update = async (id, status) => {
     setUpdating(id)
     await supabase.from('content_drafts').update({ status }).eq('id', id)
+
+    // Auto-create project when client approves
+    if (status === 'approved' && clientId) {
+      const draft = drafts.find((d) => d.id === id)
+      if (draft) {
+        await supabase.from('projects').insert({
+          name:        draft.title || `${TYPE_LABELS_LOCAL[draft.type] || 'Content'} Project`,
+          client_id:   clientId,
+          draft_id:    draft.id,
+          stage:       'post_production',
+          target_date: draft.target_date || null,
+          concept:     draft.concept || null,
+          status:      'active',
+        })
+      }
+    }
+
     setDrafts((prev) => prev.map((d) => d.id === id ? { ...d, status } : d))
     setUpdating(null)
   }
