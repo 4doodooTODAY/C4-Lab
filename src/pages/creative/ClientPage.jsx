@@ -334,7 +334,8 @@ const DRAFT_STATUS_LABELS = {
 
 function ConceptsTab({ clientId }) {
   const { drafts, loading } = useContentDrafts(clientId)
-  const active = drafts.filter((d) => d.status !== 'scrapped')
+  // Hide approved (moved to projects) and scrapped — same logic as admin side
+  const active = drafts.filter((d) => d.status !== 'scrapped' && d.status !== 'approved')
 
   if (loading) return <div className="flex justify-center py-10"><Loader2 size={20} className="animate-spin text-text-muted" /></div>
 

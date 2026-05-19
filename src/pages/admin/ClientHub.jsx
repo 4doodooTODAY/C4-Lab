@@ -642,6 +642,7 @@ function ContentTab({ clientId, shoots }) {
   }
 
   const pending  = drafts.filter((d) => d.status === 'pending_client')
+  const approved = drafts.filter((d) => d.status === 'approved')
   const other    = drafts.filter((d) => d.status === 'declined' || d.status === 'scrapped')
 
   const DraftCard = ({ draft }) => (
@@ -733,6 +734,12 @@ function ContentTab({ clientId, shoots }) {
             <div>
               <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Awaiting Client Approval</h3>
               <div className="space-y-3">{pending.map((d) => <DraftCard key={d.id} draft={d} />)}</div>
+            </div>
+          )}
+          {approved.length > 0 && (
+            <div>
+              <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Approved → In Projects</h3>
+              <div className="space-y-3">{approved.map((d) => <DraftCard key={d.id} draft={d} />)}</div>
             </div>
           )}
           {other.length > 0 && (
