@@ -1002,7 +1002,7 @@ export default function ClientHub() {
     setLoading(true)
     Promise.all([
       supabase.from('clients').select('*').eq('id', id).single(),
-      supabase.from('projects').select('id, name, stage, due_date, created_at, editor_id, profiles!projects_editor_id_fkey(full_name)').eq('client_id', id).order('created_at', { ascending: false }),
+      supabase.from('projects').select('id, name, stage, due_date, created_at, editor_id, profiles!editor_id(full_name)').eq('client_id', id).order('created_at', { ascending: false }),
       supabase.from('content_requests').select('*').eq('client_id', id).order('created_at', { ascending: false }),
     ]).then(([clientRes, projRes, reqRes]) => {
       setClient(clientRes.data)
@@ -1013,7 +1013,7 @@ export default function ClientHub() {
   }, [id])
 
   const refetchProjects = useCallback(async () => {
-    const { data } = await supabase.from('projects').select('id, name, stage, due_date, created_at, editor_id, profiles!projects_editor_id_fkey(full_name)').eq('client_id', id).order('created_at', { ascending: false })
+    const { data } = await supabase.from('projects').select('id, name, stage, due_date, created_at, editor_id, profiles!editor_id(full_name)').eq('client_id', id).order('created_at', { ascending: false })
     setProjects(data || [])
   }, [id])
 
