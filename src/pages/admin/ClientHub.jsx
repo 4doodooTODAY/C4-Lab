@@ -52,7 +52,7 @@ const STAGE_COLORS = {
 function NewShootModal({ clientId, onClose, onCreated }) {
   const { user } = useAuth()
   const [form, setForm] = useState({
-    title: '', description: '', shoot_date: '', shoot_time: '', location: '', status: 'scheduled',
+    title: '', creative_notes: '', shoot_date: '', shoot_time: '', location: '', status: 'scheduled',
   })
   const [clientTeam,    setClientTeam]    = useState([])
   const [selectedMember, setSelectedMember] = useState('')
@@ -79,7 +79,7 @@ function NewShootModal({ clientId, onClose, onCreated }) {
       const payload = {
         client_id:   clientId,
         title:       form.title.trim(),
-        description: form.description || null,
+        creative_notes: form.creative_notes || null,
         shoot_date:  form.shoot_date || null,
         shoot_time:  form.shoot_time || null,
         location:    form.location || null,
@@ -166,8 +166,9 @@ function NewShootModal({ clientId, onClose, onCreated }) {
           </div>
 
           <div>
-            <label className="label">Description</label>
-            <textarea className="input resize-none" rows={3} value={form.description} onChange={set('description')} placeholder="What are we shooting?" />
+            <label className="label">Creative Notes</label>
+            <p className="text-xs text-text-muted mb-1">(only visible to creative team)</p>
+            <textarea className="input resize-none" rows={3} value={form.creative_notes} onChange={set('creative_notes')} placeholder="What are we shooting?" />
           </div>
           {error && <p className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
           <div className="flex gap-2 justify-end pt-1">
@@ -470,7 +471,7 @@ function ShootsTab({ clientId, client }) {
               </span>
             )}
           </div>
-          {shoot.description && <p className="text-xs text-text-secondary mt-1.5 line-clamp-2">{shoot.description}</p>}
+          {shoot.creative_notes && <p className="text-xs text-text-secondary mt-1.5 line-clamp-2">{shoot.creative_notes}</p>}
           {uploadCounts[shoot.id] > 0 && (
             <p className="text-xs text-text-muted mt-1.5 flex items-center gap-1">
               <Film size={10} /> {uploadCounts[shoot.id]} file{uploadCounts[shoot.id] !== 1 ? 's' : ''} uploaded
@@ -641,7 +642,6 @@ function ContentTab({ clientId, shoots }) {
   }
 
   const pending  = drafts.filter((d) => d.status === 'pending_client')
-  const approved = drafts.filter((d) => d.status === 'approved')
   const other    = drafts.filter((d) => d.status === 'declined' || d.status === 'scrapped')
 
   const DraftCard = ({ draft }) => (
@@ -733,12 +733,6 @@ function ContentTab({ clientId, shoots }) {
             <div>
               <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Awaiting Client Approval</h3>
               <div className="space-y-3">{pending.map((d) => <DraftCard key={d.id} draft={d} />)}</div>
-            </div>
-          )}
-          {approved.length > 0 && (
-            <div>
-              <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Approved</h3>
-              <div className="space-y-3">{approved.map((d) => <DraftCard key={d.id} draft={d} />)}</div>
             </div>
           )}
           {other.length > 0 && (
@@ -836,17 +830,22 @@ function ProjectsTab({ clientId, projects, onRefetch }) {
               className="flex items-center gap-4 cursor-pointer hover:opacity-80 transition-opacity"
             >
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-text-primary">{p.name}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold text-text-primary">{p.name}</p>
+                  {!editorName && (
+                    <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                      <AlertCircle size={9} /> Waiting for editor
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                   {p.due_date && (
                     <p className="text-xs text-text-muted">Due {format(parseISO(p.due_date), 'MMM d, yyyy')}</p>
                   )}
-                  {editorName ? (
+                  {editorName && (
                     <p className="text-xs text-text-muted flex items-center gap-1">
                       <Users2 size={10} /> {editorName}
                     </p>
-                  ) : (
-                    <p className="text-xs text-amber-600 font-medium">No editor assigned</p>
                   )}
                 </div>
               </div>

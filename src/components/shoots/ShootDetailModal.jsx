@@ -215,10 +215,16 @@ function ShootFiles({ shootId }) {
 
 // ── Main modal ────────────────────────────────────────────────────────────────
 export default function ShootDetailModal({ shoot, clientId, clientName, onClose }) {
+  const { profile } = useAuth()
   const [showUpload,   setShowUpload]   = useState(false)
   const [activeSection, setSection]    = useState('files') // 'files' | 'notes'
 
   if (!shoot) return null
+
+  // Determine if user is client
+  const isClient = profile?.role === 'client'
+  // Determine if user is creative or admin
+  const canSeeCreativeNotes = profile?.role === 'admin' || profile?.role === 'creative'
 
   return (
     <>
@@ -262,14 +268,21 @@ export default function ShootDetailModal({ shoot, clientId, clientName, onClose 
             {shoot.location && (
               <div className="flex items-start gap-2 text-sm text-text-secondary">
                 <MapPin size={14} className="mt-0.5 shrink-0 text-text-muted" />
-                {shoot.location}
+                <a
+                  href={`https://maps.google.com/?q=${encodeURIComponent(shoot.location)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-accent hover:underline transition-colors"
+                >
+                  {shoot.location}
+                </a>
               </div>
             )}
 
-            {shoot.description && (
+            {shoot.creative_notes && canSeeCreativeNotes && (
               <div className="bg-surface-2/60 rounded-xl p-4">
-                <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Details</p>
-                <p className="text-sm text-text-primary leading-relaxed">{shoot.description}</p>
+                <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Creative Notes</p>
+                <p className="text-sm text-text-primary leading-relaxed">{shoot.creative_notes}</p>
               </div>
             )}
 
@@ -285,7 +298,7 @@ export default function ShootDetailModal({ shoot, clientId, clientName, onClose 
             <div className="flex gap-1 border-b border-border -mx-6 px-6">
               {[
                 { id: 'files', label: 'Files', icon: HardDrive },
-                { id: 'notes', label: 'Notes & Messages', icon: MessageSquare },
+                ...(isClient ? [] : [{ id: 'notes', label: 'Notes & Messages', icon: MessageSquare }]),
               ].map(({ id, label, icon: Icon }) => (
                 <button
                   key={id}
@@ -302,7 +315,7 @@ export default function ShootDetailModal({ shoot, clientId, clientName, onClose 
             </div>
 
             {activeSection === 'files' && <ShootFiles shootId={shoot.id} />}
-            {activeSection === 'notes' && <NotesThread shootId={shoot.id} />}
+            {!isClient && activeSection === 'notes' && <NotesThread shootId={shoot.id} />}
           </div>
         </div>
       </div>
