@@ -147,15 +147,16 @@ export default function ShootUploadModal({ shoot, clientId, clientName, onClose,
         })
 
         // Save record to shoot_uploads
-        await supabase.from('shoot_uploads').insert({
-          shoot_id:   shoot.id,
-          client_id:  clientId,
-          file_name:  item.file.name,
-          file_url:   publicUrl,
-          file_size:  item.file.size,
-          notes:      notes || null,
+        const { error: dbErr } = await supabase.from('shoot_uploads').insert({
+          shoot_id:    shoot.id,
+          client_id:   clientId || null,
+          file_name:   item.file.name,
+          file_url:    publicUrl,
+          file_size:   item.file.size,
+          notes:       notes || null,
           uploaded_by: user?.id,
         })
+        if (dbErr) throw new Error(dbErr.message)
 
         updateItem(item.id, { status: 'done', progress: 100 })
       } catch (err) {
