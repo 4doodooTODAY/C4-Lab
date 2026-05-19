@@ -1,6 +1,9 @@
-import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { FileText, Loader2, CheckCircle2, Clock, XCircle, Link as LinkIcon, CalendarDays, Camera } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import {
+  FileText, Loader2, CheckCircle2, Clock, XCircle,
+  Link as LinkIcon, CalendarDays, Camera, Upload,
+  MessageSquare, ChevronDown, ChevronUp, X,
+} from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { format, parseISO } from 'date-fns'
@@ -36,19 +39,108 @@ const STATUS_CONFIG = {
   },
 }
 
+// ── Approve Panel (expandable) ────────────────────────────────────────────────
+function ApprovePanel({ draft, onConfirm, onCancel, saving }) {
+  const [footageLinks, setFootageLinks] = useState([''])
+  const [notes, setNotes] = useState('')
+
+  const addLink = () => setFootageLinks((prev) => [...prev, ''])
+  const updateLink = (i, val) => setFootageLinks((prev) => prev.map((l, idx) => idx === i ? val : l))
+  const removeLink = (i) => setFootageLinks((prev) => prev.filter((_, idx) => idx !== i))
+
+  const handleConfirm = () => {
+    const links = footageLinks.map((l) => l.trim()).filter(Boolean)
+    onConfirm({ footageLinks: links, notes: notes.trim() })
+  }
+
+  return (
+    <div className="mt-4 pt-4 border-t border-gray-100 space-y-4">
+      {/* Footage upload links */}
+      <div>
+        <label className="flex items-center gap-2 text-xs font-semibold text-gray-700 mb-2">
+          <Upload size={12} className="text-accent" />
+          Your Footage <span className="font-normal text-gray-400">(optional — share a Google Drive, Dropbox, or WeTransfer link)</span>
+        </label>
+        <div className="space-y-2">
+          {footageLinks.map((link, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <input
+                type="url"
+                placeholder="https://drive.google.com/..."
+                value={link}
+                onChange={(e) => updateLink(i, e.target.value)}
+                className="flex-1 text-sm px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent placeholder-gray-300 bg-gray-50"
+              />
+              {footageLinks.length > 1 && (
+                <button onClick={() => removeLink(i)} className="p-1.5 text-gray-300 hover:text-gray-500">
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+          ))}
+          {footageLinks.length < 4 && (
+            <button
+              onClick={addLink}
+              className="text-xs text-accent hover:underline font-medium"
+            >
+              + Add another link
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Notes / changes */}
+      <div>
+        <label className="flex items-center gap-2 text-xs font-semibold text-gray-700 mb-2">
+          <MessageSquare size={12} className="text-accent" />
+          Notes or Changes <span className="font-normal text-gray-400">(optional)</span>
+        </label>
+        <textarea
+          rows={3}
+          placeholder="Any changes to the concept, specific ideas, or anything else your team should know…"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          className="w-full text-sm px-3 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent placeholder-gray-300 bg-gray-50 resize-none"
+        />
+      </div>
+
+      <div className="flex gap-3">
+        <button
+          onClick={onCancel}
+          disabled={saving}
+          className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-500 hover:bg-gray-50 transition-all disabled:opacity-50"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleConfirm}
+          disabled={saving}
+          className="flex-1 py-2.5 rounded-xl bg-accent text-white text-sm font-semibold hover:bg-accent/90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+        >
+          {saving ? <Loader2 size={14} className="animate-spin" /> : <><CheckCircle2 size={14} /> Confirm Approval</>}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── Concept Card ──────────────────────────────────────────────────────────────
 function ConceptCard({ draft, onApprove, onDecline, updating }) {
   const cfg  = STATUS_CONFIG[draft.status] || STATUS_CONFIG.pending_client
   const Icon = cfg.icon
   const isPending = draft.status === 'pending_client'
+  const [showApprovePanel, setShowApprovePanel] = useState(false)
+  const [showDeclinePanel, setShowDeclinePanel] = useState(false)
+  const [declineNote, setDeclineNote] = useState('')
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
       {/* Color bar */}
       <div className={`h-1 ${cfg.bar}`} />
 
-      <div className="p-6">
+      <div className="p-5 sm:p-6">
         {/* Top row */}
-        <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
           <div className="flex items-center gap-2 flex-wrap">
             {draft.type && (
               <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
@@ -67,7 +159,7 @@ function ConceptCard({ draft, onApprove, onDecline, updating }) {
         </div>
 
         {draft.title && (
-          <h3 className="text-lg font-bold text-gray-900 mb-1">{draft.title}</h3>
+          <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-1">{draft.title}</h3>
         )}
         {draft.concept && (
           <p className="text-sm text-gray-500 leading-relaxed mb-4">{draft.concept}</p>
@@ -97,26 +189,92 @@ function ConceptCard({ draft, onApprove, onDecline, updating }) {
           </div>
         )}
 
-        {/* Approve / Decline — only for pending */}
+        {/* Approved — show footage links and notes if present */}
+        {draft.status === 'approved' && (draft.client_footage_links?.length > 0 || draft.client_notes) && (
+          <div className="mb-4 p-3 rounded-xl bg-green-50 border border-green-100 space-y-2">
+            {draft.client_footage_links?.length > 0 && (
+              <div>
+                <p className="text-[10px] font-semibold text-green-700 uppercase tracking-wide mb-1">Your Footage</p>
+                {draft.client_footage_links.map((link, i) => (
+                  <a key={i} href={link} target="_blank" rel="noreferrer"
+                    className="flex items-center gap-1 text-xs text-accent hover:underline">
+                    <LinkIcon size={10} /> {link}
+                  </a>
+                ))}
+              </div>
+            )}
+            {draft.client_notes && (
+              <div>
+                <p className="text-[10px] font-semibold text-green-700 uppercase tracking-wide mb-1">Your Notes</p>
+                <p className="text-xs text-gray-600">{draft.client_notes}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Actions — only for pending */}
         {isPending && (
-          <div className="flex gap-3 pt-4 border-t border-gray-100">
-            <button
-              onClick={() => onDecline(draft.id)}
-              disabled={updating === draft.id}
-              className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-500 hover:bg-gray-50 hover:border-gray-300 transition-all disabled:opacity-50"
-            >
-              Decline
-            </button>
-            <button
-              onClick={() => onApprove(draft.id)}
-              disabled={updating === draft.id}
-              className="flex-1 py-2.5 rounded-xl bg-accent text-white text-sm font-semibold hover:bg-accent/90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {updating === draft.id
-                ? <Loader2 size={14} className="animate-spin" />
-                : <><CheckCircle2 size={14} /> Approve</>
-              }
-            </button>
+          <div className="pt-4 border-t border-gray-100">
+            {!showApprovePanel && !showDeclinePanel && (
+              <div className="flex gap-3">
+                <button
+                  onClick={() => { setShowDeclinePanel(true); setShowApprovePanel(false) }}
+                  disabled={updating === draft.id}
+                  className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-500 hover:bg-gray-50 hover:border-gray-300 transition-all disabled:opacity-50"
+                >
+                  Decline
+                </button>
+                <button
+                  onClick={() => { setShowApprovePanel(true); setShowDeclinePanel(false) }}
+                  disabled={updating === draft.id}
+                  className="flex-1 py-2.5 rounded-xl bg-accent text-white text-sm font-semibold hover:bg-accent/90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  <CheckCircle2 size={14} /> Approve
+                </button>
+              </div>
+            )}
+
+            {showApprovePanel && (
+              <ApprovePanel
+                draft={draft}
+                saving={updating === draft.id}
+                onCancel={() => setShowApprovePanel(false)}
+                onConfirm={({ footageLinks, notes }) => {
+                  setShowApprovePanel(false)
+                  onApprove(draft.id, footageLinks, notes)
+                }}
+              />
+            )}
+
+            {showDeclinePanel && (
+              <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
+                <label className="text-xs font-semibold text-gray-700">
+                  Let us know why (optional)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="What didn't work? We'll use this to revise the concept…"
+                  value={declineNote}
+                  onChange={(e) => setDeclineNote(e.target.value)}
+                  className="w-full text-sm px-3 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-red-200 focus:border-red-300 placeholder-gray-300 bg-gray-50 resize-none"
+                />
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowDeclinePanel(false)}
+                    className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-500 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => { setShowDeclinePanel(false); onDecline(draft.id, declineNote) }}
+                    disabled={updating === draft.id}
+                    className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-semibold hover:bg-red-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {updating === draft.id ? <Loader2 size={14} className="animate-spin" /> : <><XCircle size={14} /> Decline</>}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -132,13 +290,11 @@ const TABS = [
 ]
 
 export default function MyConcepts() {
-  const navigate = useNavigate()
   const { user }  = useAuth()
   const [drafts,   setDrafts]   = useState([])
   const [loading,  setLoading]  = useState(true)
   const [tab,      setTab]      = useState('pending')
-  const [updating, setUpdating] = useState(null) // draft id being updated
-  const [clientId, setClientId] = useState(null)
+  const [updating, setUpdating] = useState(null)
 
   useEffect(() => {
     if (!user?.id) return
@@ -149,10 +305,9 @@ export default function MyConcepts() {
       .maybeSingle()
       .then(async ({ data: client }) => {
         if (!client) { setLoading(false); return }
-        setClientId(client.id)
         const { data } = await supabase
           .from('content_drafts')
-          .select('id, type, title, concept, target_date, inspiration_links, status, client_id, shoots(title)')
+          .select('id, type, title, concept, target_date, inspiration_links, status, client_id, client_footage_links, client_notes, shoots(title)')
           .eq('client_id', client.id)
           .neq('status', 'scrapped')
           .order('created_at', { ascending: false })
@@ -161,13 +316,30 @@ export default function MyConcepts() {
       })
   }, [user])
 
-  const TYPE_LABELS_LOCAL = { post: 'Post', reel: 'Reel', story: 'Story', carousel: 'Carousel', other: 'Content' }
-
-  const update = async (id, status) => {
+  const handleApprove = async (id, footageLinks, notes) => {
     setUpdating(id)
-    await supabase.from('content_drafts').update({ status }).eq('id', id)
-    // Project creation is handled by admin after client approves
-    setDrafts((prev) => prev.map((d) => d.id === id ? { ...d, status } : d))
+    await supabase.from('content_drafts').update({
+      status: 'approved',
+      client_footage_links: footageLinks.length ? footageLinks : null,
+      client_notes: notes || null,
+    }).eq('id', id)
+    setDrafts((prev) => prev.map((d) => d.id === id
+      ? { ...d, status: 'approved', client_footage_links: footageLinks, client_notes: notes }
+      : d
+    ))
+    setUpdating(null)
+  }
+
+  const handleDecline = async (id, note) => {
+    setUpdating(id)
+    await supabase.from('content_drafts').update({
+      status: 'declined',
+      client_notes: note || null,
+    }).eq('id', id)
+    setDrafts((prev) => prev.map((d) => d.id === id
+      ? { ...d, status: 'declined', client_notes: note }
+      : d
+    ))
     setUpdating(null)
   }
 
@@ -187,10 +359,10 @@ export default function MyConcepts() {
 
   return (
     <div className="min-h-screen bg-white">
-      <div className="max-w-[600px] mx-auto px-6 py-12">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Content Concepts</h1>
-          <p className="text-gray-400 mt-2 text-base">
+      <div className="max-w-[600px] mx-auto px-4 sm:px-6 py-8 sm:py-12">
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Content Concepts</h1>
+          <p className="text-gray-400 mt-2 text-sm sm:text-base">
             Review and approve ideas from your team.
             {pendingCount > 0 && (
               <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700">
@@ -201,12 +373,12 @@ export default function MyConcepts() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 mb-6 border-b border-gray-100">
+        <div className="flex gap-1 mb-6 border-b border-gray-100 overflow-x-auto">
           {TABS.map(({ id, label }) => (
             <button
               key={id}
               onClick={() => setTab(id)}
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px whitespace-nowrap ${
                 tab === id
                   ? 'border-accent text-accent'
                   : 'border-transparent text-gray-400 hover:text-gray-700'
@@ -223,25 +395,25 @@ export default function MyConcepts() {
         </div>
 
         {filtered.length === 0 ? (
-          <div className="text-center py-20">
+          <div className="text-center py-16 sm:py-20">
             <FileText size={40} className="mx-auto text-gray-200 mb-4" />
             <h2 className="text-lg font-semibold text-gray-400 mb-1">
               {tab === 'pending' ? 'Nothing to review right now' : 'No concepts here'}
             </h2>
-            <p className="text-sm text-gray-300">
+            <p className="text-sm text-gray-300 px-4">
               {tab === 'pending'
                 ? "You're all caught up — your team will send ideas here for your input."
                 : 'Your team will add content concepts here.'}
             </p>
           </div>
         ) : (
-          <div className="space-y-5">
+          <div className="space-y-4 sm:space-y-5">
             {filtered.map((d) => (
               <ConceptCard
                 key={d.id}
                 draft={d}
-                onApprove={(id) => update(id, 'approved')}
-                onDecline={(id) => update(id, 'declined')}
+                onApprove={handleApprove}
+                onDecline={handleDecline}
                 updating={updating}
               />
             ))}
