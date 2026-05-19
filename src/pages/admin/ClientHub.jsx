@@ -540,6 +540,7 @@ function ContentTab({ clientId, shoots }) {
   const { drafts, loading, refetch } = useContentDrafts(clientId)
   const [showNew, setShowNew]   = useState(false)
   const [updating, setUpdating] = useState(null)
+  const [deleteConfirm, setDeleteConfirm] = useState(null) // draft id to hard delete
 
   const handleStatus = async (draftId, status) => {
     setUpdating(draftId)
@@ -564,6 +565,19 @@ function ContentTab({ clientId, shoots }) {
       }
 
       await refetch()
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setUpdating(null)
+    }
+  }
+
+  const handleHardDelete = async (draftId) => {
+    setUpdating(draftId)
+    try {
+      await supabase.from('content_drafts').delete().eq('id', draftId)
+      await refetch()
+      setDeleteConfirm(null)
     } catch (err) {
       alert(err.message)
     } finally {
@@ -611,10 +625,17 @@ function ContentTab({ clientId, shoots }) {
           )}
         </div>
         <div className="flex gap-1 shrink-0">
-          <button onClick={() => handleStatus(draft.id, 'scrapped')} disabled={!!updating}
-            title="Scrap" className="p-1.5 text-text-muted hover:text-red-500 transition-colors">
-            <Trash2 size={13} />
-          </button>
+          {draft.status === 'scrapped' ? (
+            <button onClick={() => setDeleteConfirm(draft.id)} disabled={!!updating}
+              title="Permanently delete" className="p-1.5 text-text-muted hover:text-red-600 transition-colors">
+              <X size={13} />
+            </button>
+          ) : (
+            <button onClick={() => handleStatus(draft.id, 'scrapped')} disabled={!!updating}
+              title="Scrap" className="p-1.5 text-text-muted hover:text-red-500 transition-colors">
+              <Trash2 size={13} />
+            </button>
+          )}
         </div>
       </div>
 
@@ -681,6 +702,33 @@ function ContentTab({ clientId, shoots }) {
           onClose={() => setShowNew(false)}
           onCreated={() => { setShowNew(false); refetch() }}
         />
+      )}
+
+      {/* Hard delete confirmation modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDeleteConfirm(null)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 z-10">
+            <div className="w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
+              <Trash2 size={22} className="text-red-500" />
+            </div>
+            <h2 className="text-base font-bold text-text-primary text-center mb-1">Permanently delete concept?</h2>
+            <p className="text-xs text-text-muted text-center mb-5">
+              This cannot be undone. The concept and all its data will be removed permanently.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setDeleteConfirm(null)} disabled={!!updating} className="flex-1 btn-secondary">Cancel</button>
+              <button
+                onClick={() => handleHardDelete(deleteConfirm)}
+                disabled={!!updating}
+                className="flex-1 py-2 px-4 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {updating ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                Delete permanently
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
