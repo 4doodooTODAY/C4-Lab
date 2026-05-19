@@ -56,8 +56,8 @@ function ShootCard({ shoot, onOpen }) {
             <MapPin size={11} /> {shoot.location}
           </div>
         )}
-        {shoot.description && (
-          <p className="text-xs text-text-secondary line-clamp-2">{shoot.description}</p>
+        {shoot.creative_notes && (
+          <p className="text-xs text-text-secondary line-clamp-2">{shoot.creative_notes}</p>
         )}
       </div>
 

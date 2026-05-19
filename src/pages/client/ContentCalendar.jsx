@@ -82,7 +82,6 @@ function ItemDetail({ item, onApprove, onDecline, onClose, updating }) {
             {item.location && (
               <p className="text-xs text-text-muted flex items-center gap-1.5"><MapPin size={11} /> {item.location}</p>
             )}
-            {item.description && <p className="text-xs text-text-secondary mt-2">{item.description}</p>}
           </div>
         )}
 
@@ -168,7 +167,6 @@ function ListView({ allItems, onApprove, onDecline, updating }) {
           {item.dateLabel && <p className="text-xs text-text-muted mt-0.5">{item.dateLabel}</p>}
           {item.concept && <p className="text-xs text-text-secondary mt-1 line-clamp-2">{item.concept}</p>}
           {item.location && <p className="text-xs text-text-muted mt-1 flex items-center gap-1"><MapPin size={10} /> {item.location}</p>}
-          {item.description && item.kind === 'shoot' && <p className="text-xs text-text-secondary mt-1">{item.description}</p>}
 
           <div className="flex gap-2 mt-3">
             {item.kind === 'draft' && (
@@ -288,7 +286,6 @@ export default function ContentCalendar() {
         dateLabel:   format(parseISO(s.shoot_date), 'EEE, MMM d yyyy') + (s.shoot_time ? ` at ${fmtTime(s.shoot_time)}` : ''),
         location:    s.location,
         time:        s.shoot_time ? fmtTime(s.shoot_time) : null,
-        description: s.description,
       })
     })
 

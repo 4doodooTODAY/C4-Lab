@@ -101,7 +101,7 @@ function ShootsTab({ clientId, clientName }) {
                 </span>
               )}
             </div>
-            {shoot.description && <p className="text-xs text-text-secondary mt-1.5 line-clamp-2">{shoot.description}</p>}
+            {shoot.creative_notes && <p className="text-xs text-text-secondary mt-1.5 line-clamp-2">{shoot.creative_notes}</p>}
           </div>
           <div className="flex flex-col items-end gap-2 shrink-0">
             <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
