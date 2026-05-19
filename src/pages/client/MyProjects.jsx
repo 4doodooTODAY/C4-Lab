@@ -407,17 +407,17 @@ export default function MyProjects() {
         setClientName(client.name || '')
 
         // Full project data including team profiles and linked shoot
-        const { data: projData } = await supabase
+        const { data: projData, error: projErr } = await supabase
           .from('projects')
           .select(`
-            id, name, stage, revision_count, shoot_id,
-            shoot_date, shoot_time, location, notes, target_date,
-            creative_id, editor_id,
-            shoot:shoot_id ( id, shoot_date, shoot_time, location, title )
+            id, name, stage, status, target_date, due_date, notes,
+            shoot_id, creative_id, editor_id,
+            shoot:shoot_id ( id, title, shoot_date, shoot_time, location )
           `)
           .eq('client_id', client.id)
-          .neq('stage', 'archived')
           .order('created_at', { ascending: false })
+
+        if (projErr) console.error('MyProjects fetch error:', projErr)
 
         const projects = projData || []
         const projectIds = projects.map((p) => p.id)
