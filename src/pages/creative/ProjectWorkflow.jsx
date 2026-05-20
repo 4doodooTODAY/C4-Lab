@@ -739,7 +739,7 @@ function FileList({ files, accent = false }) {
         <div key={f.id} className="flex items-center gap-3 px-3 py-2.5">
           <Film size={13} className={accent ? 'text-blue-300 shrink-0' : 'text-text-muted shrink-0'} />
           <span className={`text-sm truncate flex-1 ${accent ? 'text-blue-900' : 'text-text-primary'}`}>{f.file_name}</span>
-          <span className={`text-xs ${accent ? 'text-blue-400' : 'text-text-muted'}`}>{fmtBytes(f.file_size)}</span>
+          <span className={`text-xs ${accent ? 'text-blue-400' : 'text-text-muted'}`}>{fmtBytes(f.file_size)}{f.created_at && ` · ${new Date(f.created_at).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })} EST`}</span>
           {f.file_url && (
             <button onClick={() => forceDownload(f.file_url, f.file_name)}
               className={`transition-colors shrink-0 ${accent ? 'text-blue-500 hover:text-blue-700' : 'text-accent hover:text-accent/80'}`}>
