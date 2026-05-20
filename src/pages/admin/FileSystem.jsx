@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react'
 import {
   HardDrive, Folder, FolderOpen, Film, Image, File as FileIcon,
   ExternalLink, Trash2, Loader2, ChevronRight, Search,
-  RefreshCw, Camera, Building2, AlertCircle, X,
+  RefreshCw, Camera, Building2, AlertCircle, X, Trophy, Download,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { format, formatDistanceToNow } from 'date-fns'
 import { parseISO } from 'date-fns'
+import { forceDownload } from '../../lib/r2'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmtBytes(b) {
@@ -169,24 +170,31 @@ function ShootFolder({ label, date, files, onDelete }) {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function FileSystem() {
-  const [allFiles,     setAllFiles]     = useState([])
-  const [clients,      setClients]      = useState({})  // id → { name, contact_name }
-  const [shoots,       setShoots]       = useState({})  // id → { title, shoot_date }
-  const [loading,      setLoading]      = useState(true)
-  const [search,       setSearch]       = useState('')
-  const [deleteTarget, setDeleteTarget] = useState(null)
-  const [deleting,     setDeleting]     = useState(false)
-  const [deleteError,  setDeleteError]  = useState('')
+  const [allFiles,       setAllFiles]       = useState([])
+  const [finishedVideos, setFinishedVideos] = useState([])
+  const [clients,        setClients]        = useState({})  // id → { name, contact_name }
+  const [shoots,         setShoots]         = useState({})  // id → { title, shoot_date }
+  const [loading,        setLoading]        = useState(true)
+  const [search,         setSearch]         = useState('')
+  const [deleteTarget,   setDeleteTarget]   = useState(null)
+  const [deleting,       setDeleting]       = useState(false)
+  const [deleteError,    setDeleteError]    = useState('')
 
   const load = async () => {
     setLoading(true)
-    const [filesRes, clientsRes, shootsRes] = await Promise.all([
+    const [filesRes, clientsRes, shootsRes, revisionsRes] = await Promise.all([
       supabase
         .from('shoot_uploads')
         .select('id, file_name, file_url, file_size, created_at, shoot_id, project_id, client_id, notes, profiles(full_name)')
         .order('created_at', { ascending: false }),
       supabase.from('clients').select('id, name, contact_name'),
       supabase.from('shoots').select('id, title, shoot_date, client_id'),
+      supabase
+        .from('project_revisions')
+        .select('id, video_url, revision_number, created_at, projects(id, name, client_id, clients(name, contact_name))')
+        .eq('status', 'approved')
+        .not('video_url', 'is', null)
+        .order('created_at', { ascending: false }),
     ])
 
     const clientMap = {}
@@ -200,7 +208,18 @@ export default function FileSystem() {
       uploader: f.profiles?.full_name || null,
     }))
 
+    const finished = (revisionsRes.data || []).map((r) => ({
+      id:          r.id,
+      video_url:   r.video_url,
+      project_name: r.projects?.name || 'Untitled Project',
+      client_name:  r.projects?.clients?.name || r.projects?.clients?.contact_name || 'Unknown Client',
+      revision_number: r.revision_number,
+      created_at:  r.created_at,
+      file_name:   `${r.projects?.name || 'project'} — Final v${r.revision_number}.mp4`,
+    }))
+
     setAllFiles(enriched)
+    setFinishedVideos(finished)
     setClients(clientMap)
     setShoots(shootMap)
     setLoading(false)
@@ -327,6 +346,41 @@ export default function FileSystem() {
         </div>
       ) : (
         <div>
+          {/* ── Finished Products ── */}
+          {finishedVideos.length > 0 && (
+            <FolderNode
+              label="Finished Products"
+              subtitle="All client-approved final videos"
+              count={finishedVideos.length}
+              size={0}
+              icon={Trophy}
+              iconColor="bg-green-500"
+              defaultOpen={true}
+            >
+              {finishedVideos.map((v) => (
+                <div key={v.id} className="flex items-center gap-3 px-4 py-3 hover:bg-surface-2/30 transition-colors group">
+                  <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+                    <Film size={13} className="text-blue-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-text-primary font-medium truncate">{v.project_name}</p>
+                    <p className="text-xs text-text-muted">{v.client_name} · Final v{v.revision_number} · {formatDistanceToNow(new Date(v.created_at), { addSuffix: true })}</p>
+                  </div>
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                    <a href={v.video_url} target="_blank" rel="noreferrer"
+                      className="p-1.5 text-text-muted hover:text-accent transition-colors rounded-lg hover:bg-accent/5" title="Open">
+                      <ExternalLink size={13} />
+                    </a>
+                    <button onClick={() => forceDownload(v.video_url, v.file_name)}
+                      className="p-1.5 text-text-muted hover:text-accent transition-colors rounded-lg hover:bg-accent/5" title="Download">
+                      <Download size={13} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </FolderNode>
+          )}
+
           {Object.entries(tree).map(([clientId, shootGroups]) => {
             const client = clients[clientId]
             const clientName = client ? (client.name || client.contact_name || 'Unknown Client') : 'Unlinked Files'
