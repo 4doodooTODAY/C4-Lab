@@ -505,6 +505,22 @@ export default function ProjectDetail() {
         <ArrowLeft size={14} /> Back to Projects
       </Link>
 
+      {/* ── READY TO POST BANNER ── */}
+      {project.stage === 'ready_to_post' && isAdmin && (
+        <div className="mb-6 rounded-2xl bg-green-500 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg shadow-green-500/20">
+          <div>
+            <p className="text-lg font-bold text-white">🎉 Client approved this video!</p>
+            <p className="text-sm text-green-100 mt-0.5">Post it online, then mark the project complete.</p>
+          </div>
+          <button
+            onClick={async () => { await updateProject(id, { stage: 'delivered' }); refetch() }}
+            className="shrink-0 px-6 py-3 rounded-xl bg-white text-green-700 text-sm font-bold hover:bg-green-50 transition-colors flex items-center gap-2 shadow"
+          >
+            <Check size={16} /> Mark as Posted & Complete
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-start justify-between gap-4 mb-6">
         <div className="flex-1 min-w-0">

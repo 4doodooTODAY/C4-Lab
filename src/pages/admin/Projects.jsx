@@ -331,8 +331,28 @@ export default function Projects() {
     return true
   })
 
+  const readyToPost = projects.filter((p) => p.stage === 'ready_to_post')
+
   return (
     <div className="p-8">
+      {/* Ready to Post alert */}
+      {readyToPost.length > 0 && (
+        <div className="mb-6 rounded-2xl bg-green-500 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg shadow-green-500/20">
+          <div>
+            <p className="text-base font-bold text-white">🎉 {readyToPost.length} project{readyToPost.length !== 1 ? 's' : ''} approved & ready to post!</p>
+            <p className="text-sm text-green-100 mt-0.5">{readyToPost.map(p => p.name).join(', ')}</p>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            {readyToPost.map((p) => (
+              <a key={p.id} href={`/projects/${p.id}`}
+                className="px-4 py-2 rounded-xl bg-white text-green-700 text-sm font-bold hover:bg-green-50 transition-colors shrink-0">
+                Open {p.name}
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
