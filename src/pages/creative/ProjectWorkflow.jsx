@@ -756,13 +756,7 @@ async function downloadFiles(files, setDownloading) {
   setDownloading(true)
   for (const f of files) {
     if (f.file_url) {
-      const a = document.createElement('a')
-      a.href = f.file_url
-      a.download = f.file_name
-      a.target = '_blank'
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
+      await forceDownload(f.file_url, f.file_name)
       await new Promise((r) => setTimeout(r, 400))
     }
   }

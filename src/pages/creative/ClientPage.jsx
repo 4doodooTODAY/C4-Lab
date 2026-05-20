@@ -11,6 +11,7 @@ import { useShoots } from '../../hooks/useShoots'
 import { useContentDrafts } from '../../hooks/useContentDrafts'
 import { format, parseISO, isBefore, startOfDay } from 'date-fns'
 import { fmtTime } from '../../lib/time'
+import { forceDownload } from '../../lib/r2'
 import ShootDetailModal from '../../components/shoots/ShootDetailModal'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -313,12 +314,12 @@ function FilesTab({ clientId }) {
                         </p>
                       </div>
                       {file.file_url && (
-                        <a href={file.file_url} target="_blank" rel="noreferrer"
+                        <button
+                          onClick={(e) => { e.stopPropagation(); forceDownload(file.file_url, file.file_name) }}
                           className="p-1.5 text-text-muted hover:text-accent transition-colors"
-                          title="Open file"
-                          onClick={(e) => e.stopPropagation()}>
+                          title="Download file">
                           <ExternalLink size={13} />
-                        </a>
+                        </button>
                       )}
                     </div>
                   )

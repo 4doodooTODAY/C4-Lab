@@ -14,6 +14,7 @@ import { useClientCreatives, assignCreative, removeCreativeAssignment } from '..
 import { useShoots, createShoot, updateShoot } from '../../hooks/useShoots'
 import { useContentDrafts, createDraft, updateDraft } from '../../hooks/useContentDrafts'
 import { fmtTime } from '../../lib/time'
+import { forceDownload } from '../../lib/r2'
 import ShootDetailModal from '../../components/shoots/ShootDetailModal'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -1233,15 +1234,13 @@ function FilesTab({ clientId }) {
                         {file.notes && <p className="text-xs text-text-secondary italic mt-0.5">"{file.notes}"</p>}
                       </div>
                       {file.file_url && (
-                        <a
-                          href={file.file_url}
-                          target="_blank"
-                          rel="noreferrer"
+                        <button
+                          onClick={() => forceDownload(file.file_url, file.file_name)}
                           className="p-1.5 text-text-muted hover:text-accent transition-colors rounded-lg hover:bg-accent/5"
-                          title="Open file"
+                          title="Download file"
                         >
                           <ExternalLink size={13} />
-                        </a>
+                        </button>
                       )}
                     </div>
                   )

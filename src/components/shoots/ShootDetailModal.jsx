@@ -8,6 +8,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { format, parseISO } from 'date-fns'
 import { fmtTime } from '../../lib/time'
+import { forceDownload } from '../../lib/r2'
 import ShootUploadModal from './ShootUploadModal'
 
 // ── Status badge ──────────────────────────────────────────────────────────────
@@ -200,11 +201,12 @@ function ShootFiles({ shootId }) {
               </p>
             </div>
             {f.file_url && (
-              <a href={f.file_url} target="_blank" rel="noreferrer"
+              <button
+                onClick={(e) => { e.stopPropagation(); forceDownload(f.file_url, f.file_name) }}
                 className="p-1.5 text-text-muted hover:text-accent transition-colors rounded-lg hover:bg-accent/5"
-                onClick={(e) => e.stopPropagation()}>
+                title="Download file">
                 <ExternalLink size={12} />
-              </a>
+              </button>
             )}
           </div>
         )
