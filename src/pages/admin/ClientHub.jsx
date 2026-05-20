@@ -630,6 +630,9 @@ function ContentTab({ clientId, shoots, projects, onRefetchProjects }) {
       await supabase.from('projects').update({ editor_id: team[0].profile_id }).eq('id', proj.id)
     }
 
+    // Mark draft as converted so it disappears from concepts view
+    await supabase.from('content_drafts').update({ status: 'converted' }).eq('id', draft.id)
+
     return proj
   }
 

@@ -500,16 +500,40 @@ export default function MyProjects() {
             <p className="text-sm text-gray-300">Your projects will appear here once created.</p>
           </div>
         ) : (
-          <div className="space-y-5">
-            {projects.map((p) => (
-              <ProjectCard
-                key={p.id}
-                project={p}
-                revisions={revisions.filter((r) => r.project_id === p.id)}
-                clientName={clientName}
-              />
-            ))}
-          </div>
+          <>
+            {/* Active projects */}
+            <div className="space-y-5">
+              {projects.filter((p) => p.stage !== 'delivered').map((p) => (
+                <ProjectCard
+                  key={p.id}
+                  project={p}
+                  revisions={revisions.filter((r) => r.project_id === p.id)}
+                  clientName={clientName}
+                />
+              ))}
+            </div>
+
+            {/* Completed projects */}
+            {projects.some((p) => p.stage === 'delivered') && (
+              <div className="mt-10">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="flex-1 h-px bg-gray-100" />
+                  <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Completed Projects</span>
+                  <div className="flex-1 h-px bg-gray-100" />
+                </div>
+                <div className="space-y-5">
+                  {projects.filter((p) => p.stage === 'delivered').map((p) => (
+                    <ProjectCard
+                      key={p.id}
+                      project={p}
+                      revisions={revisions.filter((r) => r.project_id === p.id)}
+                      clientName={clientName}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {/* Footer links */}

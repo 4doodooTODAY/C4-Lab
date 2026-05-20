@@ -374,6 +374,7 @@ export default function MyConcepts() {
           .select('id, type, title, concept, target_date, inspiration_links, status, client_id, client_footage_links, client_notes, shoots(title)')
           .eq('client_id', client.id)
           .neq('status', 'scrapped')
+          .neq('status', 'converted')
           .order('created_at', { ascending: false })
         setDrafts(data || [])
         setLoading(false)
