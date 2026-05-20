@@ -27,26 +27,31 @@ function fmtBytes(bytes) {
 }
 
 const STAGES = [
+  { key: 'briefing',        label: 'Setup & Planning' },
   { key: 'post_production', label: 'Editing' },
-  { key: 'review',          label: 'In Review' },
+  { key: 'review',          label: 'Review' },
+  { key: 'ready_to_post',   label: 'Ready to Post' },
   { key: 'delivered',       label: 'Delivered' },
 ]
 
-// Normalize all legacy/planning/production stages → post_production
+// Normalize stages to canonical display key
 const STAGE_KEY_MAP = {
-  briefing:        'post_production',
-  pre_production:  'post_production',
-  planning:        'post_production',
-  production:      'post_production',
+  briefing:        'briefing',
+  pre_production:  'briefing',
+  planning:        'briefing',
+  production:      'briefing',
   post_production: 'post_production',
   review:          'review',
   revisions:       'review',
+  ready_to_post:   'ready_to_post',
   delivered:       'delivered',
 }
 
 const STAGE_DESCRIPTIONS = {
+  briefing:        'Admin is planning the project — editing begins soon.',
   post_production: 'Footage is ready — time to edit.',
   review:          'Revision is under review.',
+  ready_to_post:   'Client approved! Awaiting admin to post online.',
   delivered:       'Project complete!',
 }
 
@@ -118,6 +123,31 @@ function StagePipeline({ currentStage }) {
           {STAGE_DESCRIPTIONS[normalised] || ''}
         </p>
       </div>
+    </div>
+  )
+}
+
+// ── Who's Up ──────────────────────────────────────────────────────────────────
+function WhosUpBar({ stage, editorProfile, creativeProfile }) {
+  const normalised = STAGE_KEY_MAP[stage] || stage
+
+  const config = {
+    briefing:        { who: 'Admin',  msg: 'Planning — waiting for admin to begin the project.',   color: 'bg-blue-50 border-blue-200 text-blue-900',   badge: 'bg-blue-100 text-blue-700' },
+    post_production: { who: editorProfile?.full_name || 'Editor', msg: 'Working on the edit.',     color: 'bg-purple-50 border-purple-200 text-purple-900', badge: 'bg-purple-100 text-purple-700' },
+    review:          { who: 'Client', msg: 'Reviewing the latest cut.',                             color: 'bg-amber-50 border-amber-200 text-amber-900',  badge: 'bg-amber-100 text-amber-700' },
+    ready_to_post:   { who: 'Admin',  msg: 'Client approved — admin needs to post and close out.', color: 'bg-green-50 border-green-200 text-green-900',  badge: 'bg-green-100 text-green-700' },
+    delivered:       null,
+  }
+
+  const c = config[normalised]
+  if (!c) return null
+
+  return (
+    <div className={`rounded-2xl border px-4 py-3 mb-4 flex items-center gap-3 ${c.color}`}>
+      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${c.badge}`}>UP NEXT</span>
+      <span className="text-sm font-semibold">{c.who}</span>
+      <span className="text-xs opacity-60">—</span>
+      <span className="text-xs opacity-75">{c.msg}</span>
     </div>
   )
 }
@@ -1552,6 +1582,9 @@ export default function ProjectWorkflow() {
 
       {/* Stage pipeline */}
       <StagePipeline currentStage={project.stage} />
+
+      {/* Who's Up */}
+      <WhosUpBar stage={project.stage} editorProfile={editorProfile} creativeProfile={creativeProfile} />
 
       {/* Action banner */}
       <ActionBanner

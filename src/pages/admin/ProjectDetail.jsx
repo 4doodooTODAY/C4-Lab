@@ -4,7 +4,7 @@ import {
   ArrowLeft, Loader2, Check, Trash2, X, Plus,
   CalendarDays, MessageSquare, Film, StickyNote,
   AlertCircle, MapPin, Upload, FileVideo, Eye,
-  Camera, Scissors, Pencil, Download
+  Camera, Scissors, Pencil, Download, PlayCircle, User
 } from 'lucide-react'
 import { useProject, updateProject } from '../../hooks/useProjects'
 import { useAuth } from '../../contexts/AuthContext'
@@ -16,21 +16,32 @@ import { forceDownload } from '../../lib/r2'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const DISPLAY_STAGES = [
+  { key: 'briefing',        label: 'Setup & Planning' },
   { key: 'post_production', label: 'Editing' },
-  { key: 'review',          label: 'In Review' },
+  { key: 'review',          label: 'Review' },
   { key: 'ready_to_post',   label: 'Ready to Post' },
   { key: 'delivered',       label: 'Delivered' },
 ]
 
 const STAGE_CURRENT_LABELS = {
-  briefing:        'Editing',
-  pre_production:  'Editing',
-  production:      'Editing',
+  briefing:        'Setup & Planning',
+  pre_production:  'Setup & Planning',
+  production:      'Setup & Planning',
   post_production: 'Editing',
   review:          'In Review',
   revisions:       'Revisions',
   ready_to_post:   'Ready to Post',
   delivered:       'Delivered',
+}
+
+// Who needs to act at each stage
+const WHOS_UP = {
+  briefing:        { who: 'admin',    label: 'Admin',    msg: 'Set up the project and begin when ready.' },
+  post_production: { who: 'editor',   label: 'Editor',   msg: 'Upload the first cut for client review.' },
+  review:          { who: 'client',   label: 'Client',   msg: 'Waiting for client to review and approve.' },
+  revisions:       { who: 'editor',   label: 'Editor',   msg: 'Client requested changes — upload a revision.' },
+  ready_to_post:   { who: 'admin',    label: 'Admin',    msg: 'Client approved! Post it online and mark complete.' },
+  delivered:       { who: 'done',     label: 'Complete', msg: 'Project delivered.' },
 }
 
 const TYPE_LABELS = {
@@ -168,12 +179,18 @@ function InlineField({ label, value, displayValue, type = 'text', onSave, icon: 
 
 // ── Stage Progress Bar ────────────────────────────────────────────────────────
 function StageBar({ currentStage, isAdmin, onStageClick }) {
-  const stageToIdx = { post_production: 0, review: 1, revisions: 1, ready_to_post: 2, delivered: 3 }
+  const stageToIdx = {
+    briefing: 0, pre_production: 0, production: 0,
+    post_production: 1,
+    review: 2, revisions: 2,
+    ready_to_post: 3,
+    delivered: 4,
+  }
   const effectiveIdx = stageToIdx[currentStage] ?? 0
 
   return (
     <div className="bg-white rounded-2xl border border-border p-5 mb-4">
-      <p className="text-xs font-semibold text-text-muted mb-3 uppercase tracking-wide">Stage Progress</p>
+      <p className="text-xs font-semibold text-text-muted mb-3 uppercase tracking-wide">Project Timeline</p>
       <div className="flex items-center gap-0">
         {DISPLAY_STAGES.map((s, i) => {
           const isCurrent = i === effectiveIdx
@@ -213,8 +230,55 @@ function StageBar({ currentStage, isAdmin, onStageClick }) {
         <p className="text-xs text-text-primary font-medium">
           Current: <span className="text-accent">{STAGE_CURRENT_LABELS[currentStage] || currentStage}</span>
         </p>
-        <p className="text-xs text-text-muted">Stage advances automatically as the team completes work.</p>
+        {isAdmin && <p className="text-xs text-text-muted">Click a dot to jump to that stage.</p>}
       </div>
+    </div>
+  )
+}
+
+// ── Who's Up Banner ───────────────────────────────────────────────────────────
+function WhosUpBanner({ stage, editorProfile, creativeProfile, onBeginProject, isAdmin }) {
+  const info = WHOS_UP[stage] || WHOS_UP.briefing
+  if (info.who === 'done') return null
+
+  const personName =
+    info.who === 'editor'  ? (editorProfile?.full_name   || 'Editor (unassigned)') :
+    info.who === 'client'  ? 'Client' :
+    info.who === 'admin'   ? 'Admin' : null
+
+  const colorMap = {
+    admin:  'bg-blue-50 border-blue-200 text-blue-900',
+    editor: 'bg-purple-50 border-purple-200 text-purple-900',
+    client: 'bg-amber-50 border-amber-200 text-amber-900',
+  }
+  const badgeMap = {
+    admin:  'bg-blue-100 text-blue-700',
+    editor: 'bg-purple-100 text-purple-700',
+    client: 'bg-amber-100 text-amber-700',
+  }
+
+  return (
+    <div className={`rounded-2xl border p-4 mb-4 flex items-center justify-between gap-4 ${colorMap[info.who]}`}>
+      <div className="flex items-center gap-3">
+        <User size={16} className="shrink-0 opacity-60" />
+        <div>
+          <div className="flex items-center gap-2 mb-0.5">
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${badgeMap[info.who]}`}>
+              UP NEXT: {info.label.toUpperCase()}
+            </span>
+            {personName && <span className="text-sm font-semibold">{personName}</span>}
+          </div>
+          <p className="text-xs opacity-75">{info.msg}</p>
+        </div>
+      </div>
+      {stage === 'briefing' && isAdmin && (
+        <button
+          onClick={onBeginProject}
+          className="shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl bg-accent text-white text-sm font-bold hover:bg-accent/90 transition-colors shadow-sm"
+        >
+          <PlayCircle size={15} /> Begin Project
+        </button>
+      )}
     </div>
   )
 }
@@ -437,6 +501,11 @@ export default function ProjectDetail() {
     refetch()
   }
 
+  const handleBeginProject = async () => {
+    await updateProject(id, { stage: 'post_production' })
+    refetch()
+  }
+
   const handleStatusChange = async (e) => {
     const val = e.target.value
     setStatus(val)
@@ -557,6 +626,14 @@ export default function ProjectDetail() {
       {/* Stage progress */}
       <StageBar currentStage={project.stage} isAdmin={isAdmin} onStageClick={handleStageClick} />
 
+      {/* Who's Up */}
+      <WhosUpBanner
+        stage={project.stage}
+        editorProfile={editorProfile}
+        creativeProfile={creativeProfile}
+        onBeginProject={handleBeginProject}
+        isAdmin={isAdmin}
+      />
 
       {/* Mark as Posted */}
       {project.stage === 'ready_to_post' && isAdmin && (
@@ -876,7 +953,7 @@ export default function ProjectDetail() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-text-primary truncate">{f.file_name}</p>
-                      <p className="text-xs text-text-muted">{fmtBytes(f.file_size)} · {format(new Date(f.created_at), 'MMM d, yyyy')}</p>
+                      <p className="text-xs text-text-muted">{fmtBytes(f.file_size)} · Uploaded {new Date(f.created_at).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })} EST</p>
                     </div>
                   </div>
                 ))}
