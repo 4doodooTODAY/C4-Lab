@@ -1,10 +1,57 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, X, Loader2, Building2, Check, Mail, Phone, ChevronRight } from 'lucide-react'
+import { Plus, X, Loader2, Building2, Check, Mail, Phone, ChevronRight, Trash2, AlertTriangle } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { useClients } from '../../hooks/useClients'
 import Avatar from '../../components/ui/Avatar'
+
+// ── Delete Confirm Modal ───────────────────────────────────────────────────────
+function DeleteClientModal({ client, onClose, onDeleted }) {
+  const [deleting, setDeleting] = useState(false)
+  const [error, setError]       = useState('')
+
+  const handleDelete = async () => {
+    setDeleting(true)
+    setError('')
+    try {
+      const { error: err } = await supabase.from('clients').delete().eq('id', client.id)
+      if (err) throw new Error(err.message)
+      onDeleted()
+    } catch (e) {
+      setError(e.message)
+      setDeleting(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 z-10">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+            <AlertTriangle size={18} className="text-red-600" />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-text-primary">Delete client?</h2>
+            <p className="text-xs text-text-muted mt-0.5">This cannot be undone.</p>
+          </div>
+        </div>
+        <p className="text-sm text-text-secondary mb-5">
+          <strong>{client.contact_name || client.name}</strong> and all their associated data (projects, shoots, concepts, files) will be permanently deleted.
+        </p>
+        {error && <p className="text-xs text-red-500 bg-red-50 border border-red-100 rounded-lg px-3 py-2 mb-3">{error}</p>}
+        <div className="flex gap-2 justify-end">
+          <button onClick={onClose} className="btn-secondary">Cancel</button>
+          <button onClick={handleDelete} disabled={deleting} className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors disabled:opacity-50">
+            {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 // ── Invite Modal ──────────────────────────────────────────────────────────────
 function InviteClientModal({ onClose, onCreated }) {
@@ -114,7 +161,7 @@ function InviteClientModal({ onClose, onCreated }) {
 }
 
 // ── Client Card ───────────────────────────────────────────────────────────────
-function ClientCard({ client, onClick }) {
+function ClientCard({ client, onClick, onDelete }) {
   const assigned = (client.client_creatives || []).map((a) => ({
     ...a.profiles,
     assignedRole: a.role,
@@ -135,13 +182,20 @@ function ClientCard({ client, onClick }) {
           </p>
           <p className="text-xs text-text-muted truncate">{client.name || ''}</p>
         </div>
-        <span className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-          isPending
-            ? 'bg-amber-50 text-amber-600'
-            : 'bg-green-50 text-green-600'
-        }`}>
-          {isPending ? 'Invite pending' : 'Active'}
-        </span>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+            isPending ? 'bg-amber-50 text-amber-600' : 'bg-green-50 text-green-600'
+          }`}>
+            {isPending ? 'Invite pending' : 'Active'}
+          </span>
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(client) }}
+            className="p-1 rounded-lg text-text-muted hover:bg-red-50 hover:text-red-500 transition-colors"
+            title="Delete client"
+          >
+            <Trash2 size={13} />
+          </button>
+        </div>
       </div>
 
       {/* Contact info */}
@@ -193,7 +247,8 @@ function ClientCard({ client, onClick }) {
 export default function Clients() {
   const navigate = useNavigate()
   const { clients, loading, refetch } = useClients()
-  const [showInvite, setShowInvite] = useState(false)
+  const [showInvite,  setShowInvite]  = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState(null)
 
   return (
     <div className="p-8">
@@ -226,6 +281,7 @@ export default function Clients() {
               key={client.id}
               client={client}
               onClick={() => navigate(`/admin/clients/${client.id}`)}
+              onDelete={setDeleteTarget}
             />
           ))}
         </div>
@@ -235,6 +291,13 @@ export default function Clients() {
         <InviteClientModal
           onClose={() => setShowInvite(false)}
           onCreated={refetch}
+        />
+      )}
+      {deleteTarget && (
+        <DeleteClientModal
+          client={deleteTarget}
+          onClose={() => setDeleteTarget(null)}
+          onDeleted={() => { setDeleteTarget(null); refetch() }}
         />
       )}
     </div>
