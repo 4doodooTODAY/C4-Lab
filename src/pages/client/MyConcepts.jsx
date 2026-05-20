@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import {
   FileText, Loader2, CheckCircle2, Clock, XCircle,
   Link as LinkIcon, CalendarDays, Camera, Upload,
-  MessageSquare, ChevronDown, ChevronUp, X,
+  MessageSquare, ChevronDown, ChevronUp, X, Edit2,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
@@ -125,23 +125,32 @@ function ApprovePanel({ draft, onConfirm, onCancel, saving }) {
 }
 
 // ── Concept Card ──────────────────────────────────────────────────────────────
-function ConceptCard({ draft, onApprove, onDecline, updating }) {
+function ConceptCard({ draft, onApprove, onDecline, onEdit, updating }) {
   const cfg  = STATUS_CONFIG[draft.status] || STATUS_CONFIG.pending_client
   const Icon = cfg.icon
   const isPending = draft.status === 'pending_client'
   const [showApprovePanel, setShowApprovePanel] = useState(false)
   const [showDeclinePanel, setShowDeclinePanel] = useState(false)
+  const [showEditPanel,    setShowEditPanel]    = useState(false)
   const [declineNote, setDeclineNote] = useState('')
+  const [editForm,    setEditForm]    = useState({
+    type:              draft.type || 'post',
+    title:             draft.title || '',
+    concept:           draft.concept || '',
+    target_date:       draft.target_date || '',
+    inspiration_links: (draft.inspiration_links || []).join('\n'),
+  })
+  const [editSaved, setEditSaved] = useState(false)
+
+  const closeAll = () => { setShowApprovePanel(false); setShowDeclinePanel(false); setShowEditPanel(false) }
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-      {/* Color bar */}
       <div className={`h-1 ${cfg.bar}`} />
-
       <div className="p-5 sm:p-6">
         {/* Top row */}
-        <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
-          <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-start gap-3 mb-3 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap flex-1">
             {draft.type && (
               <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
                 {TYPE_LABELS[draft.type] || draft.type}
@@ -158,38 +167,27 @@ function ConceptCard({ draft, onApprove, onDecline, updating }) {
           </div>
         </div>
 
-        {draft.title && (
-          <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-1">{draft.title}</h3>
-        )}
-        {draft.concept && (
-          <p className="text-sm text-gray-500 leading-relaxed mb-4">{draft.concept}</p>
-        )}
+        {draft.title && <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-1">{draft.title}</h3>}
+        {draft.concept && <p className="text-sm text-gray-500 leading-relaxed mb-4">{draft.concept}</p>}
 
-        {/* Linked shoot */}
         {draft.shoots?.title && (
           <div className="flex items-center gap-1.5 text-xs text-gray-400 mb-4">
             <Camera size={11} /> Linked to shoot: <span className="font-medium text-gray-600">{draft.shoots.title}</span>
           </div>
         )}
 
-        {/* Inspiration links */}
         {draft.inspiration_links?.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-4">
+          <div className="flex flex-col gap-1 mb-4">
             {draft.inspiration_links.map((link, i) => (
-              <a
-                key={i}
-                href={link}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-1 text-xs text-accent hover:underline"
-              >
-                <LinkIcon size={10} /> Reference {i + 1}
+              <a key={i} href={link} target="_blank" rel="noreferrer"
+                className="flex items-center gap-1 text-xs text-accent hover:underline truncate">
+                <LinkIcon size={10} className="shrink-0" /> {link}
               </a>
             ))}
           </div>
         )}
 
-        {/* Approved — show footage links and notes if present */}
+        {/* Approved — show client footage/notes if any */}
         {draft.status === 'approved' && (draft.client_footage_links?.length > 0 || draft.client_notes) && (
           <div className="mb-4 p-3 rounded-xl bg-green-50 border border-green-100 space-y-2">
             {draft.client_footage_links?.length > 0 && (
@@ -212,28 +210,38 @@ function ConceptCard({ draft, onApprove, onDecline, updating }) {
           </div>
         )}
 
-        {/* Actions — only for pending */}
+        {/* PENDING ACTIONS */}
         {isPending && (
           <div className="pt-4 border-t border-gray-100">
-            {!showApprovePanel && !showDeclinePanel && (
-              <div className="flex gap-3">
+
+            {/* Main 3 buttons */}
+            {!showApprovePanel && !showDeclinePanel && !showEditPanel && (
+              <div className="flex gap-2">
                 <button
-                  onClick={() => { setShowDeclinePanel(true); setShowApprovePanel(false) }}
+                  onClick={() => { setShowDeclinePanel(true) }}
                   disabled={updating === draft.id}
-                  className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-500 hover:bg-gray-50 hover:border-gray-300 transition-all disabled:opacity-50"
+                  className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-500 hover:bg-gray-50 transition-all disabled:opacity-50"
                 >
                   Decline
                 </button>
                 <button
-                  onClick={() => { setShowApprovePanel(true); setShowDeclinePanel(false) }}
+                  onClick={() => setShowEditPanel(true)}
                   disabled={updating === draft.id}
-                  className="flex-1 py-2.5 rounded-xl bg-accent text-white text-sm font-semibold hover:bg-accent/90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 py-2.5 rounded-xl border border-accent/40 text-sm font-semibold text-accent hover:bg-accent/5 transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
                 >
-                  <CheckCircle2 size={14} /> Approve
+                  <Edit2 size={13} /> Edit
+                </button>
+                <button
+                  onClick={() => setShowApprovePanel(true)}
+                  disabled={updating === draft.id}
+                  className="flex-1 py-2.5 rounded-xl bg-accent text-white text-sm font-semibold hover:bg-accent/90 transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  <CheckCircle2 size={13} /> Approve
                 </button>
               </div>
             )}
 
+            {/* Approve panel */}
             {showApprovePanel && (
               <ApprovePanel
                 draft={draft}
@@ -246,11 +254,10 @@ function ConceptCard({ draft, onApprove, onDecline, updating }) {
               />
             )}
 
+            {/* Decline panel */}
             {showDeclinePanel && (
-              <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
-                <label className="text-xs font-semibold text-gray-700">
-                  Let us know why (optional)
-                </label>
+              <div className="space-y-3">
+                <label className="text-xs font-semibold text-gray-700">Let us know why (optional)</label>
                 <textarea
                   rows={2}
                   placeholder="What didn't work? We'll use this to revise the concept…"
@@ -259,10 +266,8 @@ function ConceptCard({ draft, onApprove, onDecline, updating }) {
                   className="w-full text-sm px-3 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-red-200 focus:border-red-300 placeholder-gray-300 bg-gray-50 resize-none"
                 />
                 <div className="flex gap-3">
-                  <button
-                    onClick={() => setShowDeclinePanel(false)}
-                    className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-500 hover:bg-gray-50"
-                  >
+                  <button onClick={() => setShowDeclinePanel(false)}
+                    className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-500 hover:bg-gray-50">
                     Cancel
                   </button>
                   <button
@@ -271,6 +276,65 @@ function ConceptCard({ draft, onApprove, onDecline, updating }) {
                     className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-semibold hover:bg-red-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                   >
                     {updating === draft.id ? <Loader2 size={14} className="animate-spin" /> : <><XCircle size={14} /> Decline</>}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Edit panel */}
+            {showEditPanel && (
+              <div className="space-y-3">
+                <p className="text-xs font-semibold text-gray-700">Make your changes — we'll be notified.</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1 block">Type</label>
+                    <select value={editForm.type} onChange={e => setEditForm(f => ({...f, type: e.target.value}))}
+                      className="w-full text-sm px-3 py-2 rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-accent/30">
+                      <option value="post">Post</option>
+                      <option value="reel">Reel</option>
+                      <option value="story">Story</option>
+                      <option value="carousel">Carousel</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1 block">Post Date</label>
+                    <input type="date" value={editForm.target_date} onChange={e => setEditForm(f => ({...f, target_date: e.target.value}))}
+                      className="w-full text-sm px-3 py-2 rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-accent/30" />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1 block">Title</label>
+                  <input value={editForm.title} onChange={e => setEditForm(f => ({...f, title: e.target.value}))}
+                    className="w-full text-sm px-3 py-2 rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-accent/30" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1 block">Description / Concept</label>
+                  <textarea rows={3} value={editForm.concept} onChange={e => setEditForm(f => ({...f, concept: e.target.value}))}
+                    className="w-full text-sm px-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-accent/30 resize-none" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1 block">Reference Links</label>
+                  <textarea rows={2} value={editForm.inspiration_links} onChange={e => setEditForm(f => ({...f, inspiration_links: e.target.value}))}
+                    placeholder="One URL per line..."
+                    className="w-full text-sm px-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-accent/30 resize-none" />
+                </div>
+                {editSaved && (
+                  <p className="text-xs text-green-600 font-medium flex items-center gap-1">
+                    <CheckCircle2 size={12} /> Changes sent to your team!
+                  </p>
+                )}
+                <div className="flex gap-3">
+                  <button onClick={() => setShowEditPanel(false)}
+                    className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-500 hover:bg-gray-50">
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => onEdit(draft.id, editForm, () => { setEditSaved(true); setTimeout(() => { setEditSaved(false); setShowEditPanel(false) }, 1500) })}
+                    disabled={updating === draft.id}
+                    className="flex-1 py-2.5 rounded-xl bg-accent text-white text-sm font-semibold hover:bg-accent/90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {updating === draft.id ? <Loader2 size={14} className="animate-spin" /> : <>Send Changes</>}
                   </button>
                 </div>
               </div>
@@ -328,6 +392,29 @@ export default function MyConcepts() {
       : d
     ))
     setUpdating(null)
+  }
+
+  const handleEdit = async (id, editForm, onDone) => {
+    setUpdating(id)
+    const links = editForm.inspiration_links.split(/[\n,]+/).map(l => l.trim()).filter(Boolean)
+    await supabase.from('content_drafts').update({
+      type:              editForm.type,
+      title:             editForm.title || null,
+      concept:           editForm.concept || null,
+      target_date:       editForm.target_date || null,
+      inspiration_links: links.length ? links : null,
+      status:            'pending_client', // stays pending, notifies admin via refetch
+    }).eq('id', id)
+    setDrafts(prev => prev.map(d => d.id === id ? {
+      ...d,
+      type:              editForm.type,
+      title:             editForm.title,
+      concept:           editForm.concept,
+      target_date:       editForm.target_date,
+      inspiration_links: links,
+    } : d))
+    setUpdating(null)
+    onDone?.()
   }
 
   const handleDecline = async (id, note) => {
@@ -414,6 +501,7 @@ export default function MyConcepts() {
                 draft={d}
                 onApprove={handleApprove}
                 onDecline={handleDecline}
+                onEdit={handleEdit}
                 updating={updating}
               />
             ))}

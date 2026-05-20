@@ -610,6 +610,8 @@ function ContentTab({ clientId, shoots, projects, onRefetchProjects }) {
       draft_id:    draft.id,
       stage:       'briefing',
       target_date: draft.target_date || null,
+      due_date:    draft.target_date || null,
+      shoot_id:    draft.shoot_id || null,
       concept:     draft.concept || null,
       status:      'active',
     }).select('id').single()
@@ -683,6 +685,39 @@ function ContentTab({ clientId, shoots, projects, onRefetchProjects }) {
   const approved = drafts.filter((d) => d.status === 'approved')
   const other    = drafts.filter((d) => d.status === 'declined' || d.status === 'scrapped')
 
+  const [editDraft, setEditDraft] = useState(null) // draft being edited
+  const [editForm, setEditForm]   = useState({})
+  const [editSaving, setEditSaving] = useState(false)
+
+  const openEdit = (draft) => {
+    setEditDraft(draft)
+    setEditForm({
+      type:              draft.type || 'post',
+      title:             draft.title || '',
+      concept:           draft.concept || '',
+      target_date:       draft.target_date || '',
+      shoot_id:          draft.shoot_id || '',
+      inspiration_links: (draft.inspiration_links || []).join('\n'),
+    })
+  }
+
+  const saveEdit = async () => {
+    if (!editDraft) return
+    setEditSaving(true)
+    const links = editForm.inspiration_links.split(/[\n,]+/).map(l => l.trim()).filter(Boolean)
+    await supabase.from('content_drafts').update({
+      type:              editForm.type,
+      title:             editForm.title || null,
+      concept:           editForm.concept || null,
+      target_date:       editForm.target_date || null,
+      shoot_id:          editForm.shoot_id || null,
+      inspiration_links: links.length ? links : null,
+    }).eq('id', editDraft.id)
+    setEditSaving(false)
+    setEditDraft(null)
+    refetch()
+  }
+
   const DraftCard = ({ draft }) => (
     <div className="card p-4">
       <div className="flex items-start justify-between gap-3 mb-2">
@@ -708,17 +743,20 @@ function ContentTab({ clientId, shoots, projects, onRefetchProjects }) {
             </p>
           )}
           {draft.inspiration_links?.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mt-1.5">
-              {draft.inspiration_links.slice(0, 3).map((link, i) => (
+            <div className="flex flex-col gap-1 mt-1.5">
+              {draft.inspiration_links.map((link, i) => (
                 <a key={i} href={link} target="_blank" rel="noreferrer"
-                  className="text-[10px] text-accent hover:underline flex items-center gap-0.5">
-                  <LinkIcon size={9} /> ref {i + 1}
+                  className="text-[10px] text-accent hover:underline flex items-center gap-1 truncate max-w-xs">
+                  <LinkIcon size={9} className="shrink-0" /> {link}
                 </a>
               ))}
             </div>
           )}
         </div>
         <div className="flex gap-1 shrink-0">
+          <button onClick={() => openEdit(draft)} title="Edit" className="p-1.5 text-text-muted hover:text-accent transition-colors">
+            <Edit2 size={13} />
+          </button>
           {draft.status === 'scrapped' ? (
             <button onClick={() => setDeleteConfirm(draft.id)} disabled={!!updating}
               title="Permanently delete" className="p-1.5 text-text-muted hover:text-red-600 transition-colors">
@@ -815,6 +853,59 @@ function ContentTab({ clientId, shoots, projects, onRefetchProjects }) {
           onClose={() => setShowNew(false)}
           onCreated={() => { setShowNew(false); refetch() }}
         />
+      )}
+
+      {editDraft && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setEditDraft(null)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 z-10 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-base font-semibold text-text-primary">Edit Concept</h2>
+              <button onClick={() => setEditDraft(null)} className="btn-ghost p-1.5"><X size={16} /></button>
+            </div>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label">Type</label>
+                  <select className="input" value={editForm.type} onChange={e => setEditForm(f => ({...f, type: e.target.value}))}>
+                    {Object.entries(DRAFT_TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Post Date</label>
+                  <input type="date" className="input" value={editForm.target_date} onChange={e => setEditForm(f => ({...f, target_date: e.target.value}))} />
+                </div>
+              </div>
+              <div>
+                <label className="label">Title / Hook</label>
+                <input className="input" value={editForm.title} onChange={e => setEditForm(f => ({...f, title: e.target.value}))} />
+              </div>
+              <div>
+                <label className="label">Concept</label>
+                <textarea className="input resize-none" rows={4} value={editForm.concept} onChange={e => setEditForm(f => ({...f, concept: e.target.value}))} />
+              </div>
+              {shoots.length > 0 && (
+                <div>
+                  <label className="label">Linked Shoot</label>
+                  <select className="input" value={editForm.shoot_id} onChange={e => setEditForm(f => ({...f, shoot_id: e.target.value}))}>
+                    <option value="">None</option>
+                    {shoots.map(s => <option key={s.id} value={s.id}>{s.title}{s.shoot_date ? ` — ${format(parseISO(s.shoot_date), 'MMM d')}` : ''}</option>)}
+                  </select>
+                </div>
+              )}
+              <div>
+                <label className="label">Inspiration Links</label>
+                <textarea className="input resize-none text-xs" rows={3} value={editForm.inspiration_links} onChange={e => setEditForm(f => ({...f, inspiration_links: e.target.value}))} placeholder="One URL per line..." />
+              </div>
+              <div className="flex gap-2 justify-end pt-1">
+                <button onClick={() => setEditDraft(null)} className="btn-secondary">Cancel</button>
+                <button onClick={saveEdit} disabled={editSaving} className="btn-primary flex items-center gap-1.5 disabled:opacity-50">
+                  {editSaving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Save
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Hard delete confirmation modal */}

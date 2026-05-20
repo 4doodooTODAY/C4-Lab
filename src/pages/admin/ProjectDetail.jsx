@@ -4,7 +4,7 @@ import {
   ArrowLeft, Loader2, Check, Trash2, X, Plus,
   CalendarDays, MessageSquare, Film, StickyNote,
   AlertCircle, MapPin, Upload, FileVideo, Eye,
-  Camera, Scissors, Pencil
+  Camera, Scissors, Pencil, Download
 } from 'lucide-react'
 import { useProject, updateProject } from '../../hooks/useProjects'
 import { useAuth } from '../../contexts/AuthContext'
@@ -544,7 +544,7 @@ export default function ProjectDetail() {
         <p className="text-xs font-semibold text-text-muted mb-4 uppercase tracking-wide">Project Details</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-5">
           <InlineField
-            label="Due Date"
+            label="Post Date"
             icon={CalendarDays}
             type="date"
             value={project.due_date || ''}
@@ -902,12 +902,20 @@ export default function ProjectDetail() {
                         <span className="text-xs text-text-muted">{format(new Date(r.created_at), 'MMM d, yyyy')}</span>
                       </div>
                     </div>
-                    <button
-                      onClick={() => navigate(`/projects/${id}/revision/${r.id}`)}
-                      className="btn-secondary flex items-center gap-1.5 text-xs shrink-0"
-                    >
-                      <Eye size={13} /> View
-                    </button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {r.video_url && (
+                        <a href={r.video_url} download target="_blank" rel="noreferrer"
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-xs font-semibold text-gray-700 transition-colors">
+                          <Download size={12} /> Download
+                        </a>
+                      )}
+                      <button
+                        onClick={() => navigate(`/projects/${id}/revision/${r.id}`)}
+                        className="btn-secondary flex items-center gap-1.5 text-xs"
+                      >
+                        <Eye size={13} /> View
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

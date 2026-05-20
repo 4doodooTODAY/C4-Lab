@@ -7,7 +7,7 @@ const PROJECT_SELECT = `
   notes, created_by, created_at,
   creative_id, editor_id, revision_count,
   admin_review_required,
-  draft_id, shoot_id, concept, target_date,
+  draft_id, shoot_id, concept, target_date, client_id,
   clients(id, name, contact_name),
   project_members(
     id, role,
