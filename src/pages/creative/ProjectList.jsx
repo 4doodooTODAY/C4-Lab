@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Loader2, Camera, Scissors, CalendarDays, MapPin, ArrowRight, Upload, MessageSquare } from 'lucide-react'
+import { Loader2, Camera, Scissors, CalendarDays, MapPin, ArrowRight, Upload, MessageSquare, Check } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { format, parseISO } from 'date-fns'
@@ -21,14 +21,11 @@ const STAGE_LABELS = {
 }
 
 // ── Shoot Card ────────────────────────────────────────────────────────────────
-function ShootCard({ shoot, onOpen }) {
+function ShootCard({ shoot, onOpen, onMarkDone }) {
   return (
-    <div
-      onClick={() => onOpen(shoot)}
-      className="bg-white rounded-2xl border border-border p-5 hover:shadow-md hover:border-border-strong transition-all flex flex-col gap-3 cursor-pointer"
-    >
+    <div className="bg-white rounded-2xl border border-border p-5 hover:shadow-md hover:border-border-strong transition-all flex flex-col gap-3">
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
+        <div className="min-w-0 cursor-pointer flex-1" onClick={() => onOpen(shoot)}>
           <p className="text-sm font-semibold text-text-primary truncate">{shoot.title}</p>
           <p className="text-xs text-text-muted mt-0.5 truncate">
             {shoot.clients?.contact_name || shoot.clients?.name || '—'}
@@ -61,12 +58,22 @@ function ShootCard({ shoot, onOpen }) {
         )}
       </div>
 
-      <button
-        onClick={(e) => { e.stopPropagation(); onOpen(shoot) }}
-        className="mt-auto btn-primary flex items-center justify-center gap-2 text-sm w-full"
-      >
-        <Upload size={13} /> View Details & Upload
-      </button>
+      <div className="flex gap-2 mt-auto">
+        <button
+          onClick={() => onOpen(shoot)}
+          className="flex-1 btn-primary flex items-center justify-center gap-2 text-sm"
+        >
+          <Upload size={13} /> Details & Upload
+        </button>
+        {shoot.status !== 'completed' && (
+          <button
+            onClick={() => onMarkDone(shoot.id)}
+            className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-green-50 text-green-700 hover:bg-green-100 transition-colors flex items-center gap-1 shrink-0"
+          >
+            <Check size={12} /> Mark Done
+          </button>
+        )}
+      </div>
     </div>
   )
 }
@@ -199,7 +206,15 @@ export default function CreativeProjectList() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {shoots.map((s) => (
-              <ShootCard key={s.id} shoot={s} onOpen={setDetailShoot} />
+              <ShootCard
+                key={s.id}
+                shoot={s}
+                onOpen={setDetailShoot}
+                onMarkDone={async (id) => {
+                  await supabase.from('shoots').update({ status: 'completed' }).eq('id', id)
+                  setShoots((prev) => prev.map((sh) => sh.id === id ? { ...sh, status: 'completed' } : sh))
+                }}
+              />
             ))}
           </div>
         )}
