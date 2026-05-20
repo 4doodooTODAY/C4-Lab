@@ -1284,12 +1284,21 @@ function RevisionsCard({ project, revisions, commentCounts, navigate }) {
                     {count} comment{count !== 1 ? 's' : ''}
                   </span>
                 </div>
-                <button
-                  onClick={() => navigate(`/projects/${project.id}/revision/${r.id}`)}
-                  className="btn-secondary text-xs flex items-center gap-1 w-full justify-center"
-                >
-                  View & Comment <ChevronRight size={12} />
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => navigate(`/projects/${project.id}/revision/${r.id}`)}
+                    className="btn-secondary text-xs flex items-center gap-1 flex-1 justify-center"
+                  >
+                    View & Comment <ChevronRight size={12} />
+                  </button>
+                  {r.video_url && (
+                    <a href={r.video_url} download target="_blank" rel="noreferrer"
+                      title="Download full quality"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-xs font-semibold text-gray-700 transition-colors">
+                      <Download size={12} /> Download
+                    </a>
+                  )}
+                </div>
               </div>
             )
           })}

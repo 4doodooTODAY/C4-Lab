@@ -207,7 +207,7 @@ function ProjectsTab({ clientId }) {
     <div className="space-y-3">
       {projects.map((p) => (
         <div key={p.id}
-          onClick={() => navigate(`/projects/${p.id}/creative`)}
+          onClick={() => navigate(`/projects/${p.id}`)}
           className="card p-4 hover:shadow-md transition-shadow cursor-pointer flex items-center gap-4">
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-text-primary">{p.name}</p>
@@ -349,6 +349,7 @@ const DRAFT_STATUS_LABELS = {
 
 function ConceptsTab({ clientId }) {
   const { drafts, loading } = useContentDrafts(clientId)
+  const [expandedDraft, setExpandedDraft] = useState(null)
   // Hide approved (moved to projects) and scrapped — same logic as admin side
   const active = drafts.filter((d) => d.status !== 'scrapped' && d.status !== 'approved')
 
@@ -364,42 +365,76 @@ function ConceptsTab({ clientId }) {
 
   return (
     <div className="space-y-3">
-      {active.map((d) => (
-        <div key={d.id} className="card p-4">
-          <div className="flex items-start justify-between gap-3 mb-2">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-surface-3 text-text-muted">
-                {DRAFT_TYPE_LABELS[d.type] || d.type || 'Draft'}
-              </span>
-              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${DRAFT_STATUS_COLORS[d.status] || 'bg-surface-2 text-text-muted'}`}>
-                {DRAFT_STATUS_LABELS[d.status] || d.status}
-              </span>
-              {d.target_date && (
-                <span className="text-[10px] text-text-muted flex items-center gap-1">
-                  <CalendarDays size={9} /> {format(parseISO(d.target_date), 'MMM d')}
+      {active.map((d) => {
+        const isExpanded = expandedDraft === d.id
+        return (
+          <div
+            key={d.id}
+            className="card p-4 cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => setExpandedDraft(isExpanded ? null : d.id)}
+          >
+            <div className="flex items-start justify-between gap-3 mb-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-surface-3 text-text-muted">
+                  {DRAFT_TYPE_LABELS[d.type] || d.type || 'Draft'}
                 </span>
-              )}
+                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${DRAFT_STATUS_COLORS[d.status] || 'bg-surface-2 text-text-muted'}`}>
+                  {DRAFT_STATUS_LABELS[d.status] || d.status}
+                </span>
+                {d.target_date && (
+                  <span className="text-[10px] text-text-muted flex items-center gap-1">
+                    <CalendarDays size={9} /> {format(parseISO(d.target_date), 'MMM d, yyyy')}
+                  </span>
+                )}
+              </div>
+              <ChevronRight size={14} className={`text-text-muted shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
             </div>
+            {d.title && <p className="text-sm font-semibold text-text-primary">{d.title}</p>}
+            {!isExpanded && d.concept && (
+              <p className="text-xs text-text-secondary mt-1 leading-relaxed line-clamp-2">{d.concept}</p>
+            )}
+            {isExpanded && (
+              <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+                {d.concept && (
+                  <p className="text-xs text-text-secondary leading-relaxed whitespace-pre-wrap">{d.concept}</p>
+                )}
+                {d.shoots?.title && (
+                  <p className="text-xs text-text-muted flex items-center gap-1">
+                    <Camera size={10} /> Linked shoot: {d.shoots.title}
+                  </p>
+                )}
+                {d.inspiration_links?.length > 0 && (
+                  <div className="flex flex-col gap-1 mt-1">
+                    <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wide">Reference Links</p>
+                    {d.inspiration_links.map((link, i) => (
+                      <a key={i} href={link} target="_blank" rel="noreferrer"
+                        className="text-xs text-accent hover:underline flex items-center gap-1 break-all">
+                        <LinkIcon size={10} /> {link}
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {!isExpanded && d.shoots?.title && (
+              <p className="text-xs text-text-muted mt-1.5 flex items-center gap-1">
+                <Camera size={10} /> {d.shoots.title}
+              </p>
+            )}
+            {!isExpanded && d.inspiration_links?.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-1.5">
+                {d.inspiration_links.map((link, i) => (
+                  <a key={i} href={link} target="_blank" rel="noreferrer"
+                    className="text-[10px] text-accent hover:underline flex items-center gap-0.5"
+                    onClick={(e) => e.stopPropagation()}>
+                    <LinkIcon size={9} /> ref {i + 1}
+                  </a>
+                ))}
+              </div>
+            )}
           </div>
-          {d.title && <p className="text-sm font-semibold text-text-primary">{d.title}</p>}
-          {d.concept && <p className="text-xs text-text-secondary mt-1 leading-relaxed">{d.concept}</p>}
-          {d.shoots?.title && (
-            <p className="text-xs text-text-muted mt-1.5 flex items-center gap-1">
-              <Camera size={10} /> {d.shoots.title}
-            </p>
-          )}
-          {d.inspiration_links?.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-1.5">
-              {d.inspiration_links.map((link, i) => (
-                <a key={i} href={link} target="_blank" rel="noreferrer"
-                  className="text-[10px] text-accent hover:underline flex items-center gap-0.5">
-                  <LinkIcon size={9} /> ref {i + 1}
-                </a>
-              ))}
-            </div>
-          )}
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   ChevronLeft, ChevronRight, CalendarDays, Camera, Film,
   FileText, LayoutGrid, LayoutList, Loader2, Check, X,
-  MapPin, Clock, ExternalLink, AlertCircle, Link as LinkIcon,
+  MapPin, Clock, ExternalLink, AlertCircle, Link as LinkIcon, Plus,
 } from 'lucide-react'
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
@@ -231,6 +231,11 @@ export default function ContentCalendar() {
   const [view, setView] = useState('calendar')   // 'calendar' | 'list'
   const [clientId, setClientId] = useState(null)
   const [clientResolved, setClientResolved] = useState(false)
+  const [showRequestModal, setShowRequestModal] = useState(false)
+  const [requestForm, setRequestForm] = useState({
+    type: 'post', title: '', concept: '', target_date: '', reference_links: '', footage_link: '',
+  })
+  const [submitting, setSubmitting] = useState(false)
 
   // Resolve the client record — clients.profile_id is the client user link
   useEffect(() => {
@@ -358,6 +363,38 @@ export default function ContentCalendar() {
     }
   }
 
+  const handleRequestSubmit = async (e) => {
+    e.preventDefault()
+    if (!clientId || !user) return
+    setSubmitting(true)
+    try {
+      const links = requestForm.reference_links
+        .split('\n')
+        .map((l) => l.trim())
+        .filter(Boolean)
+      const footageLink = requestForm.footage_link.trim()
+      const { error } = await supabase.from('content_drafts').insert({
+        client_id: clientId,
+        title: requestForm.title || null,
+        type: requestForm.type,
+        concept: requestForm.concept || null,
+        target_date: requestForm.target_date || null,
+        inspiration_links: links.length ? links : null,
+        client_footage_links: footageLink ? [footageLink] : null,
+        status: 'pending_client',
+        created_by: user.id,
+      })
+      if (error) throw new Error(error.message)
+      setShowRequestModal(false)
+      setRequestForm({ type: 'post', title: '', concept: '', target_date: '', reference_links: '', footage_link: '' })
+      await loadData()
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   // ── Calendar grid helpers ────────────────────────────────────────────────────
   const days = buildGrid(month)
 
@@ -389,16 +426,26 @@ export default function ContentCalendar() {
             )}
           </div>
         </div>
-        {/* View toggle */}
-        <div className="flex bg-surface-2 rounded-xl p-1 gap-0.5">
-          <button onClick={() => setView('calendar')}
-            className={`p-2 rounded-lg transition-colors ${view === 'calendar' ? 'bg-white shadow-sm text-text-primary' : 'text-text-muted hover:text-text-primary'}`}>
-            <LayoutGrid size={15} />
-          </button>
-          <button onClick={() => setView('list')}
-            className={`p-2 rounded-lg transition-colors ${view === 'list' ? 'bg-white shadow-sm text-text-primary' : 'text-text-muted hover:text-text-primary'}`}>
-            <LayoutList size={15} />
-          </button>
+        <div className="flex items-center gap-2">
+          {clientId && (
+            <button
+              onClick={() => setShowRequestModal(true)}
+              className="btn-primary flex items-center gap-1.5 text-xs"
+            >
+              <Plus size={13} /> Request Content
+            </button>
+          )}
+          {/* View toggle */}
+          <div className="flex bg-surface-2 rounded-xl p-1 gap-0.5">
+            <button onClick={() => setView('calendar')}
+              className={`p-2 rounded-lg transition-colors ${view === 'calendar' ? 'bg-white shadow-sm text-text-primary' : 'text-text-muted hover:text-text-primary'}`}>
+              <LayoutGrid size={15} />
+            </button>
+            <button onClick={() => setView('list')}
+              className={`p-2 rounded-lg transition-colors ${view === 'list' ? 'bg-white shadow-sm text-text-primary' : 'text-text-muted hover:text-text-primary'}`}>
+              <LayoutList size={15} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -524,6 +571,94 @@ export default function ContentCalendar() {
             </div>
           )}
         </>
+      )}
+
+      {/* Request Content Modal */}
+      {showRequestModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <h2 className="text-base font-bold text-text-primary flex items-center gap-2">
+                <Plus size={15} className="text-accent" /> Request Content
+              </h2>
+              <button onClick={() => setShowRequestModal(false)} className="p-1.5 text-text-muted hover:text-text-primary rounded-lg transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+            <form onSubmit={handleRequestSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+              <div>
+                <label className="block text-xs font-semibold text-text-secondary mb-1.5">Type</label>
+                <select
+                  className="input w-full"
+                  value={requestForm.type}
+                  onChange={(e) => setRequestForm((f) => ({ ...f, type: e.target.value }))}
+                >
+                  <option value="post">Post</option>
+                  <option value="reel">Reel</option>
+                  <option value="story">Story</option>
+                  <option value="carousel">Carousel</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-text-secondary mb-1.5">Title</label>
+                <input
+                  type="text"
+                  className="input w-full"
+                  placeholder="Give your idea a title"
+                  value={requestForm.title}
+                  onChange={(e) => setRequestForm((f) => ({ ...f, title: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-text-secondary mb-1.5">Description / Concept</label>
+                <textarea
+                  className="input w-full min-h-[100px] resize-none text-sm"
+                  placeholder="Describe the concept, vibe, key message…"
+                  value={requestForm.concept}
+                  onChange={(e) => setRequestForm((f) => ({ ...f, concept: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-text-secondary mb-1.5">Post Date</label>
+                <input
+                  type="date"
+                  className="input w-full"
+                  value={requestForm.target_date}
+                  onChange={(e) => setRequestForm((f) => ({ ...f, target_date: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-text-secondary mb-1.5">Reference Links <span className="font-normal text-text-muted">(one per line)</span></label>
+                <textarea
+                  className="input w-full min-h-[72px] resize-none text-sm"
+                  placeholder={"https://example.com/inspo\nhttps://instagram.com/..."}
+                  value={requestForm.reference_links}
+                  onChange={(e) => setRequestForm((f) => ({ ...f, reference_links: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-text-secondary mb-1.5">Footage or Files Link <span className="font-normal text-text-muted">(optional)</span></label>
+                <input
+                  type="text"
+                  className="input w-full"
+                  placeholder="Google Drive, Dropbox, etc."
+                  value={requestForm.footage_link}
+                  onChange={(e) => setRequestForm((f) => ({ ...f, footage_link: e.target.value }))}
+                />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setShowRequestModal(false)} className="btn-secondary flex-1">
+                  Cancel
+                </button>
+                <button type="submit" disabled={submitting} className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50">
+                  {submitting ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                  {submitting ? 'Submitting…' : 'Submit Request'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   )
