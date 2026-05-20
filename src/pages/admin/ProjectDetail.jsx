@@ -18,6 +18,7 @@ import { forceDownload } from '../../lib/r2'
 const DISPLAY_STAGES = [
   { key: 'post_production', label: 'Editing' },
   { key: 'review',          label: 'In Review' },
+  { key: 'ready_to_post',   label: 'Ready to Post' },
   { key: 'delivered',       label: 'Delivered' },
 ]
 
@@ -28,6 +29,7 @@ const STAGE_CURRENT_LABELS = {
   post_production: 'Editing',
   review:          'In Review',
   revisions:       'Revisions',
+  ready_to_post:   'Ready to Post',
   delivered:       'Delivered',
 }
 
@@ -166,7 +168,7 @@ function InlineField({ label, value, displayValue, type = 'text', onSave, icon: 
 
 // ── Stage Progress Bar ────────────────────────────────────────────────────────
 function StageBar({ currentStage, isAdmin, onStageClick }) {
-  const stageToIdx = { post_production: 0, review: 1, revisions: 1, delivered: 2 }
+  const stageToIdx = { post_production: 0, review: 1, revisions: 1, ready_to_post: 2, delivered: 3 }
   const effectiveIdx = stageToIdx[currentStage] ?? 0
 
   return (
