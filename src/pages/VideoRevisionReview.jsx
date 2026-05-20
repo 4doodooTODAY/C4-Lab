@@ -322,15 +322,47 @@ export default function VideoRevisionReview() {
     setSubmittingAction(true)
     setActionError('')
     try {
+      // Mark revision approved
       const { error: e1 } = await supabase.from('project_revisions')
         .update({ status: 'approved' })
         .eq('id', revisionId)
       if (e1) throw new Error(e1.message)
 
+      // Move project to ready_to_post — admin must mark it posted before delivered
       const { error: e2 } = await supabase.from('projects')
-        .update({ stage: 'delivered' })
+        .update({ stage: 'ready_to_post' })
         .eq('id', project.id)
       if (e2) throw new Error(e2.message)
+
+      // Notify the editor + all admins
+      const projectName = project.name || 'Your project'
+      const link = `/projects/${project.id}`
+      const notifTargets = []
+
+      // Editor
+      if (project.editor_id) notifTargets.push(project.editor_id)
+
+      // All admins
+      const { data: admins } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('role', 'admin')
+      ;(admins || []).forEach((a) => {
+        if (!notifTargets.includes(a.id)) notifTargets.push(a.id)
+      })
+
+      if (notifTargets.length) {
+        await supabase.from('notifications').insert(
+          notifTargets.map((profile_id) => ({
+            profile_id,
+            actor_id:  myId,
+            type:      'revision_approved',
+            title:     'Client approved the video ✅',
+            body:      `"${projectName}" has been approved and is ready to post.`,
+            link,
+          }))
+        )
+      }
 
       fetchAll()
     } catch (err) {

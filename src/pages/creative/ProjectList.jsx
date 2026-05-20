@@ -119,13 +119,10 @@ function EditCard({ project, revisions, myId, onClick, onMarkDone }) {
         >
           {hasPendingUpload ? 'Upload Revision' : 'Open Project'} <ArrowRight size={13} />
         </button>
-        {!isDone && (
-          <button
-            onClick={onMarkDone}
-            className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-green-50 text-green-700 hover:bg-green-100 transition-colors flex items-center gap-1 shrink-0"
-          >
-            <Check size={12} /> Mark Done
-          </button>
+        {stage === 'ready_to_post' && (
+          <span className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-blue-50 text-blue-700 flex items-center gap-1 shrink-0">
+            ✅ Awaiting post
+          </span>
         )}
       </div>
     </div>

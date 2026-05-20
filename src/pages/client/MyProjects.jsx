@@ -450,7 +450,7 @@ export default function MyProjects() {
       })
   }, [user])
 
-  const activeCount    = projects.filter((p) => p.stage !== 'delivered').length
+  const activeCount    = projects.filter((p) => p.stage !== 'delivered' && p.stage !== 'ready_to_post').length
   const deliveredCount = projects.filter((p) => p.stage === 'delivered').length
 
   if (loading) return (

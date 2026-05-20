@@ -17,6 +17,7 @@ const STAGE_MAP = {
   post_production: { label: 'Editing',          color: 'bg-purple-50 text-purple-600' },
   review:          { label: 'Ready to Review',  color: 'bg-orange-50 text-orange-600' },
   revisions:       { label: 'Revisions',        color: 'bg-red-50 text-red-600' },
+  ready_to_post:   { label: 'Ready to Post', color: 'bg-blue-50 text-blue-600' },
   delivered:       { label: 'Complete',         color: 'bg-green-50 text-green-700' },
 }
 

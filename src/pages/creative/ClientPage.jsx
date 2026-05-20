@@ -37,7 +37,7 @@ const STAGE_COLORS = {
 }
 const STAGE_LABELS = {
   briefing: 'Briefing', pre_production: 'Pre-Production', production: 'Production',
-  post_production: 'Post-Production', review: 'Review', revisions: 'Revisions', delivered: 'Delivered',
+  post_production: 'Post-Production', review: 'Review', revisions: 'Revisions', delivered: 'Delivered', ready_to_post: 'Ready to Post',
 }
 
 // ── Shoots Tab ─────────────────────────────────────────────────────────────────

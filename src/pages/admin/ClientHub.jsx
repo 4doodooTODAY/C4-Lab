@@ -39,7 +39,7 @@ const SHOOT_STATUS_COLORS = {
 }
 const STAGE_LABELS = {
   briefing: 'Briefing', pre_production: 'Pre-Production', production: 'Production',
-  post_production: 'Post-Production', review: 'Review', revisions: 'Revisions', delivered: 'Delivered',
+  post_production: 'Post-Production', review: 'Review', revisions: 'Revisions', delivered: 'Delivered', ready_to_post: 'Ready to Post',
 }
 const STAGE_COLORS = {
   briefing: 'bg-slate-100 text-slate-600', pre_production: 'bg-blue-50 text-blue-600',

@@ -540,6 +540,22 @@ export default function ProjectDetail() {
       <StageBar currentStage={project.stage} isAdmin={isAdmin} onStageClick={handleStageClick} />
 
 
+      {/* Mark as Posted */}
+      {project.stage === 'ready_to_post' && isAdmin && (
+        <div className="mb-6 p-4 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-bold text-blue-900">Client approved this video ✅</p>
+            <p className="text-xs text-blue-600 mt-0.5">Once posted online, mark it complete.</p>
+          </div>
+          <button
+            onClick={async () => { await updateProject(id, { stage: 'delivered' }); refetch() }}
+            className="shrink-0 px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors flex items-center gap-2"
+          >
+            <Check size={14} /> Mark as Posted
+          </button>
+        </div>
+      )}
+
       {/* Project info — inline editable */}
       <div className="bg-white rounded-2xl border border-border p-5 mb-6">
         <p className="text-xs font-semibold text-text-muted mb-4 uppercase tracking-wide">Project Details</p>
