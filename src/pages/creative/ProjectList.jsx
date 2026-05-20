@@ -189,6 +189,16 @@ export default function CreativeProjectList() {
     </div>
   )
 
+  const activeShots    = shoots.filter((s) => s.status !== 'completed')
+  const completedShots = shoots.filter((s) => s.status === 'completed')
+  const activeEdits    = edits.filter((e) => e.stage !== 'delivered')
+  const completedEdits = edits.filter((e) => e.stage === 'delivered')
+
+  const onMarkShootDone = async (id) => {
+    await supabase.from('shoots').update({ status: 'completed' }).eq('id', id)
+    setShoots((prev) => prev.map((sh) => sh.id === id ? { ...sh, status: 'completed' } : sh))
+  }
+
   return (
     <div className="p-8 max-w-4xl">
       <div className="mb-8">
@@ -196,30 +206,22 @@ export default function CreativeProjectList() {
         <p className="text-sm text-text-muted mt-1">Your shoots and editing assignments</p>
       </div>
 
-      {/* My Shoots */}
+      {/* My Shoots — active */}
       <section className="mb-10">
         <div className="flex items-center gap-2 mb-4">
           <Camera size={16} className="text-text-muted" />
           <h2 className="text-base font-semibold text-text-primary">My Shoots</h2>
-          <span className="text-xs text-text-muted bg-surface-2 px-2 py-0.5 rounded-full">{shoots.length}</span>
+          <span className="text-xs text-text-muted bg-surface-2 px-2 py-0.5 rounded-full">{activeShots.length}</span>
         </div>
-        {shoots.length === 0 ? (
+        {activeShots.length === 0 ? (
           <div className="bg-white rounded-2xl border border-border p-8 text-center">
             <Camera size={32} className="mx-auto text-text-muted/30 mb-3" />
             <p className="text-sm text-text-muted">No shoots scheduled for your clients yet.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {shoots.map((s) => (
-              <ShootCard
-                key={s.id}
-                shoot={s}
-                onOpen={setDetailShoot}
-                onMarkDone={async (id) => {
-                  await supabase.from('shoots').update({ status: 'completed' }).eq('id', id)
-                  setShoots((prev) => prev.map((sh) => sh.id === id ? { ...sh, status: 'completed' } : sh))
-                }}
-              />
+            {activeShots.map((s) => (
+              <ShootCard key={s.id} shoot={s} onOpen={setDetailShoot} onMarkDone={onMarkShootDone} />
             ))}
           </div>
         )}
@@ -235,21 +237,21 @@ export default function CreativeProjectList() {
         />
       )}
 
-      {/* My Edits */}
-      <section>
+      {/* My Edits — active */}
+      <section className="mb-10">
         <div className="flex items-center gap-2 mb-4">
           <Scissors size={16} className="text-text-muted" />
           <h2 className="text-base font-semibold text-text-primary">My Edits</h2>
-          <span className="text-xs text-text-muted bg-surface-2 px-2 py-0.5 rounded-full">{edits.length}</span>
+          <span className="text-xs text-text-muted bg-surface-2 px-2 py-0.5 rounded-full">{activeEdits.length}</span>
         </div>
-        {edits.length === 0 ? (
+        {activeEdits.length === 0 ? (
           <div className="bg-white rounded-2xl border border-border p-8 text-center">
             <Scissors size={32} className="mx-auto text-text-muted/30 mb-3" />
-            <p className="text-sm text-text-muted">No editing projects assigned to you yet.</p>
+            <p className="text-sm text-text-muted">No active editing projects assigned to you.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {edits.map((p) => (
+            {activeEdits.map((p) => (
               <EditCard
                 key={p.id}
                 project={p}
@@ -265,6 +267,32 @@ export default function CreativeProjectList() {
           </div>
         )}
       </section>
+
+      {/* Completed section */}
+      {(completedShots.length > 0 || completedEdits.length > 0) && (
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <Check size={16} className="text-green-500" />
+            <h2 className="text-base font-semibold text-text-primary">Completed</h2>
+            <span className="text-xs text-text-muted bg-surface-2 px-2 py-0.5 rounded-full">{completedShots.length + completedEdits.length}</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {completedShots.map((s) => (
+              <ShootCard key={s.id} shoot={s} onOpen={setDetailShoot} onMarkDone={onMarkShootDone} />
+            ))}
+            {completedEdits.map((p) => (
+              <EditCard
+                key={p.id}
+                project={p}
+                revisions={revisions}
+                myId={myId}
+                onClick={() => navigate(`/projects/${p.id}/creative`)}
+                onMarkDone={async () => {}}
+              />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   )
 }
