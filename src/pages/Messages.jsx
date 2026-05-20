@@ -246,7 +246,7 @@ export default function Messages() {
       .from('conversations')
       .select(`
         id, name, is_group, created_at, last_message_at, last_message_preview,
-        conversation_members(profile_id, profiles(id, full_name, avatar_url))
+        conversation_members(profile_id, profiles(id, full_name, avatar_url, role))
       `)
       .order('last_message_at', { ascending: false, nullsFirst: false })
 
@@ -678,7 +678,7 @@ export default function Messages() {
                     )}
                   </div>
                   <p className="text-xs text-text-muted truncate mt-0.5">
-                    {conv.last_message_preview || (conv.is_group ? `${conv.conversation_members?.length} members` : 'Start chatting')}
+                    {conv.last_message_preview || (conv.is_group ? `${(conv.conversation_members || []).filter(m => m.profiles?.role !== 'client').length} members` : 'Start chatting')}
                   </p>
                 </div>
               </button>
@@ -718,7 +718,7 @@ export default function Messages() {
               )}
               <p className="text-xs text-text-muted">
                 {selectedConv.is_group
-                  ? `${selectedConv.conversation_members?.length} members`
+                  ? `${(selectedConv.conversation_members || []).filter(m => m.profiles?.role !== 'client').length} members`
                   : 'Active'}
               </p>
             </div>
