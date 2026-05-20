@@ -79,20 +79,18 @@ function ShootCard({ shoot, onOpen, onMarkDone }) {
 }
 
 // ── Edit Card ─────────────────────────────────────────────────────────────────
-function EditCard({ project, revisions, myId, onClick }) {
+function EditCard({ project, revisions, myId, onClick, onMarkDone }) {
   const latest = revisions
     .filter((r) => r.project_id === project.id)
     .sort((a, b) => b.revision_number - a.revision_number)[0]
 
   const hasPendingUpload = latest?.status === 'pending_editor'
   const stage = project.stage
+  const isDone = stage === 'delivered'
 
   return (
-    <div
-      onClick={onClick}
-      className="bg-white rounded-2xl border border-border p-5 hover:shadow-md hover:border-border-strong transition-all cursor-pointer"
-    >
-      <div className="flex items-start justify-between gap-2 mb-3">
+    <div className="bg-white rounded-2xl border border-border p-5 hover:shadow-md hover:border-border-strong transition-all">
+      <div className="flex items-start justify-between gap-2 mb-3 cursor-pointer" onClick={onClick}>
         <div className="min-w-0">
           <p className="text-sm font-semibold text-text-primary truncate">{project.name}</p>
           <p className="text-xs text-text-muted mt-0.5 truncate">
@@ -105,7 +103,7 @@ function EditCard({ project, revisions, myId, onClick }) {
       </div>
 
       {latest && (
-        <p className="text-xs text-text-muted mb-3">
+        <p className="text-xs text-text-muted mb-3 cursor-pointer" onClick={onClick}>
           {latest.revision_number === 1 ? 'Initial Cut' : `Revision ${latest.revision_number - 1}`}
           {' · '}
           <span className={hasPendingUpload ? 'text-amber-600 font-medium' : ''}>
@@ -114,12 +112,22 @@ function EditCard({ project, revisions, myId, onClick }) {
         </p>
       )}
 
-      <button
-        onClick={(e) => { e.stopPropagation(); onClick() }}
-        className="w-full btn-primary flex items-center justify-center gap-2 text-sm"
-      >
-        {hasPendingUpload ? 'Upload Revision' : 'Open Project'} <ArrowRight size={13} />
-      </button>
+      <div className="flex gap-2">
+        <button
+          onClick={onClick}
+          className="flex-1 btn-primary flex items-center justify-center gap-2 text-sm"
+        >
+          {hasPendingUpload ? 'Upload Revision' : 'Open Project'} <ArrowRight size={13} />
+        </button>
+        {!isDone && (
+          <button
+            onClick={onMarkDone}
+            className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-green-50 text-green-700 hover:bg-green-100 transition-colors flex items-center gap-1 shrink-0"
+          >
+            <Check size={12} /> Mark Done
+          </button>
+        )}
+      </div>
     </div>
   )
 }
@@ -251,6 +259,10 @@ export default function CreativeProjectList() {
                 revisions={revisions}
                 myId={myId}
                 onClick={() => navigate(`/projects/${p.id}/creative`)}
+                onMarkDone={async () => {
+                  await supabase.from('projects').update({ stage: 'delivered' }).eq('id', p.id)
+                  setEdits((prev) => prev.map((e) => e.id === p.id ? { ...e, stage: 'delivered' } : e))
+                }}
               />
             ))}
           </div>
