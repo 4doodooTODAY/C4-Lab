@@ -46,6 +46,7 @@ const STAGE_COLORS = {
   production: 'bg-amber-50 text-amber-700', post_production: 'bg-purple-50 text-purple-600',
   review: 'bg-orange-50 text-orange-600', revisions: 'bg-red-50 text-red-600',
   delivered: 'bg-green-50 text-green-700',
+  ready_to_post: 'bg-blue-50 text-blue-600',
 }
 
 // ── New Shoot Modal ────────────────────────────────────────────────────────────
@@ -1004,9 +1005,28 @@ function ProjectsTab({ clientId, projects, onRefetch }) {
                   )}
                 </div>
               </div>
-              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${STAGE_COLORS[p.stage] || 'bg-surface-2 text-text-muted'}`}>
-                {STAGE_LABELS[p.stage] || p.stage}
-              </span>
+              <div className="flex flex-col items-end gap-1 shrink-0">
+                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${STAGE_COLORS[p.stage] || 'bg-surface-2 text-text-muted'}`}>
+                  {STAGE_LABELS[p.stage] || p.stage}
+                </span>
+                {p.stage === 'delivered' && (
+                  <span className="text-[10px] text-green-600 font-semibold flex items-center gap-0.5">
+                    <Check size={9} /> Posted Online
+                  </span>
+                )}
+                {p.stage === 'ready_to_post' && (
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation()
+                      await supabase.from('projects').update({ stage: 'delivered' }).eq('id', p.id)
+                      onRefetch?.()
+                    }}
+                    className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-500 text-white hover:bg-green-600 transition-colors"
+                  >
+                    Mark as Posted
+                  </button>
+                )}
+              </div>
               <ChevronRight size={14} className="text-text-muted shrink-0" />
             </div>
 

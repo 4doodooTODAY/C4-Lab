@@ -22,7 +22,7 @@ function fmtBytes(bytes) {
 const STAGE_STEPS = ['Planning', 'Shoot', 'Editing', 'Review', 'Done']
 
 function getStep(stage, pendingRevision) {
-  if (stage === 'delivered') return 4
+  if (stage === 'delivered' || stage === 'ready_to_post') return 4
   if (stage === 'review' || stage === 'revisions') {
     return pendingRevision?.status === 'pending_client_review' ? 3 : 3
   }
@@ -32,7 +32,8 @@ function getStep(stage, pendingRevision) {
 }
 
 function getStatusInfo(stage, pendingRevision) {
-  if (stage === 'delivered') return { text: 'Your project is complete!', sub: 'Files are ready to download.', color: 'text-green-600', emoji: '🎉' }
+  if (stage === 'delivered') return { text: 'Your project is complete!', sub: 'Posted online ✅', color: 'text-green-600', emoji: '🎉' }
+  if (stage === 'ready_to_post') return { text: 'Approved — coming soon!', sub: "We're getting ready to post this.", color: 'text-blue-600', emoji: '🚀' }
   if (pendingRevision?.status === 'pending_client_review') {
     const n = pendingRevision.revision_number
     return { text: n === 1 ? 'Your first cut is ready!' : `Revision ${n - 1} is ready!`, sub: 'Watch it and leave your feedback.', color: 'text-accent', emoji: '🎬' }
@@ -219,6 +220,7 @@ function ProjectCard({ project, revisions, clientName }) {
   const { text, sub, color, emoji } = getStatusInfo(project.stage, pendingRevision)
   const canReview   = pendingRevision?.status === 'pending_client_review'
   const isDelivered = project.stage === 'delivered'
+  const isReadyToPost = project.stage === 'ready_to_post'
 
   const completedRevisions = revisions.filter((r) => r.status === 'approved').length
   const shoot = project.shoot
@@ -228,6 +230,7 @@ function ProjectCard({ project, revisions, clientName }) {
       {/* Stage color bar */}
       <div className={`h-1 ${
         project.stage === 'delivered'     ? 'bg-green-400' :
+        project.stage === 'ready_to_post'  ? 'bg-blue-400' :
         project.stage === 'post_production' || project.stage === 'review' || project.stage === 'revisions' ? 'bg-accent' :
         project.stage === 'production'    ? 'bg-amber-400' :
         'bg-gray-200'
@@ -245,7 +248,12 @@ function ProjectCard({ project, revisions, clientName }) {
           </div>
           {isDelivered && (
             <span className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full bg-green-50 text-green-700 text-xs font-semibold border border-green-200">
-              <Check size={10} /> Delivered
+              <Check size={10} /> Posted Online
+            </span>
+          )}
+          {isReadyToPost && (
+            <span className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold border border-blue-200">
+              🚀 Coming Soon
             </span>
           )}
         </div>
