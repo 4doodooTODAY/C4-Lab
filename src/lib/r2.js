@@ -83,3 +83,22 @@ export function fmtEta(seconds) {
   if (s < 60) return `~${s}s left`
   return `~${Math.floor(s / 60)}m ${s % 60}s left`
 }
+
+// Force-download a file from any URL (works cross-origin / R2 / CDN)
+// Fetches as blob so the browser always saves it rather than opening it
+export async function forceDownload(url, filename) {
+  try {
+    const res  = await fetch(url)
+    const blob = await res.blob()
+    const a    = document.createElement('a')
+    a.href     = URL.createObjectURL(blob)
+    a.download = filename || url.split('/').pop() || 'download'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(a.href)
+  } catch {
+    // Fallback: open in new tab if fetch is blocked
+    window.open(url, '_blank')
+  }
+}

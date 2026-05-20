@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
-import { uploadToR2, fmtSpeed, fmtEta } from '../../lib/r2'
+import { uploadToR2, fmtSpeed, fmtEta, forceDownload } from '../../lib/r2'
 import { updateProject } from '../../hooks/useProjects'
 import Avatar from '../../components/ui/Avatar'
 import { format, parseISO } from 'date-fns'
@@ -741,10 +741,10 @@ function FileList({ files, accent = false }) {
           <span className={`text-sm truncate flex-1 ${accent ? 'text-blue-900' : 'text-text-primary'}`}>{f.file_name}</span>
           <span className={`text-xs ${accent ? 'text-blue-400' : 'text-text-muted'}`}>{fmtBytes(f.file_size)}</span>
           {f.file_url && (
-            <a href={f.file_url} download={f.file_name} target="_blank" rel="noreferrer"
+            <button onClick={() => forceDownload(f.file_url, f.file_name)}
               className={`transition-colors shrink-0 ${accent ? 'text-blue-500 hover:text-blue-700' : 'text-accent hover:text-accent/80'}`}>
               <Download size={13} />
-            </a>
+            </button>
           )}
         </div>
       ))}
@@ -1292,11 +1292,11 @@ function RevisionsCard({ project, revisions, commentCounts, navigate }) {
                     View & Comment <ChevronRight size={12} />
                   </button>
                   {r.video_url && (
-                    <a href={r.video_url} download target="_blank" rel="noreferrer"
-                      title="Download full quality"
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-xs font-semibold text-gray-700 transition-colors">
+                    <button onClick={() => forceDownload(r.video_url, `revision-${r.revision_number}.mp4`)}
+                      
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-xs font-semibold text-gray-700 transition-colors" title="Download full quality">
                       <Download size={12} /> Download
-                    </a>
+                    </button>
                   )}
                 </div>
               </div>

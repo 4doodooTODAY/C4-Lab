@@ -12,6 +12,7 @@ import { supabase } from '../../lib/supabase'
 import Avatar from '../../components/ui/Avatar'
 import { format, parseISO } from 'date-fns'
 import { fmtTime } from '../../lib/time'
+import { forceDownload } from '../../lib/r2'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const DISPLAY_STAGES = [
@@ -904,10 +905,10 @@ export default function ProjectDetail() {
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       {r.video_url && (
-                        <a href={r.video_url} download target="_blank" rel="noreferrer"
+                        <button onClick={() => forceDownload(r.video_url, `revision-${r.revision_number}.mp4`)}
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-xs font-semibold text-gray-700 transition-colors">
                           <Download size={12} /> Download
-                        </a>
+                        </button>
                       )}
                       <button
                         onClick={() => navigate(`/projects/${id}/revision/${r.id}`)}
