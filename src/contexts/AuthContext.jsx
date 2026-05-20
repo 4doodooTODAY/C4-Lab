@@ -26,6 +26,12 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(() => getCachedProfile())
   const [loading, setLoading] = useState(true)
+  const [viewMode, setViewModeState] = useState(() => localStorage.getItem('c4lab_viewmode') || 'admin')
+
+  const setViewMode = (mode) => {
+    localStorage.setItem('c4lab_viewmode', mode)
+    setViewModeState(mode)
+  }
 
   useEffect(() => {
     let mounted = true
@@ -96,7 +102,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signIn, signOut, createUser }}>
+    <AuthContext.Provider value={{ user, profile, loading, signIn, signOut, createUser, viewMode, setViewMode }}>
       {children}
     </AuthContext.Provider>
   )

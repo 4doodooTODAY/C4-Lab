@@ -1,7 +1,8 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Film, CalendarDays, Settings,
-  LogOut, Users, Building2, Inbox, Home, PenLine, Upload, MessageSquare, Bell, FolderKanban, HardDrive
+  LogOut, Users, Building2, Inbox, Home, MessageSquare, Bell, FolderKanban, HardDrive,
+  ShieldCheck, Scissors
 } from 'lucide-react'
 
 import { useAuth } from '../../contexts/AuthContext'
@@ -38,11 +39,23 @@ const NAV = {
 const ROLE_LABELS = { admin: 'Admin', creative: 'Creative', client: 'Client' }
 
 export default function Sidebar() {
-  const { profile, user, signOut } = useAuth()
+  const { profile, user, signOut, viewMode, setViewMode } = useAuth()
   const { unreadCount, setPanelOpen } = useNotifications()
+  const navigate = useNavigate()
   const role = profile?.role || 'creative'
-  const navItems = NAV[role] || NAV.creative
+  const isAdmin = role === 'admin'
+
+  // Admins use viewMode to pick which nav to show; others use their role
+  const effectiveNav = isAdmin ? (viewMode || 'admin') : role
+  const navItems = NAV[effectiveNav] || NAV.creative
+
   const displayName = profile?.full_name || user?.email || 'You'
+
+  const toggleView = () => {
+    const next = viewMode === 'admin' ? 'creative' : 'admin'
+    setViewMode(next)
+    navigate(next === 'creative' ? '/dashboard' : '/admin')
+  }
 
   return (
     <aside className="w-[220px] min-h-screen bg-sidebar flex flex-col shrink-0">
@@ -58,6 +71,27 @@ export default function Sidebar() {
           </div>
         </div>
       </div>
+
+      {/* Admin/Creative toggle — only for admins */}
+      {isAdmin && (
+        <div className="px-3 pt-3 pb-1">
+          <button
+            onClick={toggleView}
+            className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              {viewMode === 'admin'
+                ? <ShieldCheck size={13} className="text-accent" />
+                : <Scissors size={13} className="text-purple-400" />
+              }
+              <span className="text-xs font-semibold text-white/70">
+                {viewMode === 'admin' ? 'Admin View' : 'Creative View'}
+              </span>
+            </div>
+            <span className="text-[10px] text-white/30 font-medium">switch</span>
+          </button>
+        </div>
+      )}
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-0.5">

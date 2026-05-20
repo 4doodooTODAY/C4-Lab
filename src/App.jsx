@@ -63,10 +63,10 @@ function RoleSwitch({ admin, creative, client }) {
 }
 
 function RoleRedirect() {
-  const { profile, loading } = useAuth()
+  const { profile, loading, viewMode } = useAuth()
   if (loading) return null
   if (!profile) return <Navigate to="/login" replace />
-  if (profile.role === 'admin') return <Navigate to="/admin" replace />
+  if (profile.role === 'admin') return <Navigate to={viewMode === 'creative' ? '/dashboard' : '/admin'} replace />
   if (profile.role === 'creative') return <Navigate to="/dashboard" replace />
   if (profile.role === 'client') return <Navigate to="/client" replace />
   return <Navigate to="/login" replace />
@@ -152,7 +152,7 @@ function AppRoutes() {
             <ProtectedRoute roles={['admin', 'creative']}><CreativeDashboard /></ProtectedRoute>
           } />
           <Route path="/clients" element={
-            <ProtectedRoute roles={['creative']}><CreativeClients /></ProtectedRoute>
+            <ProtectedRoute roles={['creative', 'admin']}><CreativeClients /></ProtectedRoute>
           } />
           <Route path="/clients/:id" element={
             <ProtectedRoute roles={['creative', 'admin']}><CreativeClientPage /></ProtectedRoute>
