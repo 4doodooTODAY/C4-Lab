@@ -211,7 +211,6 @@ function PitchApprovalPanel({ project, profile, onApproved, onRefresh }) {
       await updateProject(project.id, {
         stage:             'pre_production',
         pitch_approved_by: profile.id,
-        pitch_approved_at: new Date().toISOString(),
       })
       // Notify the creative
       if (project.creative_id) {
@@ -843,7 +842,7 @@ export default function ProjectDetail() {
         <PitchApprovalPanel
           project={project}
           profile={profile}
-          onApproved={() => { updateProject(id, { stage: 'pre_production', pitch_approved_by: profile.id, pitch_approved_at: new Date().toISOString() }); refetch() }}
+          onApproved={() => { updateProject(id, { stage: 'pre_production', pitch_approved_by: profile.id }); refetch() }}
           onRefresh={refetch}
         />
       )}

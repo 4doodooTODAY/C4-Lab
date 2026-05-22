@@ -11,6 +11,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import Avatar from '../../components/ui/Avatar'
 import { format, parseISO, isBefore, startOfDay } from 'date-fns'
 import { useClientCreatives, assignCreative, removeCreativeAssignment } from '../../hooks/useClientCreatives'
+import { createProject } from '../../hooks/useProjects'
 import { useShoots, createShoot, updateShoot } from '../../hooks/useShoots'
 import { useContentDrafts, createDraft, updateDraft } from '../../hooks/useContentDrafts'
 import { fmtTime } from '../../lib/time'
@@ -945,10 +946,18 @@ function ContentTab({ clientId, shoots, projects, onRefetchProjects }) {
 // ── Tab: Projects ──────────────────────────────────────────────────────────────
 function ProjectsTab({ clientId, projects, onRefetch }) {
   const navigate = useNavigate()
+  const { profile } = useAuth()
   const [teamMembers, setTeamMembers] = useState([])
   const [assigningTo, setAssigningTo] = useState(null) // project id being assigned
   const [selectedEditor, setSelectedEditor] = useState('')
   const [saving, setSaving] = useState(false)
+
+  // New project mini-form
+  const [showNew, setShowNew]         = useState(false)
+  const [newName, setNewName]         = useState('')
+  const [newMediaType, setNewMediaType] = useState('video')
+  const [newEditor, setNewEditor]     = useState('')
+  const [creating, setCreating]       = useState(false)
 
   useEffect(() => {
     if (!clientId) return
@@ -969,16 +978,106 @@ function ProjectsTab({ clientId, projects, onRefetch }) {
     onRefetch?.()
   }
 
-  if (!projects.length) return (
-    <div className="card p-10 text-center">
-      <FolderKanban size={32} className="mx-auto text-text-muted/30 mb-3" />
-      <p className="text-sm font-semibold text-text-primary">No projects yet</p>
-      <p className="text-sm text-text-muted mt-1">Projects are created automatically when a concept is approved.</p>
-    </div>
-  )
+  const handleCreateProject = async (e) => {
+    e.preventDefault()
+    if (!newName.trim()) return
+    setCreating(true)
+    try {
+      const row = await createProject({
+        name:       newName.trim(),
+        client_id:  clientId,
+        stage:      'pitch',
+        status:     'active',
+        media_type: newMediaType,
+        editor_id:  newEditor || null,
+        created_by: profile?.id,
+      })
+      setShowNew(false)
+      setNewName('')
+      setNewMediaType('video')
+      setNewEditor('')
+      onRefetch?.()
+      navigate(`/projects/${row.id}`)
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setCreating(false)
+    }
+  }
 
   return (
     <div className="space-y-3">
+      {/* Header with Add button */}
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-text-muted">{projects.length} project{projects.length !== 1 ? 's' : ''}</p>
+        <button
+          onClick={() => setShowNew((v) => !v)}
+          className="btn-primary flex items-center gap-1.5 text-xs py-1.5"
+        >
+          <Plus size={13} /> New Project
+        </button>
+      </div>
+
+      {/* Inline new project form */}
+      {showNew && (
+        <form onSubmit={handleCreateProject} className="card p-4 space-y-3 border-accent/30 bg-accent/5">
+          <p className="text-sm font-semibold text-text-primary">New Project</p>
+          <div>
+            <label className="label">Project Name *</label>
+            <input
+              autoFocus
+              className="input"
+              placeholder="e.g. Summer Campaign"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              required
+            />
+          </div>
+          <div>
+            <label className="label">Type</label>
+            <div className="flex gap-2">
+              {['video', 'photo'].map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setNewMediaType(t)}
+                  className={`flex-1 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
+                    newMediaType === t ? 'border-accent bg-accent text-white' : 'border-border text-text-secondary hover:border-accent/50'
+                  }`}
+                >
+                  {t === 'video' ? '🎬 Video' : '📷 Photo'}
+                </button>
+              ))}
+            </div>
+          </div>
+          {teamMembers.length > 0 && (
+            <div>
+              <label className="label">Editor <span className="font-normal text-text-muted">(optional)</span></label>
+              <select className="input" value={newEditor} onChange={(e) => setNewEditor(e.target.value)}>
+                <option value="">— None —</option>
+                {teamMembers.map((m) => (
+                  <option key={m.id} value={m.id}>{m.full_name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          <div className="flex gap-2 justify-end">
+            <button type="button" onClick={() => setShowNew(false)} className="btn-secondary text-xs">Cancel</button>
+            <button type="submit" disabled={creating || !newName.trim()} className="btn-primary text-xs flex items-center gap-1.5 disabled:opacity-50">
+              {creating ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+              Create
+            </button>
+          </div>
+        </form>
+      )}
+
+      {projects.length === 0 && !showNew && (
+        <div className="card p-10 text-center">
+          <FolderKanban size={32} className="mx-auto text-text-muted/30 mb-3" />
+          <p className="text-sm font-semibold text-text-primary">No projects yet</p>
+          <p className="text-sm text-text-muted mt-1">Click "New Project" to create one for this client.</p>
+        </div>
+      )}
       {projects.map((p) => {
         const editorName = p.profiles?.full_name
         const isAssigning = assigningTo === p.id
