@@ -1393,6 +1393,7 @@ function UploadPhotoRevisionSection({ project, revisions, onRefresh }) {
         project_id:      project.id,
         revision_number: nextRevNum,
         photo_urls:      photoUrls,
+        video_url:       null,
         status:          'pending_client_review',
         uploaded_by:     profile.id,
         media_type:      'photo',
