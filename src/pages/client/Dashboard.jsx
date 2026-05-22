@@ -50,7 +50,7 @@ export default function ClientDashboard() {
             .eq('client_id', client.id)
             .order('created_at', { ascending: false }),
           supabase.from('project_revisions')
-            .select('id, project_id, revision_number, status, projects(id, name, client_id)')
+            .select('id, project_id, revision_number, status, media_type, projects(id, name, client_id, media_type)')
             .eq('status', 'pending_client_review'),
           supabase.from('shoots')
             .select('id, title, shoot_date, shoot_time, location, status')
@@ -76,9 +76,13 @@ export default function ClientDashboard() {
             actionItems.push({
               id:       `rev-${rev.id}`,
               type:     'review',
-              label:    rev.projects?.name || 'Your Video',
-              sub:      `Revision ${rev.revision_number} is ready to watch`,
-              href:     `/projects/${rev.project_id}/revision/${rev.id}`,
+              label:    rev.projects?.name || 'Your Project',
+              sub:      rev.media_type === 'photo' || rev.projects?.media_type === 'photo'
+                ? `Photos are ready for your review`
+                : `Revision ${rev.revision_number} is ready to watch`,
+              href:     rev.media_type === 'photo' || rev.projects?.media_type === 'photo'
+                ? `/projects/${rev.project_id}/photo-revision/${rev.id}`
+                : `/projects/${rev.project_id}/revision/${rev.id}`,
               priority: 1,
             })
           }

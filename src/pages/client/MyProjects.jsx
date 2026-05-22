@@ -499,10 +499,16 @@ function ProjectCard({ project, revisions, clientId, userId, onRefresh }) {
         {/* Primary CTA */}
         {canReview && pendingRevision && (
           <button
-            onClick={() => navigate(`/projects/${project.id}/revision/${pendingRevision.id}`)}
+            onClick={() => {
+              const isPhoto = project.media_type === 'photo' || pendingRevision.media_type === 'photo'
+              navigate(isPhoto
+                ? `/projects/${project.id}/photo-revision/${pendingRevision.id}`
+                : `/projects/${project.id}/revision/${pendingRevision.id}`
+              )
+            }}
             className="w-full py-3 px-5 rounded-xl font-semibold text-sm text-white bg-accent hover:bg-accent/90 transition-all flex items-center justify-center gap-2 mb-3 shadow-sm shadow-accent/20"
           >
-            Watch & Review <ArrowRight size={15} />
+            {project.media_type === 'photo' ? 'Review Photos' : 'Watch & Review'} <ArrowRight size={15} />
           </button>
         )}
 
@@ -557,7 +563,7 @@ export default function MyProjects() {
       .select(`
         id, name, stage, status, concept, notes, pitch_notes,
         target_date, due_date, shoot_date, location, max_revisions,
-        creative_id, editor_id
+        creative_id, editor_id, media_type
       `)
       .eq('client_id', client.id)
       .order('created_at', { ascending: false })
@@ -568,7 +574,7 @@ export default function MyProjects() {
 
     const [revRes, profilesRes] = await Promise.all([
       projectIds.length
-        ? supabase.from('project_revisions').select('id, project_id, revision_number, status').in('project_id', projectIds)
+        ? supabase.from('project_revisions').select('id, project_id, revision_number, status, media_type').in('project_id', projectIds)
         : Promise.resolve({ data: [] }),
       profileIds.length
         ? supabase.from('profiles').select('id, full_name').in('id', profileIds)

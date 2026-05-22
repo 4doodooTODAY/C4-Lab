@@ -128,9 +128,9 @@ function ItemDetail({ item, onApprove, onDecline, onClose, updating }) {
             </>
           )}
           {item.kind === 'review' && (
-            <button onClick={() => navigate(`/projects/${item.projectId}/revision/${item.revisionId}`)}
+            <button onClick={() => navigate(item.isPhoto ? `/projects/${item.projectId}/photo-revision/${item.revisionId}` : `/projects/${item.projectId}/revision/${item.revisionId}`)}
               className="btn-primary text-xs flex-1 flex items-center justify-center gap-1.5">
-              <Film size={11} /> Watch & Review
+              <Film size={11} /> {item.isPhoto ? 'Review Photos' : 'Watch & Review'}
             </button>
           )}
         </div>
@@ -182,7 +182,7 @@ function ListView({ allItems, onApprove, onDecline, updating }) {
               </>
             )}
             {item.kind === 'review' && (
-              <button onClick={() => navigate(`/projects/${item.projectId}/revision/${item.revisionId}`)}
+              <button onClick={() => navigate(item.isPhoto ? `/projects/${item.projectId}/photo-revision/${item.revisionId}` : `/projects/${item.projectId}/revision/${item.revisionId}`)}
                 className="text-xs px-3 py-1.5 rounded-lg bg-orange-500 text-white font-medium hover:bg-orange-600 transition-colors flex items-center gap-1">
                 <Film size={10} /> Watch & Review
               </button>
@@ -280,7 +280,7 @@ export default function ContentCalendar() {
       // Project revisions pending client review
       supabase
         .from('project_revisions')
-        .select('id, revision_number, created_at, projects!inner(id, name, client_id)')
+        .select('id, revision_number, created_at, media_type, projects!inner(id, name, client_id, media_type)')
         .eq('status', 'pending_client_review')
         .eq('projects.client_id', clientId),
     ])
@@ -347,6 +347,7 @@ export default function ContentCalendar() {
         dateLabel:  format(new Date(r.created_at), 'MMM d'),
         projectId:  r.projects?.id,
         revisionId: r.id,
+        isPhoto:    r.media_type === 'photo' || r.projects?.media_type === 'photo',
       })
     })
 
