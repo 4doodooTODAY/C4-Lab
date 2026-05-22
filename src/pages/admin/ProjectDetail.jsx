@@ -1282,12 +1282,14 @@ export default function ProjectDetail() {
               >
                 <MessageSquare size={14} /> Messages
               </Link>
-              <Link
-                to={project.clients?.id ? `/videos?client=${project.clients.id}` : '/videos'}
-                className="flex items-center gap-2 text-sm text-accent hover:underline"
-              >
-                <Film size={14} /> Video Review
-              </Link>
+              {project?.media_type !== 'photo' && (
+                <Link
+                  to={project.clients?.id ? `/videos?client=${project.clients.id}` : '/videos'}
+                  className="flex items-center gap-2 text-sm text-accent hover:underline"
+                >
+                  <Film size={14} /> Video Review
+                </Link>
+              )}
               <Link
                 to={`/projects/${id}/creative`}
                 className="flex items-center gap-2 text-sm text-accent hover:underline"

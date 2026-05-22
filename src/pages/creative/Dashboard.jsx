@@ -134,36 +134,37 @@ export default function CreativeDashboard() {
       const cutoff  = addDays(now, 21) // look 3 weeks ahead
 
       // My projects (or all for admin)
-      let projData = []
+      // Fetch projects + events in parallel
+      let projQuery
       if (isAdmin) {
-        const { data } = await supabase
+        projQuery = supabase
           .from('projects')
           .select('id, name, stage, shoot_date, location, creative_id, editor_id, clients(name, contact_name), creative:profiles!creative_id(id, full_name), editor:profiles!editor_id(id, full_name)')
           .neq('stage', 'archived')
           .order('shoot_date', { ascending: true, nullsFirst: false })
-        projData = data || []
       } else {
-        // scope to clients this creative/editor is assigned to
-        const { data: ccRows } = await supabase
-          .from('client_creatives')
-          .select('client_id')
-          .eq('profile_id', user.id)
-        const clientIds = (ccRows || []).map((r) => r.client_id).filter(Boolean)
-        if (clientIds.length) {
-          const { data } = await supabase
-            .from('projects')
-            .select('id, name, stage, shoot_date, location, editor_id, clients(name, contact_name), editor:profiles!editor_id(id, full_name)')
-            .neq('stage', 'archived')
-            .in('client_id', clientIds)
-            .order('shoot_date', { ascending: true, nullsFirst: false })
-          projData = data || []
-        }
+        projQuery = supabase
+          .from('projects')
+          .select('id, name, stage, shoot_date, location, editor_id, clients(name, contact_name), editor:profiles!editor_id(id, full_name)')
+          .neq('stage', 'archived')
+          .or(`creative_id.eq.${user.id},editor_id.eq.${user.id}`)
+          .order('shoot_date', { ascending: true, nullsFirst: false })
       }
+
+      const [{ data: projData }, { data: evtData }] = await Promise.all([
+        projQuery,
+        supabase
+          .from('calendar_events')
+          .select('id, title, start_at, end_at, event_type, location, all_day, calendar_event_members(profile_id)')
+          .gte('start_at', now.toISOString())
+          .lte('start_at', cutoff.toISOString())
+          .order('start_at'),
+      ])
 
       const myProjects = projData || []
       const projectIds = myProjects.map((p) => p.id)
 
-      // Revisions for those projects
+      // Revisions — only if there are projects
       const { data: revData } = projectIds.length
         ? await supabase
             .from('project_revisions')
@@ -171,14 +172,6 @@ export default function CreativeDashboard() {
             .in('project_id', projectIds)
             .order('revision_number')
         : { data: [] }
-
-      // Upcoming calendar events (next 3 weeks) that I'm part of (or visible)
-      const { data: evtData } = await supabase
-        .from('calendar_events')
-        .select('id, title, start_at, end_at, event_type, location, all_day, calendar_event_members(profile_id)')
-        .gte('start_at', now.toISOString())
-        .lte('start_at', cutoff.toISOString())
-        .order('start_at')
 
       // Filter: show event if not personal, OR if user is a member
       const visibleEvents = (evtData || []).filter((e) => {

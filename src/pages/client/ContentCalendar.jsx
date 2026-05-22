@@ -161,7 +161,7 @@ function ListView({ allItems, onApprove, onDecline, updating }) {
             {item.kind === 'shoot'    ? 'Shoot Day' :
              item.kind === 'draft'    ? `${DRAFT_TYPE_LABELS[item.type] || 'Draft'} — Needs Approval` :
              item.kind === 'approved' ? `${DRAFT_TYPE_LABELS[item.type] || 'Content'} — Approved` :
-             item.kind === 'review'   ? 'Video Ready to Review' : 'Event'}
+             item.kind === 'review'   ? (item.isPhoto ? 'Photos Ready to Review' : 'Video Ready to Review') : 'Event'}
           </p>
           <p className="text-sm font-semibold text-text-primary">{item.title}</p>
           {item.dateLabel && <p className="text-xs text-text-muted mt-0.5">{item.dateLabel}</p>}
@@ -184,7 +184,7 @@ function ListView({ allItems, onApprove, onDecline, updating }) {
             {item.kind === 'review' && (
               <button onClick={() => navigate(item.isPhoto ? `/projects/${item.projectId}/photo-revision/${item.revisionId}` : `/projects/${item.projectId}/revision/${item.revisionId}`)}
                 className="text-xs px-3 py-1.5 rounded-lg bg-orange-500 text-white font-medium hover:bg-orange-600 transition-colors flex items-center gap-1">
-                <Film size={10} /> Watch & Review
+                {item.isPhoto ? <><Camera size={10} /> Review Photos</> : <><Film size={10} /> Watch & Review</>}
               </button>
             )}
           </div>

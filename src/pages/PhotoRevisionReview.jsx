@@ -101,23 +101,27 @@ export default function PhotoRevisionReview() {
 
   const fetchAll = useCallback(async () => {
     try {
-      const { data: rev } = await supabase
-        .from('project_revisions')
-        .select('*, projects(id, name, client_id, editor_id, creative_id)')
-        .eq('id', revisionId)
-        .single()
-      if (!rev) { setError('Revision not found'); setLoading(false); return }
-      setRevision(rev)
-      setProject(rev.projects)
-
-      const [{ data: cmts }, { data: editors }] = await Promise.all([
-        supabase.from('photo_revision_comments')
+      // Fetch revision + comments in parallel (we have revisionId for both)
+      const [{ data: rev }, { data: cmts }] = await Promise.all([
+        supabase
+          .from('project_revisions')
+          .select('*, projects(id, name, client_id, editor_id, creative_id)')
+          .eq('id', revisionId)
+          .single(),
+        supabase
+          .from('photo_revision_comments')
           .select('*, profiles(id, full_name, avatar_url)')
           .eq('revision_id', revisionId)
           .order('created_at'),
-        supabase.from('project_editors').select('profile_id').eq('project_id', rev.projects.id),
       ])
+      if (!rev) { setError('Revision not found'); setLoading(false); return }
+      setRevision(rev)
+      setProject(rev.projects)
       setComments(cmts || [])
+
+      // Fetch editors (needs project_id from revision)
+      const { data: editors } = await supabase
+        .from('project_editors').select('profile_id').eq('project_id', rev.projects.id)
       setProjectEditorIds((editors || []).map((r) => r.profile_id))
     } catch (e) {
       setError(e.message)
@@ -153,23 +157,27 @@ export default function PhotoRevisionReview() {
   const handleSavePin = async () => {
     if (!pendingPin || !newComment.trim()) return
     setSaving(true)
-    const { data } = await supabase
-      .from('photo_revision_comments')
-      .insert({
-        revision_id:  revisionId,
-        photo_index:  photoIndex,
-        x_pct:        parseFloat(pendingPin.x_pct.toFixed(2)),
-        y_pct:        parseFloat(pendingPin.y_pct.toFixed(2)),
-        body:         newComment.trim(),
-        profile_id:   myId,
-        status:       'pending',
-      })
-      .select('*, profiles(id, full_name, avatar_url)')
-      .single()
-    if (data) setComments((prev) => [...prev, data])
-    setPendingPin(null)
-    setNewComment('')
-    setSaving(false)
+    try {
+      const { data, error: insErr } = await supabase
+        .from('photo_revision_comments')
+        .insert({
+          revision_id:  revisionId,
+          photo_index:  photoIndex,
+          x_pct:        parseFloat(pendingPin.x_pct.toFixed(2)),
+          y_pct:        parseFloat(pendingPin.y_pct.toFixed(2)),
+          body:         newComment.trim(),
+          profile_id:   myId,
+          status:       'pending',
+        })
+        .select('*, profiles(id, full_name, avatar_url)')
+        .single()
+      if (insErr) { setError(insErr.message); return }
+      if (data) setComments((prev) => [...prev, data])
+      setPendingPin(null)
+      setNewComment('')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleStatusChange = async (commentId, status) => {
@@ -338,6 +346,12 @@ export default function PhotoRevisionReview() {
             </p>
           </div>
 
+          {error && (
+            <div className="mx-3 mt-2 p-2 rounded-lg bg-red-50 border border-red-200">
+              <p className="text-xs text-red-600">{error}</p>
+              <button onClick={() => setError('')} className="text-[10px] text-red-400 hover:text-red-600 mt-0.5">Dismiss</button>
+            </div>
+          )}
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
             {commentsOnCurrentPhoto.length === 0 && !pendingPin && (
               <p className="text-xs text-text-muted text-center mt-8">
