@@ -82,13 +82,14 @@ export default function PhotoRevisionReview() {
   const myId   = profile?.id
   const myRole = profile?.role
 
-  const [revision,   setRevision]   = useState(null)
-  const [project,    setProject]    = useState(null)
-  const [comments,   setComments]   = useState([])
-  const [loading,    setLoading]    = useState(true)
-  const [error,      setError]      = useState('')
-  const [sending,    setSending]    = useState(false)
-  const [approving,  setApproving]  = useState(false)
+  const [revision,        setRevision]        = useState(null)
+  const [project,         setProject]         = useState(null)
+  const [comments,        setComments]        = useState([])
+  const [projectEditorIds,setProjectEditorIds]= useState([])
+  const [loading,         setLoading]         = useState(true)
+  const [error,           setError]           = useState('')
+  const [sending,         setSending]         = useState(false)
+  const [approving,       setApproving]       = useState(false)
 
   const [photoIndex,  setPhotoIndex]  = useState(0)
   const [selectedPin, setSelectedPin] = useState(null)
@@ -109,12 +110,15 @@ export default function PhotoRevisionReview() {
       setRevision(rev)
       setProject(rev.projects)
 
-      const { data: cmts } = await supabase
-        .from('photo_revision_comments')
-        .select('*, profiles(id, full_name, avatar_url)')
-        .eq('revision_id', revisionId)
-        .order('created_at')
+      const [{ data: cmts }, { data: editors }] = await Promise.all([
+        supabase.from('photo_revision_comments')
+          .select('*, profiles(id, full_name, avatar_url)')
+          .eq('revision_id', revisionId)
+          .order('created_at'),
+        supabase.from('project_editors').select('profile_id').eq('project_id', rev.projects.id),
+      ])
       setComments(cmts || [])
+      setProjectEditorIds((editors || []).map((r) => r.profile_id))
     } catch (e) {
       setError(e.message)
     } finally {
@@ -130,7 +134,7 @@ export default function PhotoRevisionReview() {
   const commentsOnCurrentPhoto = comments.filter((c) => c.photo_index === photoIndex)
 
   const isPhotographer = myRole === 'creative' || (project && project.creative_id === myId)
-  const isEditor       = project?.editor_id === myId
+  const isEditor       = projectEditorIds.includes(myId) || project?.editor_id === myId
   const isClient       = myRole === 'client'
   const canAddPins     = isClient && revision?.status === 'pending_client_review'
   const canActOnPins   = (isPhotographer || isEditor || isAdmin) && revision?.status !== 'pending_client_review'
@@ -190,17 +194,18 @@ export default function PhotoRevisionReview() {
         .update({ status: 'pending_editor' })
         .eq('id', revisionId)
       setRevision((r) => ({ ...r, status: 'pending_editor' }))
-      if (project?.editor_id) {
+      const editorIds = projectEditorIds.length ? projectEditorIds : [project?.editor_id].filter(Boolean)
+      if (editorIds.length) {
         const { notify } = await import('../lib/notify')
         const pendingCount = comments.filter((c) => c.status === 'pending').length
-        await notify({
-          profileId: project.editor_id,
+        await Promise.all(editorIds.map((eid) => notify({
+          profileId: eid,
           actorId:   myId,
           type:      'revision_feedback',
           title:     `Photo feedback submitted for "${project.name}"`,
           body:      `The client left ${pendingCount} comment${pendingCount !== 1 ? 's' : ''} on the photos.`,
           link:      `/projects/${project.id}/photo-revision/${revisionId}`,
-        })
+        })))
       }
     } catch (err) {
       console.error(err)

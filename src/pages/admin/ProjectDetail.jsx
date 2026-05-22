@@ -416,7 +416,7 @@ export default function ProjectDetail() {
 
   // Assigned creative/editor profiles
   const [creativeProfile, setCreativeProfile] = useState(null)
-  const [editorProfile, setEditorProfile]     = useState(null)
+  const [editorProfiles, setEditorProfiles]   = useState([])   // multiple editors
 
   // Inline assign state
   const [assignProfiles, setAssignProfiles]         = useState([])
@@ -426,6 +426,7 @@ export default function ProjectDetail() {
   const [assigningEditor, setAssigningEditor]       = useState(false)
   const [showCreativeSelect, setShowCreativeSelect] = useState(false)
   const [showEditorSelect, setShowEditorSelect]     = useState(false)
+  const [removingEditor, setRemovingEditor]         = useState(null)
 
   useEffect(() => {
     if (project) {
@@ -566,12 +567,12 @@ export default function ProjectDetail() {
     } else {
       setCreativeProfile(null)
     }
-    if (project.editor_id) {
-      supabase.from('profiles').select('id, full_name, avatar_url').eq('id', project.editor_id).single()
-        .then(({ data }) => setEditorProfile(data))
-    } else {
-      setEditorProfile(null)
-    }
+    // Fetch all editors from junction table
+    supabase
+      .from('project_editors')
+      .select('profile_id, profiles(id, full_name, avatar_url)')
+      .eq('project_id', project.id)
+      .then(({ data }) => setEditorProfiles((data || []).map((r) => r.profiles).filter(Boolean)))
   }, [project])
 
   useEffect(() => {
@@ -599,14 +600,36 @@ export default function ProjectDetail() {
     if (!selectedEditor) return
     setAssigningEditor(true)
     try {
-      await updateProject(id, { editor_id: selectedEditor })
+      // Upsert into junction table
+      await supabase.from('project_editors').upsert({ project_id: id, profile_id: selectedEditor })
+      // Keep editor_id in sync (use first editor as primary for backward compat)
+      if (editorProfiles.length === 0) {
+        await updateProject(id, { editor_id: selectedEditor })
+      }
+      // Update local state
+      const { data: prof } = await supabase.from('profiles').select('id, full_name, avatar_url').eq('id', selectedEditor).single()
+      if (prof) setEditorProfiles((prev) => prev.some((p) => p.id === prof.id) ? prev : [...prev, prof])
       setShowEditorSelect(false)
       setSelectedEditor('')
-      refetch()
     } catch (err) {
       setActionError(err.message)
     } finally {
       setAssigningEditor(false)
+    }
+  }
+
+  const handleRemoveEditor = async (profileId) => {
+    setRemovingEditor(profileId)
+    try {
+      await supabase.from('project_editors').delete().eq('project_id', id).eq('profile_id', profileId)
+      const remaining = editorProfiles.filter((p) => p.id !== profileId)
+      setEditorProfiles(remaining)
+      // Update editor_id to next remaining editor or null
+      await updateProject(id, { editor_id: remaining[0]?.id || null })
+    } catch (err) {
+      setActionError(err.message)
+    } finally {
+      setRemovingEditor(null)
     }
   }
 
@@ -788,7 +811,7 @@ export default function ProjectDetail() {
       {/* Who's Up */}
       <WhosUpBanner
         stage={project.stage}
-        editorProfile={editorProfile}
+        editorProfile={editorProfiles[0] || null}
         creativeProfile={creativeProfile}
         onBeginProject={handleBeginProject}
         isAdmin={isAdmin}
@@ -986,59 +1009,78 @@ export default function ProjectDetail() {
 
           <div className="border-t border-border" />
 
-          {/* Editor row */}
-          <div className="flex items-center gap-3">
-            <div className="w-6 flex items-center justify-center shrink-0">
+          {/* Editor row — multiple editors */}
+          <div className="flex gap-3">
+            <div className="w-6 flex items-center justify-center shrink-0 mt-1">
               <Scissors size={13} className="text-text-muted" />
             </div>
-            <span className="text-xs text-text-muted w-14 shrink-0">Editor</span>
-            {editorProfile ? (
-              <div className="flex items-center gap-3 flex-1">
-                <Avatar name={editorProfile.full_name} url={editorProfile.avatar_url} size={8} />
-                <p className="text-sm font-medium text-text-primary flex-1">{editorProfile.full_name}</p>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs text-text-muted">Editor{editorProfiles.length !== 1 ? 's' : ''}</span>
                 {isAdmin && !showEditorSelect && (
                   <button
                     onClick={() => { setShowEditorSelect(true); setSelectedEditor('') }}
-                    className="text-xs text-accent hover:text-accent/80 font-medium shrink-0"
+                    className="text-[11px] text-accent hover:text-accent/80 font-medium flex items-center gap-0.5"
                   >
-                    Change
+                    <Plus size={11} /> Add
                   </button>
                 )}
               </div>
-            ) : (
-              <button
-                onClick={() => isAdmin && setShowEditorSelect(true)}
-                className={`text-sm flex-1 text-left ${isAdmin ? 'text-text-muted/60 italic hover:text-accent transition-colors cursor-pointer' : 'text-text-muted/60 italic'}`}
-              >
-                Unassigned — {isAdmin ? 'click to assign' : 'not yet assigned'}
-              </button>
-            )}
-          </div>
-          {isAdmin && showEditorSelect && (
-            <div className="flex items-center gap-2 ml-10">
-              <select
-                className="input flex-1 text-sm"
-                value={selectedEditor}
-                onChange={(e) => setSelectedEditor(e.target.value)}
-              >
-                <option value="">— Select editor —</option>
-                {assignProfiles.map((p) => (
-                  <option key={p.id} value={p.id}>{p.full_name}</option>
-                ))}
-              </select>
-              <button
-                onClick={handleAssignEditor}
-                disabled={!selectedEditor || assigningEditor}
-                className="btn-primary text-xs px-3 py-1.5 flex items-center gap-1 disabled:opacity-50 shrink-0"
-              >
-                {assigningEditor ? <Loader2 size={12} className="animate-spin" /> : null}
-                Assign
-              </button>
-              <button onClick={() => setShowEditorSelect(false)} className="btn-ghost p-1.5 shrink-0">
-                <X size={14} />
-              </button>
+              {editorProfiles.length === 0 ? (
+                <button
+                  onClick={() => isAdmin && setShowEditorSelect(true)}
+                  className={`text-sm ${isAdmin ? 'text-text-muted/60 italic hover:text-accent transition-colors cursor-pointer' : 'text-text-muted/60 italic'}`}
+                >
+                  Unassigned — {isAdmin ? 'click to assign' : 'not yet assigned'}
+                </button>
+              ) : (
+                <div className="space-y-1.5">
+                  {editorProfiles.map((ep) => (
+                    <div key={ep.id} className="flex items-center gap-2">
+                      <Avatar name={ep.full_name} url={ep.avatar_url} size={7} />
+                      <p className="text-sm font-medium text-text-primary flex-1">{ep.full_name}</p>
+                      {isAdmin && (
+                        <button
+                          onClick={() => handleRemoveEditor(ep.id)}
+                          disabled={removingEditor === ep.id}
+                          className="text-text-muted hover:text-red-500 transition-colors"
+                        >
+                          {removingEditor === ep.id ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {isAdmin && showEditorSelect && (
+                <div className="flex items-center gap-2 mt-2">
+                  <select
+                    className="input flex-1 text-sm"
+                    value={selectedEditor}
+                    onChange={(e) => setSelectedEditor(e.target.value)}
+                  >
+                    <option value="">— Select editor —</option>
+                    {assignProfiles
+                      .filter((p) => !editorProfiles.some((ep) => ep.id === p.id))
+                      .map((p) => (
+                        <option key={p.id} value={p.id}>{p.full_name}</option>
+                      ))}
+                  </select>
+                  <button
+                    onClick={handleAssignEditor}
+                    disabled={!selectedEditor || assigningEditor}
+                    className="btn-primary text-xs px-3 py-1.5 flex items-center gap-1 disabled:opacity-50 shrink-0"
+                  >
+                    {assigningEditor ? <Loader2 size={12} className="animate-spin" /> : null}
+                    Add
+                  </button>
+                  <button onClick={() => setShowEditorSelect(false)} className="btn-ghost p-1.5 shrink-0">
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
       </div>
 

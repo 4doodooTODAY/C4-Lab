@@ -168,11 +168,12 @@ export default function VideoRevisionReview() {
   const videoRef      = useRef(null)
   const timelineRef   = useRef(null)
 
-  const [revision,  setRevision]  = useState(null)
-  const [project,   setProject]   = useState(null)
-  const [comments,  setComments]  = useState([])
-  const [loading,   setLoading]   = useState(true)
-  const [error,     setError]     = useState('')
+  const [revision,         setRevision]         = useState(null)
+  const [project,          setProject]          = useState(null)
+  const [comments,         setComments]         = useState([])
+  const [projectEditorIds, setProjectEditorIds] = useState([])
+  const [loading,          setLoading]          = useState(true)
+  const [error,            setError]            = useState('')
 
   const [duration,  setDuration]  = useState(0)
   const [currentTime, setCurrentTime] = useState(0)
@@ -205,6 +206,11 @@ export default function VideoRevisionReview() {
       setRevision(revRes.data)
       setProject(revRes.data.projects)
 
+      // Fetch all editors for this project
+      const { data: editors } = await supabase
+        .from('project_editors').select('profile_id').eq('project_id', revRes.data.projects.id)
+      setProjectEditorIds((editors || []).map((r) => r.profile_id))
+
       // Attach author_role from profiles join
       const enriched = (commRes.data || []).map((c) => ({
         ...c,
@@ -224,7 +230,7 @@ export default function VideoRevisionReview() {
   const myId           = profile?.id
   const isAdmin        = ctxIsAdmin  // respects creative view mode
   const isPhotographer = myRole === 'creative' || (project && project.creative_id === myId)
-  const isEditor       = project && project.editor_id === myId
+  const isEditor       = projectEditorIds.includes(myId) || (project && project.editor_id === myId)
   const isCreative     = isPhotographer || isEditor  // legacy compat
   const isClient       = myRole === 'client'
 
@@ -335,17 +341,16 @@ export default function VideoRevisionReview() {
         .eq('id', project.id)
       if (e2) throw new Error(e2.message)
 
-      // Notify editor
+      // Notify all editors
       const projectLink = `/projects/${project.id}`
-      if (project.editor_id) {
-        await notify({
-          profileId: project.editor_id, actorId: myId,
-          type: 'client_feedback_sent',
-          title: `Client sent feedback on "${project.name}"`,
-          body: `Review the comments and upload a revised cut.`,
-          link: `/projects/${project.id}/revision/${revisionId}`,
-        })
-      }
+      const editorIds = projectEditorIds.length ? projectEditorIds : [project.editor_id].filter(Boolean)
+      await Promise.all(editorIds.map((eid) => notify({
+        profileId: eid, actorId: myId,
+        type: 'client_feedback_sent',
+        title: `Client sent feedback on "${project.name}"`,
+        body: `Review the comments and upload a revised cut.`,
+        link: `/projects/${project.id}/revision/${revisionId}`,
+      })))
       await notifyAdmins({
         actorId: myId, type: 'client_feedback_sent',
         title: `Client feedback sent to editor on "${project.name}"`,
@@ -382,8 +387,9 @@ export default function VideoRevisionReview() {
       const link = `/projects/${project.id}`
       const notifTargets = []
 
-      // Editor
-      if (project.editor_id) notifTargets.push(project.editor_id)
+      // All editors
+      const allEditorIds = projectEditorIds.length ? projectEditorIds : [project.editor_id].filter(Boolean)
+      allEditorIds.forEach((eid) => notifTargets.push(eid))
 
       // All admins
       const { data: admins } = await supabase

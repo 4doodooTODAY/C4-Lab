@@ -1946,6 +1946,7 @@ export default function ProjectWorkflow() {
   const [commentCounts,  setCommentCounts]  = useState({})
   const [creativeProfile, setCreativeProfile] = useState(null)
   const [editorProfile,   setEditorProfile]   = useState(null)
+  const [projectEditorIds, setProjectEditorIds] = useState([])
   const [loading,        setLoading]        = useState(true)
   const [error,          setError]          = useState('')
 
@@ -1969,7 +1970,7 @@ export default function ProjectWorkflow() {
       if (projErr) throw projErr
 
       // 2. Fetch everything else in parallel
-      const [shootsRes, uploadsRes, shootUploadsRes, notesRes, revsRes] = await Promise.all([
+      const [shootsRes, uploadsRes, shootUploadsRes, notesRes, revsRes, editorsRes] = await Promise.all([
         supabase.from('project_shoots').select('*').eq('project_id', id).order('shoot_date'),
         supabase.from('shoot_uploads').select('*, profiles(id, full_name, role)').eq('project_id', id).order('created_at'),
         projData.shoot_id
@@ -1977,7 +1978,9 @@ export default function ProjectWorkflow() {
           : Promise.resolve({ data: [] }),
         supabase.from('shoot_notes').select('*').eq('project_id', id).order('created_at'),
         supabase.from('project_revisions').select('*').eq('project_id', id).order('revision_number'),
+        supabase.from('project_editors').select('profile_id').eq('project_id', id),
       ])
+      setProjectEditorIds((editorsRes.data || []).map((r) => r.profile_id))
 
       const revData = revsRes.data || []
 
@@ -2143,7 +2146,7 @@ export default function ProjectWorkflow() {
   }
 
   const isCreative = profile?.role === 'creative' || project.creative_id === profile?.id || isAdmin
-  const isEditor   = project.editor_id   === profile?.id || isAdmin
+  const isEditor   = projectEditorIds.includes(profile?.id) || project.editor_id === profile?.id || isAdmin
   return (
     <div className="p-8 max-w-4xl">
       {/* Back link */}
