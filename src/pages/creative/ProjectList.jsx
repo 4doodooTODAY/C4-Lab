@@ -134,6 +134,7 @@ export default function CreativeProjectList() {
   const { profile } = useAuth()
   const navigate    = useNavigate()
   const myId        = profile?.id
+  const isEditor    = profile?.role === 'editor'
 
   const [shoots,       setShoots]       = useState([])
   const [edits,        setEdits]        = useState([])
@@ -146,22 +147,24 @@ export default function CreativeProjectList() {
     setLoading(true)
 
     Promise.all([
-      // My Shoots — actual shoot records for clients I'm assigned to
-      supabase
-        .from('client_creatives')
-        .select('client_id')
-        .eq('profile_id', myId)
-        .then(async ({ data: assignments }) => {
-          if (!assignments?.length) return []
-          const clientIds = assignments.map((a) => a.client_id)
-          const { data } = await supabase
-            .from('shoots')
-            .select('id, title, creative_notes, shoot_date, shoot_time, location, status, client_id, clients(name, contact_name)')
-            .in('client_id', clientIds)
-            .neq('status', 'cancelled')
-            .order('shoot_date', { ascending: true })
-          return data || []
-        }),
+      // My Shoots — creatives only, editors skip this
+      isEditor
+        ? Promise.resolve([])
+        : supabase
+            .from('client_creatives')
+            .select('client_id')
+            .eq('profile_id', myId)
+            .then(async ({ data: assignments }) => {
+              if (!assignments?.length) return []
+              const clientIds = assignments.map((a) => a.client_id)
+              const { data } = await supabase
+                .from('shoots')
+                .select('id, title, creative_notes, shoot_date, shoot_time, location, status, client_id, clients(name, contact_name)')
+                .in('client_id', clientIds)
+                .neq('status', 'cancelled')
+                .order('shoot_date', { ascending: true })
+              return data || []
+            }),
 
       // My Edits — projects where I'm the editor or creative, scoped to my assigned clients
       supabase
@@ -210,38 +213,43 @@ export default function CreativeProjectList() {
     <div className="p-8 max-w-4xl">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-text-primary">My Work</h1>
-        <p className="text-sm text-text-muted mt-1">Your shoots and editing assignments</p>
+        <p className="text-sm text-text-muted mt-1">
+          {isEditor ? 'Your editing projects' : 'Your shoots and editing assignments'}
+        </p>
       </div>
 
-      {/* My Shoots — active */}
-      <section className="mb-10">
-        <div className="flex items-center gap-2 mb-4">
-          <Camera size={16} className="text-text-muted" />
-          <h2 className="text-base font-semibold text-text-primary">My Shoots</h2>
-          <span className="text-xs text-text-muted bg-surface-2 px-2 py-0.5 rounded-full">{activeShots.length}</span>
-        </div>
-        {activeShots.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-border p-8 text-center">
-            <Camera size={32} className="mx-auto text-text-muted/30 mb-3" />
-            <p className="text-sm text-text-muted">No shoots scheduled for your clients yet.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {activeShots.map((s) => (
-              <ShootCard key={s.id} shoot={s} onOpen={setDetailShoot} onMarkDone={onMarkShootDone} />
-            ))}
-          </div>
-        )}
-      </section>
+      {/* My Shoots — creatives only */}
+      {!isEditor && (
+        <>
+          <section className="mb-10">
+            <div className="flex items-center gap-2 mb-4">
+              <Camera size={16} className="text-text-muted" />
+              <h2 className="text-base font-semibold text-text-primary">My Shoots</h2>
+              <span className="text-xs text-text-muted bg-surface-2 px-2 py-0.5 rounded-full">{activeShots.length}</span>
+            </div>
+            {activeShots.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-border p-8 text-center">
+                <Camera size={32} className="mx-auto text-text-muted/30 mb-3" />
+                <p className="text-sm text-text-muted">No shoots scheduled for your clients yet.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {activeShots.map((s) => (
+                  <ShootCard key={s.id} shoot={s} onOpen={setDetailShoot} onMarkDone={onMarkShootDone} />
+                ))}
+              </div>
+            )}
+          </section>
 
-      {/* Shoot detail modal */}
-      {detailShoot && (
-        <ShootDetailModal
-          shoot={detailShoot}
-          clientId={detailShoot.client_id}
-          clientName={detailShoot.clients?.name || detailShoot.clients?.contact_name || ''}
-          onClose={() => setDetailShoot(null)}
-        />
+          {detailShoot && (
+            <ShootDetailModal
+              shoot={detailShoot}
+              clientId={detailShoot.client_id}
+              clientName={detailShoot.clients?.name || detailShoot.clients?.contact_name || ''}
+              onClose={() => setDetailShoot(null)}
+            />
+          )}
+        </>
       )}
 
       {/* My Edits — active */}
