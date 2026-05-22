@@ -173,9 +173,8 @@ export default function CreativeProjectList() {
           if (!clientIds.length) return { data: [] }
           return supabase
             .from('projects')
-            .select('id, name, stage, editor_id, creative_id, client_id, clients(name, contact_name)')
-            .or(`editor_id.eq.${myId},creative_id.eq.${myId}`)
-            .in('client_id', clientIds)
+            .select('id, name, stage, editor_id, client_id, clients(name, contact_name)')
+            .eq('editor_id', myId)
             .order('created_at', { ascending: false })
         }),
 

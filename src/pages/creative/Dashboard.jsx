@@ -152,10 +152,9 @@ export default function CreativeDashboard() {
         if (clientIds.length) {
           const { data } = await supabase
             .from('projects')
-            .select('id, name, stage, shoot_date, location, creative_id, editor_id, clients(name, contact_name), creative:profiles!creative_id(id, full_name), editor:profiles!editor_id(id, full_name)')
+            .select('id, name, stage, shoot_date, location, editor_id, clients(name, contact_name), editor:profiles!editor_id(id, full_name)')
             .neq('stage', 'archived')
-            .or(`creative_id.eq.${user.id},editor_id.eq.${user.id}`)
-            .in('client_id', clientIds)
+            .eq('editor_id', user.id)
             .order('shoot_date', { ascending: true, nullsFirst: false })
           projData = data || []
         }
