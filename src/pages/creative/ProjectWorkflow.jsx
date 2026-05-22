@@ -1356,16 +1356,17 @@ function UploadPhotoRevisionSection({ project, revisions, onRefresh }) {
   const { profile } = useAuth()
   const fileInputRef = useRef()
 
-  const [open,      setOpen]     = useState(false)
-  const [photos,    setPhotos]   = useState([])  // File[]
-  const [uploading, setUploading] = useState(false)
+  const [open,        setOpen]        = useState(false)
+  const [photos,      setPhotos]      = useState([])   // File[]
+  const [uploading,   setUploading]   = useState(false)
   const [uploadError, setUploadError] = useState('')
-  const [editorNote, setEditorNote] = useState('')
+  const [editorNote,  setEditorNote]  = useState('')
+  const [doneCount,   setDoneCount]   = useState(0)    // how many photos uploaded so far
+  const [currentPct,  setCurrentPct]  = useState(0)    // progress of current file
 
   const stage     = STAGE_KEY_MAP[project.stage] || project.stage
   const latestRev = [...revisions].sort((a, b) => b.revision_number - a.revision_number)[0]
   const nextRevNum = latestRev ? latestRev.revision_number + 1 : 1
-  // Photo projects can upload at any active stage (production or post_production), or when client has returned feedback
   const canUpload = ['production', 'post_production'].includes(stage) || (latestRev && latestRev.status === 'pending_editor')
   const pendingAdminRev = revisions.find((r) => r.status === 'pending_admin_review')
   if (!canUpload || pendingAdminRev) return null
@@ -1374,10 +1375,13 @@ function UploadPhotoRevisionSection({ project, revisions, onRefresh }) {
     if (photos.length === 0) return
     setUploading(true)
     setUploadError('')
+    setDoneCount(0)
+    setCurrentPct(0)
     try {
-      // Upload each photo to R2 and collect URLs
       const photoUrls = []
-      for (const file of photos) {
+      for (let i = 0; i < photos.length; i++) {
+        const file = photos[i]
+        setCurrentPct(0)
         const { publicUrl } = await uploadToR2({
           file,
           category:    'revisions',
@@ -1385,8 +1389,10 @@ function UploadPhotoRevisionSection({ project, revisions, onRefresh }) {
           projectName: project.name,
           folderType:  'shoots',
           shootDate:   project.shoot_date || null,
+          onProgress:  (p) => setCurrentPct(p),
         })
         photoUrls.push(publicUrl)
+        setDoneCount(i + 1)
       }
 
       const { error: e } = await supabase.from('project_revisions').insert({
@@ -1421,6 +1427,8 @@ function UploadPhotoRevisionSection({ project, revisions, onRefresh }) {
 
       setPhotos([])
       setEditorNote('')
+      setDoneCount(0)
+      setCurrentPct(0)
       setOpen(false)
       onRefresh()
     } catch (err) {
@@ -1439,7 +1447,7 @@ function UploadPhotoRevisionSection({ project, revisions, onRefresh }) {
         <h2 className="text-sm font-bold text-text-primary mb-1">
           {nextRevNum === 1 ? 'Ready to submit your photos?' : `Ready to upload Revision ${nextRevNum - 1}?`}
         </h2>
-        <p className="text-xs text-text-muted mb-4">Upload the edited photos — clients can leave pinpoint comments on each one.</p>
+        <p className="text-xs text-text-muted mb-4">Upload your edited photos — clients can leave pinpoint comments on each one.</p>
         <button onClick={() => setOpen(true)} className="btn-primary">
           {nextRevNum === 1 ? 'Upload Initial Photos' : `Upload Revision ${nextRevNum - 1}`}
         </button>
@@ -1454,32 +1462,36 @@ function UploadPhotoRevisionSection({ project, revisions, onRefresh }) {
         Upload Photos — {nextRevNum === 1 ? 'Initial Set' : `Revision ${nextRevNum - 1}`}
       </h2>
 
-      <div
-        className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${
-          photos.length > 0 ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/50'
-        }`}
-        onClick={() => !uploading && fileInputRef.current?.click()}
-      >
-        <Camera size={22} className="mx-auto text-text-muted mb-2" />
-        {photos.length > 0 ? (
-          <p className="text-sm font-semibold text-text-primary">{photos.length} photo{photos.length !== 1 ? 's' : ''} selected</p>
-        ) : (
-          <>
-            <p className="text-sm font-semibold text-text-primary">Click to select photos</p>
-            <p className="text-xs text-text-muted mt-1">JPG, PNG, WEBP — multiple files allowed</p>
-          </>
-        )}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          multiple
-          className="hidden"
-          onChange={(e) => setPhotos(Array.from(e.target.files || []))}
-        />
-      </div>
+      {/* File picker — hidden while uploading */}
+      {!uploading && (
+        <div
+          className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${
+            photos.length > 0 ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/50'
+          }`}
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <Camera size={22} className="mx-auto text-text-muted mb-2" />
+          {photos.length > 0 ? (
+            <p className="text-sm font-semibold text-text-primary">{photos.length} photo{photos.length !== 1 ? 's' : ''} selected</p>
+          ) : (
+            <>
+              <p className="text-sm font-semibold text-text-primary">Click to select photos</p>
+              <p className="text-xs text-text-muted mt-1">JPG, PNG, WEBP — multiple files allowed</p>
+            </>
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={(e) => setPhotos(Array.from(e.target.files || []))}
+          />
+        </div>
+      )}
 
-      {photos.length > 0 && (
+      {/* Selected file list */}
+      {photos.length > 0 && !uploading && (
         <div className="flex flex-wrap gap-2">
           {photos.map((f, i) => (
             <span key={i} className="text-xs bg-surface-2 px-2 py-1 rounded-lg text-text-secondary truncate max-w-[160px]">{f.name}</span>
@@ -1487,28 +1499,56 @@ function UploadPhotoRevisionSection({ project, revisions, onRefresh }) {
         </div>
       )}
 
-      <div>
-        <label className="block text-xs font-semibold text-text-secondary mb-1.5">Notes <span className="font-normal text-text-muted">(optional)</span></label>
-        <textarea
-          className="input w-full min-h-[70px] resize-none text-sm"
-          placeholder="Any context or notes for the client…"
-          value={editorNote}
-          onChange={(e) => setEditorNote(e.target.value)}
-          disabled={uploading}
-        />
-      </div>
+      {/* Upload progress */}
+      {uploading && (
+        <div className="space-y-3 py-2">
+          <div className="flex items-center justify-between text-xs text-text-muted">
+            <span>Uploading photo {doneCount + 1} of {photos.length}…</span>
+            <span>{currentPct}%</span>
+          </div>
+          <div className="h-2 bg-surface-2 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-accent rounded-full transition-all duration-200"
+              style={{ width: `${currentPct}%` }}
+            />
+          </div>
+          <div className="flex gap-1 flex-wrap">
+            {photos.map((f, i) => (
+              <span key={i} className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                i < doneCount ? 'bg-green-100 text-green-700' :
+                i === doneCount ? 'bg-accent/10 text-accent' :
+                'bg-surface-2 text-text-muted'
+              }`}>
+                {i < doneCount ? '✓ ' : ''}{f.name.length > 20 ? f.name.slice(0, 18) + '…' : f.name}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!uploading && (
+        <div>
+          <label className="block text-xs font-semibold text-text-secondary mb-1.5">Notes <span className="font-normal text-text-muted">(optional)</span></label>
+          <textarea
+            className="input w-full min-h-[70px] resize-none text-sm"
+            placeholder="Any context or notes for the client…"
+            value={editorNote}
+            onChange={(e) => setEditorNote(e.target.value)}
+          />
+        </div>
+      )}
 
       {uploadError && <p className="text-xs text-red-500">{uploadError}</p>}
 
       <div className="flex gap-2">
-        <button onClick={() => setOpen(false)} className="btn-secondary" disabled={uploading}>Cancel</button>
+        <button onClick={() => { setOpen(false); setPhotos([]) }} className="btn-secondary" disabled={uploading}>Cancel</button>
         <button
           onClick={handleUpload}
           disabled={photos.length === 0 || uploading}
           className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50"
         >
           {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-          {uploading ? 'Uploading…' : `Submit Photos →`}
+          {uploading ? `Uploading ${doneCount + 1}/${photos.length}…` : `Submit ${photos.length > 0 ? photos.length + ' ' : ''}Photos →`}
         </button>
       </div>
     </div>
