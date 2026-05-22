@@ -22,11 +22,9 @@ const NAV = {
     { to: '/messages',      icon: MessageSquare,    label: 'Messages' },
   ],
   creative: [
-    { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', end: true },
+    { to: '/calendar',  icon: CalendarDays,     label: 'Calendar', end: true },
     { to: '/clients',   icon: Building2,        label: 'Clients' },
-    { to: '/projects',  icon: FolderKanban,    label: 'Projects' },
-    { to: '/videos',    icon: Film,             label: 'Review' },
-    { to: '/calendar',  icon: CalendarDays,     label: 'Calendar' },
+    { to: '/projects',  icon: FolderKanban,     label: 'Projects' },
     { to: '/messages',  icon: MessageSquare,    label: 'Messages' },
   ],
   client: [
@@ -54,7 +52,7 @@ export default function Sidebar() {
   const toggleView = () => {
     const next = viewMode === 'admin' ? 'creative' : 'admin'
     setViewMode(next)
-    navigate(next === 'creative' ? '/dashboard' : '/admin')
+    navigate(next === 'creative' ? '/calendar' : '/admin')
   }
 
   return (
