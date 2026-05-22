@@ -4,7 +4,7 @@ import {
   ArrowLeft, Loader2, Upload, Check, Film, StickyNote, Send,
   Download, FileVideo, CalendarDays, MapPin, Eye,
   ChevronRight, X, MessageSquare, Users, ExternalLink,
-  AlertCircle, CheckCircle2, Clock, Zap, Plus,
+  AlertCircle, CheckCircle2, Clock, Zap, Plus, Camera,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
@@ -193,7 +193,7 @@ function ActionBanner({ project, uploads, revisions, isCreative, isEditor, navig
         body: 'Leave timeline notes for the client before sending it over.',
         action: {
           label: 'Review Now →',
-          onClick: () => navigate(`/projects/${project.id}/revision/${pendingPhotographerReview.id}`),
+          onClick: () => navigate(project.media_type === 'photo' ? `/projects/${project.id}/photo-revision/${pendingPhotographerReview.id}` : `/projects/${project.id}/revision/${pendingPhotographerReview.id}`),
         },
       }
     } else if (stage === 'production') {
@@ -227,7 +227,7 @@ function ActionBanner({ project, uploads, revisions, isCreative, isEditor, navig
         body: "Address the accepted comments and upload a revised cut.",
         action: {
           label: 'View Feedback →',
-          onClick: () => navigate(`/projects/${project.id}/revision/${latestRev.id}`),
+          onClick: () => navigate(project.media_type === 'photo' ? `/projects/${project.id}/photo-revision/${latestRev.id}` : `/projects/${project.id}/revision/${latestRev.id}`),
         },
       }
     } else if (latestRev?.status === 'pending_client_review' && stage === 'post_production') {
@@ -238,7 +238,7 @@ function ActionBanner({ project, uploads, revisions, isCreative, isEditor, navig
         body: 'Check the comments and upload a revised cut.',
         action: {
           label: 'View Comments →',
-          onClick: () => navigate(`/projects/${project.id}/revision/${latestRev.id}`),
+          onClick: () => navigate(project.media_type === 'photo' ? `/projects/${project.id}/photo-revision/${latestRev.id}` : `/projects/${project.id}/revision/${latestRev.id}`),
         },
       }
     } else {
@@ -1350,6 +1350,169 @@ function AdminReviewSection({ revision, project, onRefresh }) {
 
 // ── Upload Revision Section (Editor only) ─────────────────────────────────────
 
+// ── Photo revision upload (for photo projects) ────────────────────────────────
+
+function UploadPhotoRevisionSection({ project, revisions, onRefresh }) {
+  const { profile } = useAuth()
+  const fileInputRef = useRef()
+
+  const [open,      setOpen]     = useState(false)
+  const [photos,    setPhotos]   = useState([])  // File[]
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState('')
+  const [editorNote, setEditorNote] = useState('')
+
+  const stage     = STAGE_KEY_MAP[project.stage] || project.stage
+  const latestRev = [...revisions].sort((a, b) => b.revision_number - a.revision_number)[0]
+  const nextRevNum = latestRev ? latestRev.revision_number + 1 : 1
+  const canUpload = stage === 'post_production' || (latestRev && latestRev.status === 'pending_editor')
+  const pendingAdminRev = revisions.find((r) => r.status === 'pending_admin_review')
+  if (!canUpload || pendingAdminRev) return null
+
+  const handleUpload = async () => {
+    if (photos.length === 0) return
+    setUploading(true)
+    setUploadError('')
+    try {
+      // Upload each photo to R2 and collect URLs
+      const photoUrls = []
+      for (const file of photos) {
+        const { publicUrl } = await uploadToR2({
+          file,
+          category:    'revisions',
+          clientName:  project.clients?.name || '',
+          projectName: project.name,
+          folderType:  'shoots',
+          shootDate:   project.shoot_date || null,
+        })
+        photoUrls.push(publicUrl)
+      }
+
+      const { error: e } = await supabase.from('project_revisions').insert({
+        project_id:      project.id,
+        revision_number: nextRevNum,
+        photo_urls:      photoUrls,
+        status:          'pending_client_review',
+        uploaded_by:     profile.id,
+        media_type:      'photo',
+      })
+      if (e) throw new Error(e.message)
+
+      await updateProject(project.id, { stage: 'review', revision_count: nextRevNum })
+
+      const { notifyAdmins: notifyAdminsFn } = await import('../../lib/notify')
+      await notifyAdminsFn({
+        actorId: profile.id,
+        type:    'revision_uploaded',
+        title:   `${nextRevNum === 1 ? 'Initial Photos' : `Revision ${nextRevNum - 1}`} uploaded for "${project.name}"`,
+        body:    'Photos are ready for client review.',
+        link:    `/projects/${project.id}`,
+      })
+
+      if (editorNote.trim()) {
+        await supabase.from('shoot_notes').insert({
+          project_id: project.id,
+          author_id:  profile.id,
+          content:    `[Photo Revision ${nextRevNum} note] ${editorNote.trim()}`,
+        })
+      }
+
+      setPhotos([])
+      setEditorNote('')
+      setOpen(false)
+      onRefresh()
+    } catch (err) {
+      setUploadError(err.message)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  if (!open) {
+    return (
+      <div className="bg-white rounded-2xl border border-border p-6 text-center">
+        <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center mx-auto mb-3">
+          <Camera size={22} className="text-accent" />
+        </div>
+        <h2 className="text-sm font-bold text-text-primary mb-1">
+          {nextRevNum === 1 ? 'Ready to submit your photos?' : `Ready to upload Revision ${nextRevNum - 1}?`}
+        </h2>
+        <p className="text-xs text-text-muted mb-4">Upload the edited photos — clients can leave pinpoint comments on each one.</p>
+        <button onClick={() => setOpen(true)} className="btn-primary">
+          {nextRevNum === 1 ? 'Upload Initial Photos' : `Upload Revision ${nextRevNum - 1}`}
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-border p-5 space-y-4">
+      <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+        <Camera size={14} className="text-text-muted" />
+        Upload Photos — {nextRevNum === 1 ? 'Initial Set' : `Revision ${nextRevNum - 1}`}
+      </h2>
+
+      <div
+        className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${
+          photos.length > 0 ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/50'
+        }`}
+        onClick={() => !uploading && fileInputRef.current?.click()}
+      >
+        <Camera size={22} className="mx-auto text-text-muted mb-2" />
+        {photos.length > 0 ? (
+          <p className="text-sm font-semibold text-text-primary">{photos.length} photo{photos.length !== 1 ? 's' : ''} selected</p>
+        ) : (
+          <>
+            <p className="text-sm font-semibold text-text-primary">Click to select photos</p>
+            <p className="text-xs text-text-muted mt-1">JPG, PNG, WEBP — multiple files allowed</p>
+          </>
+        )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={(e) => setPhotos(Array.from(e.target.files || []))}
+        />
+      </div>
+
+      {photos.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {photos.map((f, i) => (
+            <span key={i} className="text-xs bg-surface-2 px-2 py-1 rounded-lg text-text-secondary truncate max-w-[160px]">{f.name}</span>
+          ))}
+        </div>
+      )}
+
+      <div>
+        <label className="block text-xs font-semibold text-text-secondary mb-1.5">Notes <span className="font-normal text-text-muted">(optional)</span></label>
+        <textarea
+          className="input w-full min-h-[70px] resize-none text-sm"
+          placeholder="Any context or notes for the client…"
+          value={editorNote}
+          onChange={(e) => setEditorNote(e.target.value)}
+          disabled={uploading}
+        />
+      </div>
+
+      {uploadError && <p className="text-xs text-red-500">{uploadError}</p>}
+
+      <div className="flex gap-2">
+        <button onClick={() => setOpen(false)} className="btn-secondary" disabled={uploading}>Cancel</button>
+        <button
+          onClick={handleUpload}
+          disabled={photos.length === 0 || uploading}
+          className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50"
+        >
+          {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+          {uploading ? 'Uploading…' : `Submit Photos →`}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function UploadRevisionSection({ project, revisions, onRefresh }) {
   const { profile }  = useAuth()
   const fileInputRef = useRef()
@@ -1627,7 +1790,7 @@ function RevisionsCard({ project, revisions, commentCounts, navigate }) {
                 </div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => navigate(`/projects/${project.id}/revision/${r.id}`)}
+                    onClick={() => navigate(project.media_type === 'photo' ? `/projects/${project.id}/photo-revision/${r.id}` : `/projects/${project.id}/revision/${r.id}`)}
                     className="btn-secondary text-xs flex items-center gap-1 flex-1 justify-center"
                   >
                     View & Comment <ChevronRight size={12} />
@@ -2055,13 +2218,19 @@ export default function ProjectWorkflow() {
           )}
 
           {/* 3b. Upload Revision — visible to any editor role */}
-          {isEditor && (
+          {isEditor && project?.media_type === 'photo' ? (
+            <UploadPhotoRevisionSection
+              project={project}
+              revisions={revisions}
+              onRefresh={fetchAll}
+            />
+          ) : isEditor ? (
             <UploadRevisionSection
               project={project}
               revisions={revisions}
               onRefresh={fetchAll}
             />
-          )}
+          ) : null}
         </div>
 
         {/* RIGHT COLUMN — 1/3 width */}

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 
 const PROJECT_SELECT = `
-  id, name, type, status, stage,
+  id, name, type, status, stage, media_type,
   start_date, due_date, shoot_date, location,
   notes, created_by, created_at,
   creative_id, editor_id, revision_count,

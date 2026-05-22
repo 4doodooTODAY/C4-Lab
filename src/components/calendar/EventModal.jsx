@@ -15,7 +15,7 @@ const TYPE_BUTTONS = Object.entries(EVENT_TYPES)
 
 export default function EventModal({ date, event, onSave, onDelete, onClose }) {
   const { profile } = useAuth()
-  const isEdit    = Boolean(event)
+  const isEdit    = Boolean(event?.id)
   const { isAdmin } = useAuth()
 
   // Form state
@@ -55,7 +55,7 @@ export default function EventModal({ date, event, onSave, onDelete, onClose }) {
     supabase
       .from('profiles')
       .select('id, full_name, avatar_url, role')
-      .in('role', ['admin', 'creative', 'editor'])
+      .in('role', ['creative', 'editor'])
       .order('full_name')
       .then(({ data }) => setTeam(data || []))
   }, [])

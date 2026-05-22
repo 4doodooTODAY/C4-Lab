@@ -620,7 +620,7 @@ export default function ProjectDetail() {
 
   useEffect(() => {
     if (!isAdmin) return
-    supabase.from('profiles').select('id, full_name, role').in('role', ['admin', 'creative', 'editor']).order('full_name')
+    supabase.from('profiles').select('id, full_name, role').in('role', ['creative', 'editor']).order('full_name')
       .then(({ data }) => setAssignProfiles(data || []))
   }, [isAdmin])
 
@@ -1254,7 +1254,11 @@ export default function ProjectDetail() {
                         </button>
                       )}
                       <button
-                        onClick={() => navigate(`/projects/${id}/revision/${r.id}`)}
+                        onClick={() => navigate(
+                          project?.media_type === 'photo'
+                            ? `/projects/${id}/photo-revision/${r.id}`
+                            : `/projects/${id}/revision/${r.id}`
+                        )}
                         className="btn-secondary flex items-center gap-1.5 text-xs"
                       >
                         <Eye size={13} /> View

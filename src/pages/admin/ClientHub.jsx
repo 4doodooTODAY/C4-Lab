@@ -295,7 +295,7 @@ function OverviewTab({ client, shoots, projects, requests }) {
   const [saving, setSaving]           = useState(false)
 
   useEffect(() => {
-    supabase.from('profiles').select('id, full_name, role, avatar_url').neq('role', 'client').order('full_name').then(({ data }) => {
+    supabase.from('profiles').select('id, full_name, role, avatar_url').in('role', ['creative', 'editor']).order('full_name').then(({ data }) => {
       setAllProfiles(data || [])
     })
   }, [])

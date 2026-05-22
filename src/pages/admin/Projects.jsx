@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Plus, X, Loader2, FolderKanban, Search, ChevronRight,
-  CalendarDays, AlertCircle, Users
+  CalendarDays, AlertCircle, Users, Film, Camera
 } from 'lucide-react'
 import { useProjects, createProject } from '../../hooks/useProjects'
 import { useAuth } from '../../contexts/AuthContext'
@@ -72,7 +72,7 @@ function NewProjectModal({ onClose, onCreated }) {
   const { user } = useAuth()
   const [clients,       setClients]       = useState([])
   const [clientTeam,    setClientTeam]    = useState([])   // profiles assigned to selected client
-  const [form, setForm] = useState({ name: '', client_id: '', admin_review_required: false })
+  const [form, setForm] = useState({ name: '', client_id: '', media_type: 'video', admin_review_required: false })
   const [selectedEditor, setSelectedEditor] = useState('')
   const [saving, setSaving] = useState(false)
   const [error,  setError]  = useState('')
@@ -112,6 +112,7 @@ function NewProjectModal({ onClose, onCreated }) {
         admin_review_required: form.admin_review_required,
         editor_id:             selectedEditor || null,
         status:                'active',
+        media_type:            form.media_type,
       }
       const row = await createProject(payload)
       onCreated(row.id)
@@ -155,6 +156,34 @@ function NewProjectModal({ onClose, onCreated }) {
               onChange={set('name')}
               required
             />
+          </div>
+
+          {/* Media type */}
+          <div>
+            <label className="label">Project Type *</label>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { value: 'video', label: 'Video', icon: Film, desc: 'Timeline-based revisions' },
+                { value: 'photo', label: 'Photo',  icon: Camera, desc: 'Pinpoint photo comments' },
+              ].map(({ value, label, icon: Icon, desc }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, media_type: value }))}
+                  className={`flex items-start gap-3 p-3 rounded-xl border-2 text-left transition-all ${
+                    form.media_type === value
+                      ? 'border-accent bg-accent/5'
+                      : 'border-border hover:border-border-strong'
+                  }`}
+                >
+                  <Icon size={18} className={form.media_type === value ? 'text-accent mt-0.5' : 'text-text-muted mt-0.5'} />
+                  <div>
+                    <p className={`text-sm font-semibold ${form.media_type === value ? 'text-accent' : 'text-text-primary'}`}>{label}</p>
+                    <p className="text-[11px] text-text-muted mt-0.5">{desc}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Team — only shown after client is selected */}
