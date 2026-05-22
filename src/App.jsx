@@ -32,8 +32,9 @@ const Messages               = lazy(() => import('./pages/Messages'))
 const CreativeProjectList    = lazy(() => import('./pages/creative/ProjectList'))
 const CreativeProjectWorkflow = lazy(() => import('./pages/creative/ProjectWorkflow'))
 const ClientMyProjects       = lazy(() => import('./pages/client/MyProjects'))
-const ClientMyConcepts       = lazy(() => import('./pages/client/MyConcepts'))
+// ClientMyConcepts removed — concepts no longer exist in the system
 const VideoRevisionReview    = lazy(() => import('./pages/VideoRevisionReview'))
+const PhotoRevisionReview    = lazy(() => import('./pages/PhotoRevisionReview'))
 const AdminFileSystem        = lazy(() => import('./pages/admin/FileSystem'))
 
 function PageLoader() {
@@ -147,6 +148,9 @@ function AppRoutes() {
           <Route path="/projects/:id/revision/:revisionId" element={
             <ProtectedRoute roles={['admin', 'creative', 'editor', 'client']}><VideoRevisionReview /></ProtectedRoute>
           } />
+          <Route path="/projects/:id/photo-revision/:revisionId" element={
+            <ProtectedRoute roles={['admin', 'creative', 'editor', 'client']}><PhotoRevisionReview /></ProtectedRoute>
+          } />
 
           {/* Creative */}
           <Route path="/dashboard" element={
@@ -169,9 +173,7 @@ function AppRoutes() {
           <Route path="/client/calendar" element={
             <ProtectedRoute roles={['client']}><ContentCalendar /></ProtectedRoute>
           } />
-          <Route path="/client/concepts" element={
-            <ProtectedRoute roles={['client']}><ClientMyConcepts /></ProtectedRoute>
-          } />
+          {/* /client/concepts removed — concepts no longer exist */}
           <Route path="/client/request" element={
             <ProtectedRoute roles={['client']}><RequestPost /></ProtectedRoute>
           } />

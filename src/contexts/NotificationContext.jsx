@@ -2,6 +2,9 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import { supabase } from '../lib/supabase'
 import { useAuth } from './AuthContext'
 
+// Notification types that are internal to the team — clients should never see these
+const TEAM_ONLY_TYPES = ['message']
+
 const VAPID_PUBLIC_KEY = 'BJhLo2Yrmpz1sspZUGYB_hStsFhz5-9-HGUXcVfrPm4-EuovmBH6n57TgwTtUlxgo3NnQvewY6ZAnWhRBbYpwTY'
 
 function urlBase64ToUint8Array(base64String) {
@@ -14,7 +17,8 @@ function urlBase64ToUint8Array(base64String) {
 const NotificationContext = createContext(null)
 
 export function NotificationProvider({ children }) {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
+  const isClient = profile?.role === 'client'
   const [notifications, setNotifications] = useState([])
   const [unreadCount, setUnreadCount]     = useState(0)
   const [panelOpen, setPanelOpen]         = useState(false)
@@ -31,8 +35,9 @@ export function NotificationProvider({ children }) {
       .order('created_at', { ascending: false })
       .limit(60)
       .then(({ data }) => {
-        setNotifications(data || [])
-        setUnreadCount((data || []).filter((n) => !n.read).length)
+        const filtered = (data || []).filter((n) => !isClient || !TEAM_ONLY_TYPES.includes(n.type))
+        setNotifications(filtered)
+        setUnreadCount(filtered.filter((n) => !n.read).length)
       })
   }, [user?.id])
 
@@ -45,6 +50,8 @@ export function NotificationProvider({ children }) {
         event: 'INSERT', schema: 'public', table: 'notifications',
         filter: `profile_id=eq.${user.id}`,
       }, (payload) => {
+        // Don't show team-only notifications to clients
+        if (isClient && TEAM_ONLY_TYPES.includes(payload.new.type)) return
         setNotifications((prev) => [payload.new, ...prev])
         setUnreadCount((prev) => prev + 1)
       })

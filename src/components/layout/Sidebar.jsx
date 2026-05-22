@@ -22,7 +22,15 @@ const NAV = {
     { to: '/messages',      icon: MessageSquare,    label: 'Messages' },
   ],
   creative: [
-    { to: '/calendar',  icon: CalendarDays,     label: 'Calendar', end: true },
+    { to: '/dashboard', icon: LayoutDashboard, label: 'Overview', end: true },
+    { to: '/calendar',  icon: CalendarDays,     label: 'Calendar' },
+    { to: '/clients',   icon: Building2,        label: 'Clients' },
+    { to: '/projects',  icon: FolderKanban,     label: 'Projects' },
+    { to: '/messages',  icon: MessageSquare,    label: 'Messages' },
+  ],
+  editor: [
+    { to: '/dashboard', icon: LayoutDashboard, label: 'Overview', end: true },
+    { to: '/calendar',  icon: CalendarDays,     label: 'Calendar' },
     { to: '/clients',   icon: Building2,        label: 'Clients' },
     { to: '/projects',  icon: FolderKanban,     label: 'Projects' },
     { to: '/messages',  icon: MessageSquare,    label: 'Messages' },
@@ -34,7 +42,7 @@ const NAV = {
   ],
 }
 
-const ROLE_LABELS = { admin: 'Admin', creative: 'Creative', client: 'Client' }
+const ROLE_LABELS = { admin: 'Admin', creative: 'Creative', editor: 'Editor', client: 'Client' }
 
 export default function Sidebar() {
   const { profile, user, signOut, viewMode, setViewMode } = useAuth()
@@ -45,7 +53,7 @@ export default function Sidebar() {
 
   // Admins use viewMode to pick which nav to show; others use their role
   const effectiveNav = isAdmin ? (viewMode || 'admin') : role
-  const navItems = NAV[effectiveNav] || NAV.creative
+  const navItems = NAV[effectiveNav] || NAV[role] || NAV.creative
 
   const displayName = profile?.full_name || user?.email || 'You'
 

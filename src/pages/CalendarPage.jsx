@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { format, addMonths, subMonths, parseISO } from 'date-fns'
-import { ChevronLeft, ChevronRight, Loader2, Plus, Camera, FileText, X, MapPin, Clock } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, Plus, Camera, FileText, X, MapPin, Clock, FolderKanban } from 'lucide-react'
 import CalendarGrid from '../components/calendar/CalendarGrid'
 import EventModal from '../components/calendar/EventModal'
 import { useCalendarEvents } from '../hooks/useCalendarEvents'
@@ -21,9 +21,9 @@ function ShootDraftPanel({ item, onClose }) {
       <div className="p-4">
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="flex items-center gap-2">
-            {isShoot ? <Camera size={14} className="text-violet-600 shrink-0" /> : <FileText size={14} className="text-amber-600 shrink-0" />}
-            <span className={`text-xs font-semibold uppercase tracking-wide ${isShoot ? 'text-violet-600' : 'text-amber-600'}`}>
-              {isShoot ? 'Shoot Day' : `Content Draft — ${item._type || 'Post'}`}
+            {isShoot ? <Camera size={14} className="text-violet-600 shrink-0" /> : item._isProject ? <FolderKanban size={14} className="text-blue-600 shrink-0" /> : <FileText size={14} className="text-amber-600 shrink-0" />}
+            <span className={`text-xs font-semibold uppercase tracking-wide ${isShoot ? 'text-violet-600' : item._isProject ? 'text-blue-600' : 'text-amber-600'}`}>
+              {isShoot ? 'Shoot' : item._isProject ? 'Project' : `Content Draft — ${item._type || 'Post'}`}
             </span>
           </div>
           <button onClick={onClose} className="text-text-muted hover:text-text-primary p-0.5">
@@ -47,14 +47,14 @@ function ShootDraftPanel({ item, onClose }) {
 }
 
 export default function CalendarPage() {
-  const { profile, user } = useAuth()
-  const isAdmin   = profile?.role === 'admin'
-  const isCreative = profile?.role === 'creative'
+  const { profile, user, isAdmin } = useAuth()
+  const isCreative = profile?.role === 'creative' || profile?.role === 'editor'
 
   const [currentDate, setCurrentDate] = useState(new Date())
   const [modalState,  setModalState]  = useState(null)
   const [shoots,      setShoots]      = useState([])
   const [drafts,      setDrafts]      = useState([])
+  const [projects,    setProjects]    = useState([])
   const [auxLoading,  setAuxLoading]  = useState(false)
   const [selectedAux, setSelectedAux] = useState(null) // selected shoot/draft for panel
 
@@ -88,7 +88,16 @@ export default function CalendarPage() {
         .not('status', 'in', '("scrapped")')
         .gte('target_date', monthStart)
         .lt('target_date', nextMonth),
-    ]).then(([shootsRes, draftsRes]) => {
+
+      // Projects with shoot_date in this month
+      supabase
+        .from('projects')
+        .select('id, name, stage, shoot_date, location, clients(name, contact_name)')
+        .not('stage', 'eq', 'delivered')
+        .not('shoot_date', 'is', null)
+        .gte('shoot_date', monthStart)
+        .lt('shoot_date', nextMonth),
+    ]).then(([shootsRes, draftsRes, projectsRes]) => {
       // Convert shoots to synthetic calendar events
       const shootEvents = (shootsRes.data || []).map((s) => {
         const dateStr  = s.shoot_date
@@ -127,8 +136,25 @@ export default function CalendarPage() {
         }
       })
 
+      const projectEvents = (projectsRes.data || []).map((p) => {
+        const startAt = new Date(`${p.shoot_date}T09:00:00`)
+        return {
+          id:          `_project_${p.id}`,
+          title:       p.name,
+          event_type:  'project',
+          start_at:    startAt.toISOString(),
+          end_at:      startAt.toISOString(),
+          all_day:     true,
+          location:    p.location,
+          _isProject:  true,
+          _stage:      p.stage,
+          _clientName: p.clients?.contact_name || p.clients?.name,
+        }
+      })
+
       setShoots(shootEvents)
       setDrafts(draftEvents)
+      setProjects(projectEvents)
       setAuxLoading(false)
     })
   }, [user, currentDate])
@@ -141,20 +167,25 @@ export default function CalendarPage() {
       )
 
   // Merge real events + synthetic shoot/draft events
-  const events = [...roleEvents, ...shoots, ...drafts]
+  const events = [...roleEvents, ...shoots, ...drafts, ...projects]
 
   const prevMonth = () => { setCurrentDate((d) => subMonths(d, 1)); setSelectedAux(null) }
   const nextMonth = () => { setCurrentDate((d) => addMonths(d, 1)); setSelectedAux(null) }
   const goToday   = () => { setCurrentDate(new Date()); setSelectedAux(null) }
 
-  const handleDayClick   = (date)  => { setModalState({ date, event: null }); setSelectedAux(null) }
+  const handleDayClick   = (date)  => {
+    if (!isAdmin) return  // creatives/editors cannot create events
+    setModalState({ date, event: null })
+    setSelectedAux(null)
+  }
   const handleEventClick = (event) => {
     // Synthetic events: show detail panel, don't open modal
-    if (event._isShoot || event._isDraft) {
+    if (event._isShoot || event._isDraft || event._isProject) {
       setSelectedAux(event)
       return
     }
     setSelectedAux(null)
+    if (!isAdmin) return  // creatives/editors cannot edit events
     setModalState({ date: new Date(event.start_at), event })
   }
 

@@ -4,6 +4,7 @@ import { EVENT_TYPES } from './EventChip'
 import { format, parseISO } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
+// EventModal is only reachable by admins (CalendarPage guards non-admins)
 import Avatar from '../ui/Avatar'
 
 function toDateInput(iso)  { return iso ? iso.slice(0, 10) : '' }
@@ -15,7 +16,7 @@ const TYPE_BUTTONS = Object.entries(EVENT_TYPES)
 export default function EventModal({ date, event, onSave, onDelete, onClose }) {
   const { profile } = useAuth()
   const isEdit    = Boolean(event)
-  const isAdmin   = profile?.role === 'admin'
+  const { isAdmin } = useAuth()
 
   // Form state
   const [title,      setTitle]      = useState(event?.title      || '')
@@ -54,7 +55,7 @@ export default function EventModal({ date, event, onSave, onDelete, onClose }) {
     supabase
       .from('profiles')
       .select('id, full_name, avatar_url, role')
-      .in('role', ['admin', 'creative'])
+      .in('role', ['admin', 'creative', 'editor'])
       .order('full_name')
       .then(({ data }) => setTeam(data || []))
   }, [])

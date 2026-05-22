@@ -44,7 +44,7 @@ export default function ClientDashboard() {
 
         const today = new Date().toISOString().split('T')[0]
 
-        const [projRes, revRes, conceptsRes, shootsRes] = await Promise.all([
+        const [projRes, revRes, shootsRes] = await Promise.all([
           supabase.from('projects')
             .select('id, name, stage, status, due_date, created_at')
             .eq('client_id', client.id)
@@ -52,10 +52,6 @@ export default function ClientDashboard() {
           supabase.from('project_revisions')
             .select('id, project_id, revision_number, status, projects(id, name, client_id)')
             .eq('status', 'pending_client_review'),
-          supabase.from('content_drafts')
-            .select('id, title, type')
-            .eq('client_id', client.id)
-            .eq('status', 'pending_client'),
           supabase.from('shoots')
             .select('id, title, shoot_date, shoot_time, location, status')
             .eq('client_id', client.id)
@@ -88,19 +84,6 @@ export default function ClientDashboard() {
           }
         }
 
-        // Concepts awaiting approval
-        for (const draft of (conceptsRes.data || [])) {
-          actionItems.push({
-            id:       `draft-${draft.id}`,
-            type:     'concept',
-            label:    draft.title || 'Content Concept',
-            sub:      'Waiting for your approval',
-            href:     '/client/concepts',
-            priority: 2,
-          })
-        }
-
-        // Sort by priority (reviews first)
         actionItems.sort((a, b) => a.priority - b.priority)
         setActions(actionItems)
         setLoading(false)
@@ -279,17 +262,6 @@ export default function ClientDashboard() {
               <p className="text-xs text-gray-400 mt-0.5">
                 {activeProjects.length > 0 ? `${activeProjects.length} in progress` : 'View all projects'}
               </p>
-            </div>
-            <ArrowRight size={15} className="text-gray-300 group-hover:text-accent transition-colors" />
-          </Link>
-
-          <Link to="/client/concepts" className="flex items-center gap-4 p-4 rounded-2xl border border-gray-100 bg-white hover:border-accent/30 hover:bg-accent/5 transition-all group shadow-sm">
-            <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center shrink-0">
-              <FileText size={18} className="text-purple-600" />
-            </div>
-            <div className="flex-1">
-              <p className="font-semibold text-gray-900">Content Concepts</p>
-              <p className="text-xs text-gray-400 mt-0.5">Review and approve ideas from your team</p>
             </div>
             <ArrowRight size={15} className="text-gray-300 group-hover:text-accent transition-colors" />
           </Link>
