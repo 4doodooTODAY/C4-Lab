@@ -143,7 +143,7 @@ export default function CreativeDashboard() {
           .order('shoot_date', { ascending: true, nullsFirst: false })
         projData = data || []
       } else {
-        // scope to only the clients this creative/editor is assigned to
+        // scope to clients this creative/editor is assigned to
         const { data: ccRows } = await supabase
           .from('client_creatives')
           .select('client_id')
@@ -154,7 +154,7 @@ export default function CreativeDashboard() {
             .from('projects')
             .select('id, name, stage, shoot_date, location, editor_id, clients(name, contact_name), editor:profiles!editor_id(id, full_name)')
             .neq('stage', 'archived')
-            .eq('editor_id', user.id)
+            .in('client_id', clientIds)
             .order('shoot_date', { ascending: true, nullsFirst: false })
           projData = data || []
         }

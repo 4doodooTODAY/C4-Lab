@@ -57,7 +57,7 @@ function RoleSwitch({ admin, creative, client }) {
   const { profile } = useAuth()
   const role = profile?.role
   if (role === 'admin' && admin) return admin
-  if (role === 'creative' && creative) return creative
+  if ((role === 'creative' || role === 'editor') && creative) return creative
   if (role === 'client' && client) return client
   return admin || creative || client || null
 }
@@ -68,6 +68,7 @@ function RoleRedirect() {
   if (!profile) return <Navigate to="/login" replace />
   if (profile.role === 'admin') return <Navigate to={viewMode === 'creative' ? '/dashboard' : '/admin'} replace />
   if (profile.role === 'creative') return <Navigate to="/dashboard" replace />
+  if (profile.role === 'editor') return <Navigate to="/dashboard" replace />
   if (profile.role === 'client') return <Navigate to="/client" replace />
   return <Navigate to="/login" replace />
 }
@@ -130,7 +131,7 @@ function AppRoutes() {
             <ProtectedRoute roles={['admin']}><AdminFileSystem /></ProtectedRoute>
           } />
           <Route path="/projects" element={
-            <ProtectedRoute roles={['admin', 'creative']}>
+            <ProtectedRoute roles={['admin', 'creative', 'editor']}>
               <RoleSwitch
                 admin={<AdminProjects />}
                 creative={<CreativeProjectList />}
@@ -138,24 +139,24 @@ function AppRoutes() {
             </ProtectedRoute>
           } />
           <Route path="/projects/:id" element={
-            <ProtectedRoute roles={['admin', 'creative']}><ProjectDetail /></ProtectedRoute>
+            <ProtectedRoute roles={['admin', 'creative', 'editor']}><ProjectDetail /></ProtectedRoute>
           } />
           <Route path="/projects/:id/creative" element={
-            <ProtectedRoute roles={['admin', 'creative']}><CreativeProjectWorkflow /></ProtectedRoute>
+            <ProtectedRoute roles={['admin', 'creative', 'editor']}><CreativeProjectWorkflow /></ProtectedRoute>
           } />
           <Route path="/projects/:id/revision/:revisionId" element={
-            <ProtectedRoute roles={['admin', 'creative', 'client']}><VideoRevisionReview /></ProtectedRoute>
+            <ProtectedRoute roles={['admin', 'creative', 'editor', 'client']}><VideoRevisionReview /></ProtectedRoute>
           } />
 
           {/* Creative */}
           <Route path="/dashboard" element={
-            <ProtectedRoute roles={['admin', 'creative']}><CreativeDashboard /></ProtectedRoute>
+            <ProtectedRoute roles={['admin', 'creative', 'editor']}><CreativeDashboard /></ProtectedRoute>
           } />
           <Route path="/clients" element={
-            <ProtectedRoute roles={['creative', 'admin']}><CreativeClients /></ProtectedRoute>
+            <ProtectedRoute roles={['creative', 'editor', 'admin']}><CreativeClients /></ProtectedRoute>
           } />
           <Route path="/clients/:id" element={
-            <ProtectedRoute roles={['creative', 'admin']}><CreativeClientPage /></ProtectedRoute>
+            <ProtectedRoute roles={['creative', 'editor', 'admin']}><CreativeClientPage /></ProtectedRoute>
           } />
 
           {/* Client */}
@@ -180,17 +181,17 @@ function AppRoutes() {
 
           {/* Shared */}
           <Route path="/videos" element={
-            <ProtectedRoute roles={['admin', 'creative']}><VideoList /></ProtectedRoute>
+            <ProtectedRoute roles={['admin', 'creative', 'editor']}><VideoList /></ProtectedRoute>
           } />
           <Route path="/video/:id" element={
-            <ProtectedRoute roles={['admin', 'creative', 'client']}><VideoReview /></ProtectedRoute>
+            <ProtectedRoute roles={['admin', 'creative', 'editor', 'client']}><VideoReview /></ProtectedRoute>
           } />
           <Route path="/calendar" element={
-            <ProtectedRoute roles={['admin', 'creative']}><CalendarPage /></ProtectedRoute>
+            <ProtectedRoute roles={['admin', 'creative', 'editor']}><CalendarPage /></ProtectedRoute>
           } />
 
           <Route path="/messages" element={
-            <ProtectedRoute roles={['admin', 'creative']}><Messages /></ProtectedRoute>
+            <ProtectedRoute roles={['admin', 'creative', 'editor']}><Messages /></ProtectedRoute>
           } />
           <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="/" replace />} />

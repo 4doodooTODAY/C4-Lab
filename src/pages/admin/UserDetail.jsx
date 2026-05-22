@@ -6,7 +6,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { format, formatDistanceToNow } from 'date-fns'
 import Avatar, { TagBadge, ALL_TAGS } from '../../components/ui/Avatar'
 
-const ROLES = ['creative', 'client', 'admin']
+const ROLES = ['creative', 'editor', 'client', 'admin']
 
 async function callAction(body, session) {
   const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-user`, {

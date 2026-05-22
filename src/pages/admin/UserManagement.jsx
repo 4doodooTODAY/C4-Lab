@@ -6,7 +6,7 @@ import { supabase } from '../../lib/supabase'
 import { formatDistanceToNow } from 'date-fns'
 import Avatar, { TagBadge } from '../../components/ui/Avatar'
 
-const ROLES = ['creative', 'client', 'admin']
+const ROLES = ['creative', 'editor', 'client', 'admin']
 
 function callUserAction(body, session) {
   return fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-user`, {
@@ -193,8 +193,9 @@ function DeleteModal({ user, onClose, onDeleted }) {
 
 // ── Section config ───────────────────────────────────────────────────────────
 const SECTIONS = [
-  { role: 'admin',    label: 'Admins',    icon: Shield,  color: 'text-purple-600', bg: 'bg-purple-50' },
-  { role: 'creative', label: 'Creatives', icon: Palette, color: 'text-blue-600',   bg: 'bg-blue-50'   },
+  { role: 'admin',    label: 'Admins',    icon: Shield,   color: 'text-purple-600', bg: 'bg-purple-50' },
+  { role: 'creative', label: 'Creatives', icon: Palette,  color: 'text-blue-600',   bg: 'bg-blue-50'   },
+  { role: 'editor',   label: 'Editors',   icon: Briefcase, color: 'text-green-600',  bg: 'bg-green-50'  },
 ]
 
 function UserRow({ u, onDelete, onNavigate, onResend, resending, resent }) {

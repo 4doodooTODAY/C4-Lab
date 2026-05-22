@@ -620,7 +620,7 @@ export default function ProjectDetail() {
 
   useEffect(() => {
     if (!isAdmin) return
-    supabase.from('profiles').select('id, full_name, role').in('role', ['admin', 'creative']).order('full_name')
+    supabase.from('profiles').select('id, full_name, role').in('role', ['admin', 'creative', 'editor']).order('full_name')
       .then(({ data }) => setAssignProfiles(data || []))
   }, [isAdmin])
 

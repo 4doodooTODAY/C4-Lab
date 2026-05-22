@@ -30,10 +30,16 @@ using (
   )
 );
 
--- Editors: only the project they are assigned to
-create policy "Editors see own projects"
+-- Creatives and Editors: see projects for clients they are assigned to
+create policy "Team see projects for assigned clients"
 on projects for select
-using ( projects.editor_id = auth.uid() );
+using (
+  exists (
+    select 1 from client_creatives
+    where client_creatives.profile_id = auth.uid()
+    and   client_creatives.client_id  = projects.client_id
+  )
+);
 
 -- Clients: only their own projects
 create policy "Clients see own projects"
@@ -57,6 +63,7 @@ drop policy if exists "Editors see revisions for own projects"           on proj
 drop policy if exists "Editors insert revisions for own projects"        on project_revisions;
 drop policy if exists "Editors update revisions for own projects"        on project_revisions;
 drop policy if exists "Team see revisions for assigned clients"          on project_revisions;
+drop policy if exists "Team see revisions for own projects"              on project_revisions;
 drop policy if exists "Team insert revisions for assigned clients"       on project_revisions;
 drop policy if exists "Team update revisions for assigned clients"       on project_revisions;
 drop policy if exists "Clients see revisions for own projects"           on project_revisions;
@@ -71,15 +78,18 @@ using (
   )
 );
 
-create policy "Editors see revisions for own projects"
+-- Creatives & editors can see revisions for projects on their assigned clients
+create policy "Team see revisions for own projects"
 on project_revisions for select
 using (
   exists (
     select 1 from projects p
-    where p.id = project_revisions.project_id and p.editor_id = auth.uid()
+    join client_creatives cc on cc.client_id = p.client_id
+    where p.id = project_revisions.project_id and cc.profile_id = auth.uid()
   )
 );
 
+-- Only the assigned editor can write/update revisions (they do the cuts)
 create policy "Editors insert revisions for own projects"
 on project_revisions for insert
 with check (
@@ -117,6 +127,7 @@ alter table project_shoots enable row level security;
 
 drop policy if exists "Admins full access on project_shoots"       on project_shoots;
 drop policy if exists "Editors see shoots for own projects"        on project_shoots;
+drop policy if exists "Team see shoots for own projects"           on project_shoots;
 drop policy if exists "Editors manage shoots for own projects"     on project_shoots;
 drop policy if exists "Editors update shoots for own projects"     on project_shoots;
 drop policy if exists "Editors delete shoots for own projects"     on project_shoots;
@@ -138,13 +149,14 @@ using (
   )
 );
 
--- Editors can see/manage shoots on their assigned projects
-create policy "Editors see shoots for own projects"
+-- Creatives and editors can see/manage shoots for their assigned clients
+create policy "Team see shoots for own projects"
 on project_shoots for select
 using (
   exists (
     select 1 from projects p
-    where p.id = project_shoots.project_id and p.editor_id = auth.uid()
+    join client_creatives cc on cc.client_id = p.client_id
+    where p.id = project_shoots.project_id and cc.profile_id = auth.uid()
   )
 );
 
@@ -152,7 +164,8 @@ create policy "Editors manage shoots for own projects"
 on project_shoots for insert with check (
   exists (
     select 1 from projects p
-    where p.id = project_shoots.project_id and p.editor_id = auth.uid()
+    join client_creatives cc on cc.client_id = p.client_id
+    where p.id = project_shoots.project_id and cc.profile_id = auth.uid()
   )
 );
 
@@ -161,7 +174,8 @@ on project_shoots for update
 using (
   exists (
     select 1 from projects p
-    where p.id = project_shoots.project_id and p.editor_id = auth.uid()
+    join client_creatives cc on cc.client_id = p.client_id
+    where p.id = project_shoots.project_id and cc.profile_id = auth.uid()
   )
 );
 
@@ -170,11 +184,12 @@ on project_shoots for delete
 using (
   exists (
     select 1 from projects p
-    where p.id = project_shoots.project_id and p.editor_id = auth.uid()
+    join client_creatives cc on cc.client_id = p.client_id
+    where p.id = project_shoots.project_id and cc.profile_id = auth.uid()
   )
 );
 
--- Creatives can see shoots for clients they are assigned to
+-- Creatives can see shoots for clients they are assigned to (redundant with above but explicit)
 create policy "Creatives see shoots for assigned clients"
 on project_shoots for select
 using (
