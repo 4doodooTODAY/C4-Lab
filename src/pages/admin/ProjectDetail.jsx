@@ -1220,7 +1220,7 @@ export default function ProjectDetail() {
           <div className="bg-white rounded-2xl border border-border p-5">
             <div className="flex items-center justify-between mb-1">
               <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
-                <FileVideo size={14} className="text-text-muted" /> Revisions
+                {project?.media_type === 'photo' ? <Camera size={14} className="text-text-muted" /> : <FileVideo size={14} className="text-text-muted" />} Revisions
               </h2>
             </div>
             <p className="text-xs text-text-muted mb-4">Client can approve at any revision — up to 3 total.</p>
@@ -1233,7 +1233,7 @@ export default function ProjectDetail() {
                 {revisions.map((r) => (
                   <div key={r.id} className="flex items-center gap-3 p-3 rounded-xl border border-border">
                     <div className="w-10 h-10 rounded-lg bg-surface-2 flex items-center justify-center shrink-0">
-                      <FileVideo size={16} className="text-text-muted" />
+                      {project?.media_type === 'photo' ? <Camera size={16} className="text-text-muted" /> : <FileVideo size={16} className="text-text-muted" />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-text-primary">Revision {r.revision_number}</p>

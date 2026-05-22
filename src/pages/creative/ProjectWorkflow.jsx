@@ -188,7 +188,7 @@ function ActionBanner({ project, uploads, revisions, isCreative, isEditor, navig
     if (pendingPhotographerReview) {
       banner = {
         variant: 'accent',
-        icon: <FileVideo size={18} />,
+        icon: project.media_type === 'photo' ? <Camera size={18} /> : <FileVideo size={18} />,
         title: `${revisionLabel(pendingPhotographerReview.revision_number)} needs your review`,
         body: 'Leave timeline notes for the client before sending it over.',
         action: {
@@ -1797,7 +1797,7 @@ function RevisionsCard({ project, revisions, commentCounts, navigate }) {
   return (
     <div className="bg-white rounded-2xl border border-border p-5">
       <h2 className="text-sm font-semibold text-text-primary mb-4 flex items-center gap-2">
-        <FileVideo size={14} className="text-text-muted" /> Revisions
+        {project.media_type === 'photo' ? <Camera size={14} className="text-text-muted" /> : <FileVideo size={14} className="text-text-muted" />} Revisions
       </h2>
 
       {sorted.length === 0 ? (

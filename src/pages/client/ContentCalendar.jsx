@@ -130,7 +130,7 @@ function ItemDetail({ item, onApprove, onDecline, onClose, updating }) {
           {item.kind === 'review' && (
             <button onClick={() => navigate(item.isPhoto ? `/projects/${item.projectId}/photo-revision/${item.revisionId}` : `/projects/${item.projectId}/revision/${item.revisionId}`)}
               className="btn-primary text-xs flex-1 flex items-center justify-center gap-1.5">
-              <Film size={11} /> {item.isPhoto ? 'Review Photos' : 'Watch & Review'}
+              {item.isPhoto ? <><Camera size={11} /> Review Photos</> : <><Film size={11} /> Watch & Review</>}
             </button>
           )}
         </div>
