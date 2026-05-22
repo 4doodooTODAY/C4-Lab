@@ -27,11 +27,11 @@ function fmtBytes(bytes) {
 }
 
 const STAGES = [
-  { key: 'pitch',          label: 'Pitch' },
-  { key: 'production',     label: 'Shoot' },
+  { key: 'pitch',           label: 'Not Started' },
+  { key: 'production',      label: 'In Progress' },
   { key: 'post_production', label: 'Editing' },
-  { key: 'review',         label: 'Review' },
-  { key: 'delivered',      label: 'Delivered' },
+  { key: 'review',          label: 'Review' },
+  { key: 'delivered',       label: 'Delivered' },
 ]
 
 // Normalize stages to canonical display key
@@ -49,8 +49,8 @@ const STAGE_KEY_MAP = {
 }
 
 const STAGE_DESCRIPTIONS = {
-  pitch:           'Waiting for client approval before work begins.',
-  production:      'Shoot scheduled. Upload footage after the shoot.',
+  pitch:           'Waiting to be kicked off.',
+  production:      'Upload footage and files for this project.',
   post_production: 'Footage is ready — time to edit.',
   review:          'Revision is under review.',
   delivered:       'Project complete!',
@@ -200,8 +200,8 @@ function ActionBanner({ project, uploads, revisions, isCreative, isEditor, navig
       banner = {
         variant: 'amber',
         icon: <Upload size={18} />,
-        title: 'Upload your shoot footage',
-        body: 'Upload all files from the shoot, write your notes, then submit to the editor.',
+        title: 'Upload footage and files',
+        body: 'Upload all files for this project, write your notes, then submit to the editor.',
       }
     } else {
       banner = {

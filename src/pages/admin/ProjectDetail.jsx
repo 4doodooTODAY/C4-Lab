@@ -19,7 +19,7 @@ import { forceDownload, uploadToR2 } from '../../lib/r2'
 // ── Constants ─────────────────────────────────────────────────────────────────
 const DISPLAY_STAGES = [
   { key: 'pitch',           label: 'Not Started' },
-  { key: 'production',      label: 'Shoot' },
+  { key: 'production',      label: 'In Progress' },
   { key: 'post_production', label: 'Editing' },
   { key: 'review',          label: 'Review' },
   { key: 'delivered',       label: 'Delivered' },
@@ -42,7 +42,7 @@ const STAGE_CURRENT_LABELS = {
   pitch:           'Pitch — Awaiting Approval',
   briefing:        'Setup & Planning',
   pre_production:  'Pre-Production',
-  production:      'Shoot / Footage Upload',
+  production:      'In Progress',
   post_production: 'Editing',
   review:          'In Review',
   revisions:       'Revisions',
@@ -54,8 +54,8 @@ const STAGE_CURRENT_LABELS = {
 const WHOS_UP = {
   pitch:           { who: 'client',     label: 'Client / Admin', msg: 'Awaiting pitch approval before work begins.' },
   briefing:        { who: 'admin',      label: 'Admin',          msg: 'Set up the project and begin when ready.' },
-  pre_production:  { who: 'admin',      label: 'Admin',          msg: 'Schedule the shoot.' },
-  production:      { who: 'creative',   label: 'Photographer',   msg: 'Upload footage + notes after the shoot.' },
+  pre_production:  { who: 'admin',      label: 'Admin',          msg: 'Set up the project and assign the team.' },
+  production:      { who: 'creative',   label: 'Creative',       msg: 'Upload footage and files for this project.' },
   post_production: { who: 'editor',     label: 'Editor',         msg: 'Upload the first cut — it goes to the photographer first.' },
   review:          { who: 'varies',     label: 'Review Cycle',   msg: 'Photographer → Client → Editor until approved.' },
   revisions:       { who: 'editor',     label: 'Editor',         msg: 'Client requested changes — upload a revision.' },
