@@ -163,7 +163,7 @@ function CommentItem({ comment, viewerRole, isClient, onAccept, onDecline, updat
 export default function VideoRevisionReview() {
   const { id, revisionId } = useParams()
   const navigate           = useNavigate()
-  const { profile }        = useAuth()
+  const { profile, isAdmin: ctxIsAdmin } = useAuth()
 
   const videoRef      = useRef(null)
   const timelineRef   = useRef(null)
@@ -222,7 +222,7 @@ export default function VideoRevisionReview() {
 
   const myRole         = profile?.role
   const myId           = profile?.id
-  const isAdmin        = myRole === 'admin'
+  const isAdmin        = ctxIsAdmin  // respects creative view mode
   const isPhotographer = myRole === 'creative' || (project && project.creative_id === myId)
   const isEditor       = project && project.editor_id === myId
   const isCreative     = isPhotographer || isEditor  // legacy compat

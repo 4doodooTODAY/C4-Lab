@@ -537,7 +537,7 @@ export default function ProjectDetail() {
 
       // 3. Add team members + client to calendar_event_members so everyone sees it
       if (evtData) {
-        const memberIds = [project.creative_id, project.editor_id].filter(Boolean)
+        const memberIds = [project.editor_id].filter(Boolean)
 
         // Resolve client's profile_id (clients table links to profiles via profile_id)
         if (project.client_id) {
@@ -1027,60 +1027,6 @@ export default function ProjectDetail() {
       <div className="bg-white rounded-2xl border border-border p-5 mb-6">
         <p className="text-xs font-semibold text-text-muted mb-4 uppercase tracking-wide">Assigned Team</p>
         <div className="space-y-4">
-
-          {/* Creative row */}
-          <div className="flex items-center gap-3">
-            <div className="w-6 flex items-center justify-center shrink-0">
-              <Camera size={13} className="text-text-muted" />
-            </div>
-            <span className="text-xs text-text-muted w-14 shrink-0">Creative</span>
-            {creativeProfile ? (
-              <div className="flex items-center gap-3 flex-1">
-                <Avatar name={creativeProfile.full_name} url={creativeProfile.avatar_url} size={8} />
-                <p className="text-sm font-medium text-text-primary flex-1">{creativeProfile.full_name}</p>
-                {isAdmin && !showCreativeSelect && (
-                  <button
-                    onClick={() => { setShowCreativeSelect(true); setSelectedCreative('') }}
-                    className="text-xs text-accent hover:text-accent/80 font-medium shrink-0"
-                  >
-                    Change
-                  </button>
-                )}
-              </div>
-            ) : (
-              <button
-                onClick={() => isAdmin && setShowCreativeSelect(true)}
-                className={`text-sm flex-1 text-left ${isAdmin ? 'text-text-muted/60 italic hover:text-accent transition-colors cursor-pointer' : 'text-text-muted/60 italic'}`}
-              >
-                Unassigned — {isAdmin ? 'click to assign' : 'not yet assigned'}
-              </button>
-            )}
-          </div>
-          {isAdmin && (showCreativeSelect || (!creativeProfile && showCreativeSelect)) && (
-            <div className="flex items-center gap-2 ml-10">
-              <select
-                className="input flex-1 text-sm"
-                value={selectedCreative}
-                onChange={(e) => setSelectedCreative(e.target.value)}
-              >
-                <option value="">— Select creative —</option>
-                {assignProfiles.map((p) => (
-                  <option key={p.id} value={p.id}>{p.full_name}</option>
-                ))}
-              </select>
-              <button
-                onClick={handleAssignCreative}
-                disabled={!selectedCreative || assigningCreative}
-                className="btn-primary text-xs px-3 py-1.5 flex items-center gap-1 disabled:opacity-50 shrink-0"
-              >
-                {assigningCreative ? <Loader2 size={12} className="animate-spin" /> : null}
-                Assign
-              </button>
-              <button onClick={() => setShowCreativeSelect(false)} className="btn-ghost p-1.5 shrink-0">
-                <X size={14} />
-              </button>
-            </div>
-          )}
 
           <div className="border-t border-border" />
 

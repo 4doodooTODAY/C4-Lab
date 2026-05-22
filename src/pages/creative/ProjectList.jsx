@@ -163,13 +163,21 @@ export default function CreativeProjectList() {
           return data || []
         }),
 
-      // My Edits — projects where I'm the editor
+      // My Edits — projects where I'm the editor or creative, scoped to my assigned clients
       supabase
-        .from('projects')
-        .select('id, name, stage, editor_id, clients(name, contact_name)')
-        .eq('editor_id', myId)
-        .neq('status', 'archived')
-        .order('created_at', { ascending: false }),
+        .from('client_creatives')
+        .select('client_id')
+        .eq('profile_id', myId)
+        .then(async ({ data: ccRows }) => {
+          const clientIds = (ccRows || []).map((r) => r.client_id).filter(Boolean)
+          if (!clientIds.length) return { data: [] }
+          return supabase
+            .from('projects')
+            .select('id, name, stage, editor_id, creative_id, client_id, clients(name, contact_name)')
+            .or(`editor_id.eq.${myId},creative_id.eq.${myId}`)
+            .in('client_id', clientIds)
+            .order('created_at', { ascending: false })
+        }),
 
       // Revisions for edit status badges
       supabase
@@ -177,7 +185,7 @@ export default function CreativeProjectList() {
         .select('id, project_id, revision_number, status'),
     ]).then(([shootData, editRes, revRes]) => {
       setShoots(shootData)
-      setEdits(editRes.data || [])
+      setEdits(editRes?.data || editRes || [])
       setRevisions(revRes.data || [])
       setLoading(false)
     })

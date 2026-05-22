@@ -1730,7 +1730,7 @@ function ProjectStatusCard({ project, revisions, creativeProfile, editorProfile 
 
 export default function ProjectWorkflow() {
   const { id }      = useParams()
-  const { profile } = useAuth()
+  const { profile, isAdmin } = useAuth()
   const navigate    = useNavigate()
 
   const [project,        setProject]        = useState(null)
@@ -1937,7 +1937,6 @@ export default function ProjectWorkflow() {
     )
   }
 
-  const isAdmin    = profile?.role === 'admin'
   const isCreative = profile?.role === 'creative' || project.creative_id === profile?.id || isAdmin
   const isEditor   = project.editor_id   === profile?.id || isAdmin
   return (

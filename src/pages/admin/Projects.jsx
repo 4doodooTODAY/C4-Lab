@@ -73,8 +73,7 @@ function NewProjectModal({ onClose, onCreated }) {
   const [clients,       setClients]       = useState([])
   const [clientTeam,    setClientTeam]    = useState([])   // profiles assigned to selected client
   const [form, setForm] = useState({ name: '', client_id: '', admin_review_required: false })
-  const [selectedCreative, setSelectedCreative] = useState('')
-  const [selectedEditor,   setSelectedEditor]   = useState('')
+  const [selectedEditor, setSelectedEditor] = useState('')
   const [saving, setSaving] = useState(false)
   const [error,  setError]  = useState('')
 
@@ -86,14 +85,13 @@ function NewProjectModal({ onClose, onCreated }) {
 
   // When client changes, load assigned team from client_creatives
   useEffect(() => {
-    if (!form.client_id) { setClientTeam([]); setSelectedCreative(''); setSelectedEditor(''); return }
+    if (!form.client_id) { setClientTeam([]); setSelectedEditor(''); return }
     supabase
       .from('client_creatives')
       .select('profile_id, role, profiles(id, full_name, avatar_url, role)')
       .eq('client_id', form.client_id)
       .then(({ data }) => {
         setClientTeam((data || []).map((a) => ({ ...a.profiles, assignedRole: a.role })))
-        setSelectedCreative('')
         setSelectedEditor('')
       })
   }, [form.client_id])
@@ -112,8 +110,7 @@ function NewProjectModal({ onClose, onCreated }) {
         stage:                 'pitch',
         created_by:            user?.id,
         admin_review_required: form.admin_review_required,
-        creative_id:           selectedCreative || null,
-        editor_id:             selectedEditor   || null,
+        editor_id:             selectedEditor || null,
         status:                'active',
       }
       const row = await createProject(payload)
@@ -169,15 +166,6 @@ function NewProjectModal({ onClose, onCreated }) {
               </p>
               {clientTeam.length > 0 && (
                 <>
-                  <div>
-                    <label className="label">Creative / Photographer</label>
-                    <select className="input" value={selectedCreative} onChange={(e) => setSelectedCreative(e.target.value)}>
-                      <option value="">— None —</option>
-                      {clientTeam.map((m) => (
-                        <option key={m.id} value={m.id}>{m.full_name}</option>
-                      ))}
-                    </select>
-                  </div>
                   <div>
                     <label className="label">Editor</label>
                     <select className="input" value={selectedEditor} onChange={(e) => setSelectedEditor(e.target.value)}>

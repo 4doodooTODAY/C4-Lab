@@ -119,8 +119,7 @@ function Stat({ label, value, icon: Icon, accent }) {
 
 // ── Main ───────────────────────────────────────────────────────────────────────
 export default function CreativeDashboard() {
-  const { profile, user } = useAuth()
-  const isAdmin = profile?.role === 'admin'
+  const { profile, user, isAdmin } = useAuth()
 
   const [projects,   setProjects]   = useState([])
   const [revisions,  setRevisions]  = useState([])
@@ -135,17 +134,32 @@ export default function CreativeDashboard() {
       const cutoff  = addDays(now, 21) // look 3 weeks ahead
 
       // My projects (or all for admin)
-      let projQuery = supabase
-        .from('projects')
-        .select('id, name, stage, shoot_date, location, creative_id, editor_id, clients(name, contact_name), creative:profiles!creative_id(id, full_name), editor:profiles!editor_id(id, full_name)')
-        .neq('stage', 'archived')
-        .order('shoot_date', { ascending: true, nullsFirst: false })
-
-      if (!isAdmin) {
-        projQuery = projQuery.or(`creative_id.eq.${user.id},editor_id.eq.${user.id}`)
+      let projData = []
+      if (isAdmin) {
+        const { data } = await supabase
+          .from('projects')
+          .select('id, name, stage, shoot_date, location, creative_id, editor_id, clients(name, contact_name), creative:profiles!creative_id(id, full_name), editor:profiles!editor_id(id, full_name)')
+          .neq('stage', 'archived')
+          .order('shoot_date', { ascending: true, nullsFirst: false })
+        projData = data || []
+      } else {
+        // scope to only the clients this creative/editor is assigned to
+        const { data: ccRows } = await supabase
+          .from('client_creatives')
+          .select('client_id')
+          .eq('profile_id', user.id)
+        const clientIds = (ccRows || []).map((r) => r.client_id).filter(Boolean)
+        if (clientIds.length) {
+          const { data } = await supabase
+            .from('projects')
+            .select('id, name, stage, shoot_date, location, creative_id, editor_id, clients(name, contact_name), creative:profiles!creative_id(id, full_name), editor:profiles!editor_id(id, full_name)')
+            .neq('stage', 'archived')
+            .or(`creative_id.eq.${user.id},editor_id.eq.${user.id}`)
+            .in('client_id', clientIds)
+            .order('shoot_date', { ascending: true, nullsFirst: false })
+          projData = data || []
+        }
       }
-
-      const { data: projData } = await projQuery
 
       const myProjects = projData || []
       const projectIds = myProjects.map((p) => p.id)

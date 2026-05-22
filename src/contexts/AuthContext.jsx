@@ -109,8 +109,11 @@ export function AuthProvider({ children }) {
     return data
   }
 
+  // isAdmin is false when an admin has switched to creative view — they get full creative permissions only
+  const isAdmin = profile?.role === 'admin' && viewMode !== 'creative'
+
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signIn, signOut, createUser, viewMode, setViewMode }}>
+    <AuthContext.Provider value={{ user, profile, loading, signIn, signOut, createUser, viewMode, setViewMode, isAdmin }}>
       {children}
     </AuthContext.Provider>
   )
