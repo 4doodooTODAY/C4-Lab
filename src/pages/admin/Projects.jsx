@@ -109,7 +109,7 @@ function NewProjectModal({ onClose, onCreated }) {
       const payload = {
         name:                  form.name.trim(),
         client_id:             form.client_id || null,
-        stage:                 'post_production',
+        stage:                 'pitch',
         created_by:            user?.id,
         admin_review_required: form.admin_review_required,
         creative_id:           selectedCreative || null,

@@ -1,13 +1,30 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   ArrowLeft, Loader2, Check, Trash2, Lock, Unlock, Mail, Phone,
-  Building2, Users, AlertTriangle, StickyNote, FileText, Upload, X
+  Building2, Users, AlertTriangle, StickyNote, FileText, Upload, X,
+  Film, Image, Download, Plus,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { format, formatDistanceToNow } from 'date-fns'
 import Avatar from '../../components/ui/Avatar'
 import { useCreatives } from '../../hooks/useClients'
+import { uploadToR2, forceDownload } from '../../lib/r2'
+import { useAuth } from '../../contexts/AuthContext'
+
+function fmtBytes(b) {
+  if (!b) return ''
+  if (b >= 1_073_741_824) return (b / 1_073_741_824).toFixed(1) + ' GB'
+  if (b >= 1_048_576)     return (b / 1_048_576).toFixed(1) + ' MB'
+  return (b / 1024).toFixed(1) + ' KB'
+}
+
+function fileIcon(name = '') {
+  const ext = name.split('.').pop()?.toLowerCase()
+  if (['mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v'].includes(ext)) return Film
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'raw', 'cr2', 'arw'].includes(ext)) return Image
+  return Upload
+}
 
 async function callAction(body, session) {
   const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-user`, {
@@ -109,6 +126,7 @@ export default function ClientDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const allCreatives = useCreatives()
+  const { profile } = useAuth()
 
   const [client, setClient] = useState(null)
   const [authUser, setAuthUser] = useState(null)
@@ -118,6 +136,13 @@ export default function ClientDetail() {
   const [footageUploads, setFootageUploads] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+
+  // Footage upload state
+  const footageInputRef = useRef()
+  const [uploadFiles, setUploadFiles]     = useState([])
+  const [uploading, setUploading]         = useState(false)
+  const [uploadError, setUploadError]     = useState('')
+  const [dragOver, setDragOver]           = useState(false)
 
   // Editable contact fields
   const [editName, setEditName] = useState('')
@@ -186,23 +211,22 @@ export default function ClientDetail() {
 
       // Content requests for this client
       if (clientRes.data?.profile_id) {
-        const [reqRes, uploadRes] = await Promise.all([
-          supabase
-            .from('content_requests')
-            .select('id, title, status, created_at')
-            .eq('profile_id', clientRes.data.profile_id)
-            .order('created_at', { ascending: false })
-            .limit(10),
-          supabase
-            .from('media')
-            .select('id, title, created_at, storage_path')
-            .eq('uploaded_by', clientRes.data.profile_id)
-            .order('created_at', { ascending: false })
-            .limit(10),
-        ])
+        const reqRes = await supabase
+          .from('content_requests')
+          .select('id, title, status, created_at')
+          .eq('profile_id', clientRes.data.profile_id)
+          .order('created_at', { ascending: false })
+          .limit(10)
         if (reqRes.data) setContentRequests(reqRes.data)
-        if (uploadRes.data) setFootageUploads(uploadRes.data)
       }
+
+      // Footage uploads from shoot_uploads for this client
+      const uploadRes = await supabase
+        .from('shoot_uploads')
+        .select('id, file_name, file_url, file_size, created_at')
+        .eq('client_id', id)
+        .order('created_at', { ascending: false })
+      if (uploadRes.data) setFootageUploads(uploadRes.data)
 
       setLoading(false)
     }
@@ -277,6 +301,43 @@ export default function ClientDetail() {
       alert(`Invite resent to ${client.email}`)
     } catch (err) {
       setError(err.message)
+    }
+  }
+
+  const handleFootageUpload = async () => {
+    if (!uploadFiles.length) return
+    setUploading(true)
+    setUploadError('')
+    try {
+      for (const file of uploadFiles) {
+        const { publicUrl } = await uploadToR2({
+          file,
+          category:    'footage',
+          clientName:  client.name || client.contact_name || 'client',
+          projectName: 'general',
+          folderType:  'clients',
+        })
+        const { error: dbErr } = await supabase.from('shoot_uploads').insert({
+          client_id:   id,
+          file_name:   file.name,
+          file_url:    publicUrl,
+          file_size:   file.size,
+          uploaded_by: profile?.id,
+        })
+        if (dbErr) throw new Error(dbErr.message)
+      }
+      // Refresh list
+      const { data } = await supabase
+        .from('shoot_uploads')
+        .select('id, file_name, file_url, file_size, created_at')
+        .eq('client_id', id)
+        .order('created_at', { ascending: false })
+      setFootageUploads(data || [])
+      setUploadFiles([])
+    } catch (err) {
+      setUploadError(err.message)
+    } finally {
+      setUploading(false)
     }
   }
 
@@ -428,20 +489,97 @@ export default function ClientDetail() {
 
         {/* Footage Uploads */}
         <div className="card p-6">
-          <h2 className="text-sm font-semibold text-text-primary mb-4">Footage Uploads</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-text-primary">Footage Uploads</h2>
+            <span className="text-xs text-text-muted">{footageUploads.length} file{footageUploads.length !== 1 ? 's' : ''}</span>
+          </div>
+
+          {/* Drop zone — always visible */}
+          <div
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(e) => {
+              e.preventDefault()
+              setDragOver(false)
+              setUploadFiles((prev) => [...prev, ...Array.from(e.dataTransfer.files)])
+            }}
+            onClick={() => !uploading && footageInputRef.current?.click()}
+            className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-all mb-4 ${
+              dragOver
+                ? 'border-accent bg-accent/5'
+                : 'border-border hover:border-accent/50 hover:bg-surface-2/50'
+            } ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            <Upload size={20} className="mx-auto text-text-muted mb-1.5" />
+            <p className="text-sm font-medium text-text-primary">Drop files here or <span className="text-accent">click to browse</span></p>
+            <p className="text-xs text-text-muted mt-0.5">Videos, photos, and more from your computer or camera roll</p>
+            <input
+              ref={footageInputRef}
+              type="file"
+              multiple
+              accept="video/*,image/*,.mov,.mp4,.avi,.mkv,.raw,.cr2,.arw,.zip"
+              className="hidden"
+              onChange={(e) => setUploadFiles((prev) => [...prev, ...Array.from(e.target.files)])}
+            />
+          </div>
+
+          {/* Selected files ready to upload */}
+          {uploadFiles.length > 0 && (
+            <div className="mb-3 space-y-1.5">
+              {uploadFiles.map((f, i) => {
+                const Icon = fileIcon(f.name)
+                return (
+                  <div key={i} className="flex items-center gap-2 text-xs bg-surface-2/60 rounded-lg px-3 py-2">
+                    <Icon size={13} className="text-text-muted shrink-0" />
+                    <span className="flex-1 truncate text-text-primary">{f.name}</span>
+                    <span className="text-text-muted shrink-0">{fmtBytes(f.size)}</span>
+                    {!uploading && (
+                      <button onClick={(e) => { e.stopPropagation(); setUploadFiles((prev) => prev.filter((_, j) => j !== i)) }}>
+                        <X size={12} className="text-text-muted hover:text-red-500" />
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+              {uploadError && <p className="text-xs text-red-500 mt-1">{uploadError}</p>}
+              <button
+                onClick={handleFootageUpload}
+                disabled={uploading}
+                className="btn-primary w-full flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
+              >
+                {uploading
+                  ? <><Loader2 size={14} className="animate-spin" /> Uploading…</>
+                  : <><Upload size={14} /> Upload {uploadFiles.length} file{uploadFiles.length !== 1 ? 's' : ''}</>
+                }
+              </button>
+            </div>
+          )}
+
+          {/* Existing files */}
           {footageUploads.length === 0 ? (
             <p className="text-sm text-text-muted">No footage uploaded yet.</p>
           ) : (
-            <div className="space-y-2">
-              {footageUploads.map((m) => (
-                <div key={m.id} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
-                  <div className="flex items-center gap-2">
-                    <Upload size={13} className="text-text-muted shrink-0" />
-                    <p className="text-sm text-text-primary">{m.title || 'Untitled'}</p>
+            <div className="space-y-1">
+              {footageUploads.map((f) => {
+                const Icon = fileIcon(f.file_name || '')
+                return (
+                  <div key={f.id} className="flex items-center gap-2 py-2 border-b border-border last:border-0">
+                    <Icon size={13} className="text-text-muted shrink-0" />
+                    <p className="text-sm text-text-primary flex-1 truncate">{f.file_name || 'Untitled'}</p>
+                    <span className="text-xs text-text-muted shrink-0">{fmtBytes(f.file_size)}</span>
+                    <span className="text-xs text-text-muted shrink-0">{format(new Date(f.created_at), 'MMM d, yyyy')}</span>
+                    {f.file_url && (
+                      <button
+                        onClick={() => forceDownload(f.file_url, f.file_name)}
+                        className="text-text-muted hover:text-accent transition-colors shrink-0"
+                        title="Download"
+                      >
+                        <Download size={13} />
+                      </button>
+                    )}
                   </div>
-                  <span className="text-xs text-text-muted">{format(new Date(m.created_at), 'MMM d, yyyy')}</span>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>

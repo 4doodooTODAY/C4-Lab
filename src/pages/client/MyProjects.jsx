@@ -3,11 +3,13 @@ import { useNavigate, Link } from 'react-router-dom'
 import {
   Loader2, FolderKanban, ArrowRight, CheckCircle2, Upload,
   Film, X, Check, CalendarDays, MapPin, Users, Clock,
-  ChevronDown, ChevronUp, Scissors, Camera, StickyNote,
+  Camera, Scissors, StickyNote, ThumbsUp, ThumbsDown,
+  MessageSquare, Sparkles,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { uploadToR2, fmtSpeed, fmtEta } from '../../lib/r2'
+import { notify, notifyAdmins } from '../../lib/notify'
 import { format, parseISO, isPast, isFuture, formatDistanceToNow } from 'date-fns'
 import { fmtTime } from '../../lib/time'
 
@@ -19,50 +21,63 @@ function fmtBytes(bytes) {
 }
 
 // ── Stage config ──────────────────────────────────────────────────────────────
-const STAGE_STEPS = ['Planning', 'Shoot', 'Editing', 'Review', 'Done']
+// Stages: pitch → pre_production → production → post_production → review → delivered
+const STAGE_STEPS = ['Pitch', 'Shoot', 'Editing', 'Review', 'Done']
 
 function getStep(stage, pendingRevision) {
   if (stage === 'delivered' || stage === 'ready_to_post') return 4
-  if (stage === 'review' || stage === 'revisions') {
-    return pendingRevision?.status === 'pending_client_review' ? 3 : 3
-  }
+  if (stage === 'review' || stage === 'revisions') return 3
   if (stage === 'post_production') return 2
-  if (stage === 'production') return 1
-  return 0
+  if (stage === 'production' || stage === 'pre_production' || stage === 'briefing') return 1
+  return 0 // pitch
 }
 
 function getStatusInfo(stage, pendingRevision) {
-  if (stage === 'delivered') return { text: 'Your project is complete!', sub: 'Posted online ✅', color: 'text-green-600', emoji: '🎉' }
-  if (stage === 'ready_to_post') return { text: 'Approved — coming soon!', sub: "We're getting ready to post this.", color: 'text-blue-600', emoji: '🚀' }
-  if (pendingRevision?.status === 'pending_client_review') {
-    const n = pendingRevision.revision_number
-    return { text: n === 1 ? 'Your first cut is ready!' : `Revision ${n - 1} is ready!`, sub: 'Watch it and leave your feedback.', color: 'text-accent', emoji: '🎬' }
+  const revStatus = pendingRevision?.status
+
+  if (stage === 'delivered')
+    return { text: 'Your project is complete!', sub: 'Posted online ✅', color: 'text-green-600', emoji: '🎉' }
+  if (stage === 'ready_to_post')
+    return { text: 'Approved — coming soon!', sub: "We're preparing to post this.", color: 'text-blue-600', emoji: '🚀' }
+
+  if (stage === 'review' || stage === 'revisions') {
+    if (revStatus === 'pending_client_review') {
+      const n = pendingRevision.revision_number
+      return { text: n === 1 ? 'Your first cut is ready!' : `Revision ${n - 1} is ready!`, sub: 'Watch and leave your feedback.', color: 'text-accent', emoji: '🎬' }
+    }
+    if (revStatus === 'pending_photographer_review' || revStatus === 'pending_creative_review')
+      return { text: 'Under review', sub: 'The photographer is reviewing before sending it to you.', color: 'text-purple-600', emoji: '🔍' }
+    if (revStatus === 'pending_editor')
+      return { text: 'Revisions in progress', sub: 'Your feedback is being addressed.', color: 'text-orange-600', emoji: '✂️' }
+    return { text: 'Under review', sub: 'Your team is reviewing.', color: 'text-gray-600', emoji: '' }
   }
-  if (stage === 'production') return { text: 'Shoot day!', sub: 'Your footage is being captured.', color: 'text-amber-600', emoji: '🎥' }
-  if (stage === 'post_production') return { text: 'In the edit', sub: 'Your editor is working on the footage.', color: 'text-purple-600', emoji: '✂️' }
-  if (stage === 'revisions' || stage === 'review') {
-    if (pendingRevision?.status === 'pending_editor') return { text: 'Revisions in progress', sub: 'Your feedback is being addressed.', color: 'text-orange-600', emoji: '' }
-    return { text: 'Under review', sub: 'Your team is reviewing before sending over.', color: 'text-gray-600', emoji: '' }
-  }
-  return { text: 'Getting set up', sub: "We're planning everything for your shoot.", color: 'text-gray-500', emoji: '📋' }
+
+  if (stage === 'post_production')
+    return { text: 'In the edit', sub: 'Your editor is cutting the footage.', color: 'text-purple-600', emoji: '✂️' }
+  if (stage === 'production')
+    return { text: 'Footage being uploaded', sub: 'The photographer is submitting the shoot files.', color: 'text-amber-600', emoji: '🎥' }
+  if (stage === 'pre_production' || stage === 'briefing')
+    return { text: 'Shoot being planned', sub: "We're scheduling everything for your project.", color: 'text-blue-600', emoji: '📅' }
+  if (stage === 'pitch')
+    return { text: 'Waiting for your approval', sub: 'Review the project brief and approve to get started.', color: 'text-accent', emoji: '✨' }
+
+  return { text: 'Getting set up', sub: "We're planning everything.", color: 'text-gray-500', emoji: '📋' }
 }
 
 // ── Progress bar ──────────────────────────────────────────────────────────────
 function ProgressBar({ stage, pendingRevision }) {
   const step = getStep(stage, pendingRevision)
   return (
-    <div className="flex items-center gap-0 w-full">
+    <div className="flex items-center w-full">
       {STAGE_STEPS.map((label, i) => {
         const done    = i < step
         const current = i === step
         const isLast  = i === STAGE_STEPS.length - 1
         return (
           <div key={label} className="flex items-center flex-1 min-w-0">
-            <div className="flex flex-col items-center min-w-0 flex-1">
+            <div className="flex flex-col items-center flex-1 min-w-0">
               <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 transition-all ${
-                done    ? 'bg-green-500 text-white' :
-                current ? 'bg-accent text-white ring-4 ring-accent/20' :
-                          'bg-gray-100 text-gray-400'
+                done ? 'bg-green-500 text-white' : current ? 'bg-accent text-white ring-4 ring-accent/20' : 'bg-gray-100 text-gray-400'
               }`}>
                 {done ? <Check size={10} /> : i + 1}
               </div>
@@ -70,9 +85,7 @@ function ProgressBar({ stage, pendingRevision }) {
                 done ? 'text-green-500' : current ? 'text-accent' : 'text-gray-300'
               }`}>{label}</p>
             </div>
-            {!isLast && (
-              <div className={`h-0.5 flex-1 mx-0.5 mb-3 ${done ? 'bg-green-400' : 'bg-gray-100'}`} />
-            )}
+            {!isLast && <div className={`h-0.5 flex-1 mx-0.5 mb-3 ${done ? 'bg-green-400' : 'bg-gray-100'}`} />}
           </div>
         )
       })}
@@ -80,7 +93,7 @@ function ProgressBar({ stage, pendingRevision }) {
   )
 }
 
-// ── Team avatar ───────────────────────────────────────────────────────────────
+// ── Team pill ─────────────────────────────────────────────────────────────────
 function TeamPill({ label, name, icon: Icon, color }) {
   if (!name) return null
   return (
@@ -113,14 +126,11 @@ function FootageUploader({ project, clientName, onDone }) {
 
   const handleUpload = async () => {
     if (!files.length) return
-    setUploading(true)
-    setError('')
+    setUploading(true); setError('')
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i]
-        setFileIdx(i)
-        setProgress(0)
-        setStats(null)
+        setFileIdx(i); setProgress(0); setStats(null)
         const { publicUrl } = await uploadToR2({
           file, category: 'client-footage', clientName: clientName || '',
           projectName: project.name, folderType: 'shoots',
@@ -132,8 +142,7 @@ function FootageUploader({ project, clientName, onDone }) {
         })
         if (dbErr) throw new Error(dbErr.message)
       }
-      setDone(true)
-      setFiles([])
+      setDone(true); setFiles([])
     } catch (err) {
       setError(err.message || 'Upload failed.')
     } finally {
@@ -144,9 +153,8 @@ function FootageUploader({ project, clientName, onDone }) {
   if (done) return (
     <div className="mt-3 p-4 bg-green-50 border border-green-200 rounded-xl text-center">
       <CheckCircle2 size={20} className="mx-auto text-green-500 mb-1.5" />
-      <p className="text-sm font-semibold text-green-800">Footage uploaded!</p>
-      <p className="text-xs text-green-600 mt-0.5 mb-2">Your team will start working on it.</p>
-      <div className="flex gap-2">
+      <p className="text-sm font-semibold text-green-800">Footage sent to your team!</p>
+      <div className="flex gap-2 mt-2">
         <button onClick={() => setDone(false)} className="flex-1 py-1.5 rounded-lg text-xs font-semibold border border-green-300 text-green-700 hover:bg-green-100 transition-colors">Upload more</button>
         <button onClick={() => { setDone(false); onDone?.() }} className="flex-1 py-1.5 rounded-lg text-xs font-semibold bg-green-600 text-white hover:bg-green-700 transition-colors">Done</button>
       </div>
@@ -209,30 +217,163 @@ function FootageUploader({ project, clientName, onDone }) {
   )
 }
 
+// ── Pitch approval panel ───────────────────────────────────────────────────────
+function PitchPanel({ project, clientId, userId, onApproved }) {
+  const [approving,  setApproving]  = useState(false)
+  const [declining,  setDeclining]  = useState(false)
+  const [notes,      setNotes]      = useState('')
+  const [showNotes,  setShowNotes]  = useState(false)
+  const [error,      setError]      = useState('')
+
+  const handleApprove = async () => {
+    setApproving(true); setError('')
+    try {
+      const { error: e } = await supabase.from('projects')
+        .update({ stage: 'pre_production', pitch_approved_by: userId, pitch_approved_at: new Date().toISOString() })
+        .eq('id', project.id)
+      if (e) throw new Error(e.message)
+
+      // Notify admin + creative
+      const targets = [project.creative_id].filter(Boolean)
+      await notifyAdmins({
+        actorId: userId, type: 'pitch_approved',
+        title: `"${project.name}" approved by client`,
+        body: 'The client approved the project pitch. Shoot can now be scheduled.',
+        link: `/projects/${project.id}`,
+      })
+      for (const profileId of targets) {
+        await notify({
+          profileId, actorId: userId, type: 'pitch_approved',
+          title: `"${project.name}" has been approved!`,
+          body: 'The client approved your project pitch.',
+          link: `/projects/${project.id}`,
+        })
+      }
+      onApproved()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setApproving(false)
+    }
+  }
+
+  const handleRequestChanges = async () => {
+    if (!notes.trim()) { setShowNotes(true); return }
+    setDeclining(true); setError('')
+    try {
+      const { error: e } = await supabase.from('projects')
+        .update({ pitch_notes: notes.trim() })
+        .eq('id', project.id)
+      if (e) throw new Error(e.message)
+
+      await notifyAdmins({
+        actorId: userId, type: 'pitch_changes_requested',
+        title: `"${project.name}" — client requested changes`,
+        body: notes.trim(),
+        link: `/projects/${project.id}`,
+      })
+      setShowNotes(false)
+      onApproved() // refresh
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setDeclining(false)
+    }
+  }
+
+  return (
+    <div className="bg-gradient-to-br from-accent/5 to-purple-50 border border-accent/20 rounded-2xl p-5">
+      <div className="flex items-center gap-2 mb-3">
+        <Sparkles size={16} className="text-accent" />
+        <h3 className="text-sm font-bold text-gray-900">New Project Pitch</h3>
+      </div>
+
+      {project.concept && (
+        <div className="bg-white rounded-xl px-4 py-3 mb-4 border border-accent/10">
+          <p className="text-xs text-gray-400 font-medium mb-1">Project Brief</p>
+          <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{project.concept}</p>
+        </div>
+      )}
+
+      {project.notes && (
+        <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 mb-4">
+          <p className="text-xs text-amber-500 font-medium mb-1">Note from your team</p>
+          <p className="text-sm text-gray-700 leading-relaxed">{project.notes}</p>
+        </div>
+      )}
+
+      {project.pitch_notes && (
+        <div className="bg-orange-50 border border-orange-100 rounded-xl px-4 py-3 mb-4">
+          <p className="text-xs text-orange-500 font-medium mb-1">Your previous feedback</p>
+          <p className="text-sm text-gray-700 leading-relaxed">{project.pitch_notes}</p>
+        </div>
+      )}
+
+      {showNotes && (
+        <div className="mb-3">
+          <label className="text-xs text-gray-500 font-medium mb-1 block">What needs to change?</label>
+          <textarea
+            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 resize-none focus:outline-none focus:ring-2 focus:ring-accent/30 min-h-[80px]"
+            placeholder="Describe what you'd like changed…"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            autoFocus
+          />
+        </div>
+      )}
+
+      {error && <p className="text-xs text-red-500 mb-3">{error}</p>}
+
+      <div className="flex gap-2">
+        <button
+          onClick={handleApprove}
+          disabled={approving}
+          className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-accent text-white text-sm font-semibold hover:bg-accent/90 transition-all disabled:opacity-50"
+        >
+          {approving ? <Loader2 size={13} className="animate-spin" /> : <ThumbsUp size={13} />}
+          Approve & Start
+        </button>
+        <button
+          onClick={showNotes ? handleRequestChanges : () => setShowNotes(true)}
+          disabled={declining}
+          className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-medium hover:border-gray-300 hover:bg-gray-50 transition-all disabled:opacity-50"
+        >
+          {declining ? <Loader2 size={13} className="animate-spin" /> : <ThumbsDown size={13} />}
+          {showNotes ? 'Send Feedback' : 'Request Changes'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── Project Card ──────────────────────────────────────────────────────────────
-function ProjectCard({ project, revisions, clientName }) {
+function ProjectCard({ project, revisions, clientId, userId, onRefresh }) {
   const navigate    = useNavigate()
   const [showUpload, setShowUpload] = useState(false)
 
-  const pendingRevision = [...revisions]
-    .sort((a, b) => b.revision_number - a.revision_number)[0]
+  const sortedRevs = [...revisions].sort((a, b) => b.revision_number - a.revision_number)
+  const pendingRevision = sortedRevs[0]
 
   const { text, sub, color, emoji } = getStatusInfo(project.stage, pendingRevision)
-  const canReview   = pendingRevision?.status === 'pending_client_review'
-  const isDelivered = project.stage === 'delivered'
+  const isPitch      = project.stage === 'pitch'
+  const canReview    = pendingRevision?.status === 'pending_client_review'
+  const isDelivered  = project.stage === 'delivered'
   const isReadyToPost = project.stage === 'ready_to_post'
 
-  const completedRevisions = revisions.filter((r) => r.status === 'approved').length
-  const shoot = project.shoot
+  const revisionCount  = revisions.length
+  const revisionLimit  = project.max_revisions || 3
+  const revisionsLeft  = Math.max(0, revisionLimit - revisionCount)
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-all">
       {/* Stage color bar */}
-      <div className={`h-1 ${
-        project.stage === 'delivered'     ? 'bg-green-400' :
-        project.stage === 'ready_to_post'  ? 'bg-blue-400' :
-        project.stage === 'post_production' || project.stage === 'review' || project.stage === 'revisions' ? 'bg-accent' :
-        project.stage === 'production'    ? 'bg-amber-400' :
+      <div className={`h-1.5 ${
+        isPitch             ? 'bg-accent' :
+        isDelivered         ? 'bg-green-400' :
+        isReadyToPost       ? 'bg-blue-400' :
+        project.stage === 'review' || project.stage === 'revisions' ? 'bg-accent' :
+        project.stage === 'post_production' ? 'bg-purple-400' :
+        project.stage === 'production'      ? 'bg-amber-400' :
         'bg-gray-200'
       }`} />
 
@@ -248,7 +389,7 @@ function ProjectCard({ project, revisions, clientName }) {
           </div>
           {isDelivered && (
             <span className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full bg-green-50 text-green-700 text-xs font-semibold border border-green-200">
-              <Check size={10} /> Posted Online
+              <Check size={10} /> Delivered
             </span>
           )}
           {isReadyToPost && (
@@ -258,93 +399,100 @@ function ProjectCard({ project, revisions, clientName }) {
           )}
         </div>
 
-        {/* Progress bar */}
-        <div className="mb-5">
-          <ProgressBar stage={project.stage} pendingRevision={pendingRevision} />
-        </div>
+        {/* Progress bar (hidden on pitch, not yet started) */}
+        {!isPitch && (
+          <div className="mb-5">
+            <ProgressBar stage={project.stage} pendingRevision={pendingRevision} />
+          </div>
+        )}
 
-        {/* Info grid — shoot date, team, deadline */}
-        <div className="grid grid-cols-1 gap-2 mb-4">
-          {/* Shoot date from linked shoot or project */}
-          {(shoot?.shoot_date || project.shoot_date) && (
-            <div className="flex items-start gap-2.5 bg-gray-50 rounded-xl px-3 py-2.5">
-              <Camera size={13} className="text-gray-400 mt-0.5 shrink-0" />
-              <div>
-                <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Shoot</p>
-                <p className="text-sm font-semibold text-gray-800">
-                  {format(parseISO(shoot?.shoot_date || project.shoot_date), 'EEEE, MMMM d, yyyy')}
-                </p>
-                {(shoot?.shoot_time || project.shoot_time) && (
-                  <p className="text-xs text-gray-500">{fmtTime(shoot?.shoot_time || project.shoot_time)}</p>
-                )}
-                {(shoot?.location || project.location) && (
-                  <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
-                    <MapPin size={9} /> {shoot?.location || project.location}
+        {/* Pitch approval panel */}
+        {isPitch && (
+          <div className="mb-4">
+            <PitchPanel
+              project={project}
+              clientId={clientId}
+              userId={userId}
+              onApproved={onRefresh}
+            />
+          </div>
+        )}
+
+        {/* Info grid */}
+        {!isPitch && (
+          <div className="grid grid-cols-1 gap-2 mb-4">
+            {/* Shoot date */}
+            {project.shoot_date && (
+              <div className="flex items-start gap-2.5 bg-gray-50 rounded-xl px-3 py-2.5">
+                <Camera size={13} className="text-gray-400 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Shoot</p>
+                  <p className="text-sm font-semibold text-gray-800">
+                    {format(parseISO(project.shoot_date), 'EEEE, MMMM d, yyyy')}
                   </p>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Target delivery date */}
-          {project.target_date && (
-            <div className="flex items-start gap-2.5 bg-gray-50 rounded-xl px-3 py-2.5">
-              <Clock size={13} className="text-gray-400 mt-0.5 shrink-0" />
-              <div>
-                <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Target Delivery</p>
-                <p className="text-sm font-semibold text-gray-800">
-                  {format(parseISO(project.target_date), 'MMMM d, yyyy')}
-                </p>
-                <p className="text-xs text-gray-500">
-                  {isFuture(parseISO(project.target_date))
-                    ? `In ${formatDistanceToNow(parseISO(project.target_date))}`
-                    : isPast(parseISO(project.target_date)) ? 'Past due date' : 'Today'}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Team */}
-          {(project.creative?.full_name || project.editor?.full_name) && (
-            <div className="flex items-start gap-2.5 bg-gray-50 rounded-xl px-3 py-2.5">
-              <Users size={13} className="text-gray-400 mt-0.5 shrink-0" />
-              <div>
-                <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide mb-1.5">Your Team</p>
-                <div className="flex flex-wrap gap-3">
-                  <TeamPill label="Creative" name={project.creative?.full_name} icon={Camera} color="bg-purple-400" />
-                  <TeamPill label="Editor"   name={project.editor?.full_name}   icon={Scissors} color="bg-blue-400" />
+                  {project.location && (
+                    <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                      <MapPin size={9} /> {project.location}
+                    </p>
+                  )}
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Notes from team */}
-          {project.notes && (
-            <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2.5">
-              <StickyNote size={13} className="text-amber-500 mt-0.5 shrink-0" />
-              <div>
-                <p className="text-[10px] text-amber-600 font-medium uppercase tracking-wide">Note from your team</p>
-                <p className="text-xs text-gray-700 mt-0.5 leading-relaxed">{project.notes}</p>
+            {/* Target delivery */}
+            {project.target_date && (
+              <div className="flex items-start gap-2.5 bg-gray-50 rounded-xl px-3 py-2.5">
+                <Clock size={13} className="text-gray-400 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Target Delivery</p>
+                  <p className="text-sm font-semibold text-gray-800">
+                    {format(parseISO(project.target_date), 'MMMM d, yyyy')}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {isFuture(parseISO(project.target_date))
+                      ? `In ${formatDistanceToNow(parseISO(project.target_date))}`
+                      : 'Past due date'}
+                  </p>
+                </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
 
-        {/* Stats row */}
-        {(completedRevisions > 0 || revisions.length > 0) && (
+            {/* Team */}
+            {(project.creative?.full_name || project.editor?.full_name) && (
+              <div className="flex items-start gap-2.5 bg-gray-50 rounded-xl px-3 py-2.5">
+                <Users size={13} className="text-gray-400 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide mb-1.5">Your Team</p>
+                  <div className="flex flex-wrap gap-3">
+                    <TeamPill label="Photographer" name={project.creative?.full_name} icon={Camera}   color="bg-purple-400" />
+                    <TeamPill label="Editor"       name={project.editor?.full_name}   icon={Scissors} color="bg-blue-400" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Notes from team */}
+            {project.notes && (
+              <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2.5">
+                <StickyNote size={13} className="text-amber-500 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-[10px] text-amber-600 font-medium uppercase tracking-wide">Note from your team</p>
+                  <p className="text-xs text-gray-700 mt-0.5 leading-relaxed">{project.notes}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Revision stats */}
+        {!isPitch && revisions.length > 0 && (
           <div className="flex items-center gap-4 text-xs text-gray-400 mb-4 pb-4 border-b border-gray-100">
-            {revisions.length > 0 && (
-              <span className="flex items-center gap-1">
-                <Film size={10} />
-                {revisions.length} cut{revisions.length !== 1 ? 's' : ''} submitted
-              </span>
-            )}
-            {completedRevisions > 0 && (
-              <span className="flex items-center gap-1 text-green-500">
-                <CheckCircle2 size={10} />
-                {completedRevisions} approved
-              </span>
-            )}
+            <span className="flex items-center gap-1">
+              <Film size={10} /> {revisions.length} cut{revisions.length !== 1 ? 's' : ''} submitted
+            </span>
+            <span className="flex items-center gap-1">
+              <MessageSquare size={10} /> {revisionsLeft} revision{revisionsLeft !== 1 ? 's' : ''} remaining
+            </span>
           </div>
         )}
 
@@ -364,14 +512,14 @@ function ProjectCard({ project, revisions, clientName }) {
           </div>
         )}
 
-        {!canReview && !isDelivered && (
+        {!isPitch && !canReview && !isDelivered && !isReadyToPost && (
           <div className="w-full py-2.5 px-5 rounded-xl bg-gray-50 border border-gray-100 text-gray-400 text-sm text-center mb-3 flex items-center justify-center gap-2">
-            <Clock size={13} /> Sit tight — your team is on it
+            <Clock size={13} /> Your team is on it — we'll notify you when action is needed
           </div>
         )}
 
-        {/* Upload footage */}
-        {!isDelivered && (
+        {/* Footage upload */}
+        {!isPitch && !isDelivered && (
           <button
             onClick={() => setShowUpload((v) => !v)}
             className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-accent font-medium transition-colors"
@@ -380,14 +528,8 @@ function ProjectCard({ project, revisions, clientName }) {
             {showUpload ? 'Hide uploader' : 'Send footage to your team'}
           </button>
         )}
-
-        {/* Footage uploader */}
         {showUpload && !isDelivered && (
-          <FootageUploader
-            project={project}
-            clientName={clientName}
-            onDone={() => setShowUpload(false)}
-          />
+          <FootageUploader project={project} clientName="" onDone={() => setShowUpload(false)} />
         )}
       </div>
     </div>
@@ -399,67 +541,57 @@ export default function MyProjects() {
   const { user } = useAuth()
   const [projects,   setProjects]   = useState([])
   const [revisions,  setRevisions]  = useState([])
-  const [clientName, setClientName] = useState('')
+  const [clientId,   setClientId]   = useState(null)
   const [loading,    setLoading]    = useState(true)
 
-  useEffect(() => {
+  const loadAll = async () => {
     if (!user?.id) return
     setLoading(true)
-    supabase
-      .from('clients')
-      .select('id, name')
-      .eq('profile_id', user.id)
-      .maybeSingle()
-      .then(async ({ data: client }) => {
-        if (!client) { setLoading(false); return }
-        setClientName(client.name || '')
+    const { data: client } = await supabase
+      .from('clients').select('id, name').eq('profile_id', user.id).maybeSingle()
+    if (!client) { setLoading(false); return }
+    setClientId(client.id)
 
-        // Full project data including team profiles and linked shoot
-        const { data: projData, error: projErr } = await supabase
-          .from('projects')
-          .select(`
-            id, name, stage, status, target_date, due_date, notes,
-            shoot_id, creative_id, editor_id,
-            shoot:shoot_id ( id, title, shoot_date, shoot_time, location )
-          `)
-          .eq('client_id', client.id)
-          .order('created_at', { ascending: false })
+    const { data: projData } = await supabase
+      .from('projects')
+      .select(`
+        id, name, stage, status, concept, notes, pitch_notes,
+        target_date, due_date, shoot_date, location, max_revisions,
+        creative_id, editor_id
+      `)
+      .eq('client_id', client.id)
+      .order('created_at', { ascending: false })
 
-        if (projErr) console.error('MyProjects fetch error:', projErr)
+    const projects = projData || []
+    const projectIds = projects.map((p) => p.id)
+    const profileIds = [...new Set(projects.flatMap((p) => [p.creative_id, p.editor_id].filter(Boolean)))]
 
-        const projects = projData || []
-        const projectIds = projects.map((p) => p.id)
+    const [revRes, profilesRes] = await Promise.all([
+      projectIds.length
+        ? supabase.from('project_revisions').select('id, project_id, revision_number, status').in('project_id', projectIds)
+        : Promise.resolve({ data: [] }),
+      profileIds.length
+        ? supabase.from('profiles').select('id, full_name').in('id', profileIds)
+        : Promise.resolve({ data: [] }),
+    ])
 
-        // Load team profiles + revisions in parallel
-        const profileIds = [...new Set(projects.flatMap((p) => [p.creative_id, p.editor_id].filter(Boolean)))]
+    const profileMap = {}
+    ;(profilesRes.data || []).forEach((p) => { profileMap[p.id] = p })
 
-        const [revRes, profilesRes] = await Promise.all([
-          projectIds.length
-            ? supabase.from('project_revisions').select('id, project_id, revision_number, status').in('project_id', projectIds)
-            : Promise.resolve({ data: [] }),
-          profileIds.length
-            ? supabase.from('profiles').select('id, full_name, avatar_url').in('id', profileIds)
-            : Promise.resolve({ data: [] }),
-        ])
+    setProjects(projects.map((p) => ({
+      ...p,
+      creative: p.creative_id ? profileMap[p.creative_id] : null,
+      editor:   p.editor_id   ? profileMap[p.editor_id]   : null,
+    })))
+    setRevisions(revRes.data || [])
+    setLoading(false)
+  }
 
-        const profileMap = {}
-        ;(profilesRes.data || []).forEach((p) => { profileMap[p.id] = p })
+  useEffect(() => { loadAll() }, [user])
 
-        // Attach creative + editor profiles to each project
-        const enriched = projects.map((p) => ({
-          ...p,
-          creative: p.creative_id ? profileMap[p.creative_id] : null,
-          editor:   p.editor_id   ? profileMap[p.editor_id]   : null,
-        }))
-
-        setProjects(enriched)
-        setRevisions(revRes.data || [])
-        setLoading(false)
-      })
-  }, [user])
-
-  const activeCount    = projects.filter((p) => p.stage !== 'delivered' && p.stage !== 'ready_to_post').length
-  const deliveredCount = projects.filter((p) => p.stage === 'delivered').length
+  const pitchProjects   = projects.filter((p) => p.stage === 'pitch')
+  const activeProjects  = projects.filter((p) => p.stage !== 'pitch' && p.stage !== 'delivered' && p.stage !== 'ready_to_post')
+  const doneProjects    = projects.filter((p) => p.stage === 'delivered' || p.stage === 'ready_to_post')
 
   if (loading) return (
     <div className="flex justify-center py-24">
@@ -471,7 +603,6 @@ export default function MyProjects() {
     <div className="min-h-screen bg-gray-50/40">
       <div className="max-w-[640px] mx-auto px-6 py-12">
 
-        {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Your Projects</h1>
           <p className="text-gray-400 mt-1.5">Track the progress of your creative work.</p>
@@ -481,9 +612,9 @@ export default function MyProjects() {
         {projects.length > 0 && (
           <div className="grid grid-cols-3 gap-3 mb-8">
             {[
-              { label: 'Active',     value: activeCount,    color: 'text-accent' },
-              { label: 'Delivered',  value: deliveredCount, color: 'text-green-500' },
-              { label: 'Total',      value: projects.length, color: 'text-gray-700' },
+              { label: 'Active',     value: activeProjects.length, color: 'text-accent' },
+              { label: 'Delivered',  value: doneProjects.length,   color: 'text-green-500' },
+              { label: 'Total',      value: projects.length,       color: 'text-gray-700' },
             ].map(({ label, value, color }) => (
               <div key={label} className="bg-white rounded-2xl border border-gray-100 p-4 text-center shadow-sm">
                 <p className={`text-2xl font-bold ${color}`}>{value}</p>
@@ -497,57 +628,60 @@ export default function MyProjects() {
           <div className="bg-white rounded-2xl border border-gray-100 p-16 text-center shadow-sm">
             <FolderKanban size={40} className="mx-auto text-gray-200 mb-4" />
             <h2 className="text-lg font-semibold text-gray-400 mb-1">No projects yet</h2>
-            <p className="text-sm text-gray-300">Your projects will appear here once created.</p>
+            <p className="text-sm text-gray-300">Your projects will appear here once your team creates them.</p>
           </div>
         ) : (
-          <>
-            {/* Active projects */}
-            <div className="space-y-5">
-              {projects.filter((p) => p.stage !== 'delivered').map((p) => (
-                <ProjectCard
-                  key={p.id}
-                  project={p}
-                  revisions={revisions.filter((r) => r.project_id === p.id)}
-                  clientName={clientName}
-                />
-              ))}
-            </div>
-
-            {/* Completed projects */}
-            {projects.some((p) => p.stage === 'delivered') && (
-              <div className="mt-10">
+          <div className="space-y-10">
+            {/* Pitches awaiting approval */}
+            {pitchProjects.length > 0 && (
+              <div>
                 <div className="flex items-center gap-2 mb-4">
-                  <div className="flex-1 h-px bg-gray-100" />
-                  <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Completed Projects</span>
-                  <div className="flex-1 h-px bg-gray-100" />
+                  <Sparkles size={14} className="text-accent" />
+                  <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider">Awaiting Your Approval</h2>
                 </div>
                 <div className="space-y-5">
-                  {projects.filter((p) => p.stage === 'delivered').map((p) => (
-                    <ProjectCard
-                      key={p.id}
-                      project={p}
-                      revisions={revisions.filter((r) => r.project_id === p.id)}
-                      clientName={clientName}
-                    />
+                  {pitchProjects.map((p) => (
+                    <ProjectCard key={p.id} project={p} revisions={[]} clientId={clientId} userId={user?.id} onRefresh={loadAll} />
                   ))}
                 </div>
               </div>
             )}
-          </>
-        )}
 
-        {/* Footer links */}
-        {projects.length > 0 && (
-          <div className="mt-8 flex gap-3 justify-center">
-            <Link to="/client/concepts" className="text-xs text-gray-400 hover:text-accent transition-colors">
-              View concepts →
-            </Link>
-            <span className="text-gray-200">·</span>
-            <Link to="/client/calendar" className="text-xs text-gray-400 hover:text-accent transition-colors">
-              See calendar →
-            </Link>
+            {/* Active projects */}
+            {activeProjects.length > 0 && (
+              <div>
+                {pitchProjects.length > 0 && <div className="flex items-center gap-2 mb-4"><h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider">In Progress</h2></div>}
+                <div className="space-y-5">
+                  {activeProjects.map((p) => (
+                    <ProjectCard key={p.id} project={p} revisions={revisions.filter((r) => r.project_id === p.id)} clientId={clientId} userId={user?.id} onRefresh={loadAll} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Completed */}
+            {doneProjects.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="flex-1 h-px bg-gray-100" />
+                  <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Completed</span>
+                  <div className="flex-1 h-px bg-gray-100" />
+                </div>
+                <div className="space-y-5">
+                  {doneProjects.map((p) => (
+                    <ProjectCard key={p.id} project={p} revisions={revisions.filter((r) => r.project_id === p.id)} clientId={clientId} userId={user?.id} onRefresh={loadAll} />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
+
+        <div className="mt-8 flex gap-3 justify-center">
+          <Link to="/client/calendar" className="text-xs text-gray-400 hover:text-accent transition-colors">
+            See calendar →
+          </Link>
+        </div>
       </div>
     </div>
   )

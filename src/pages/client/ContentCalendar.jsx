@@ -255,12 +255,19 @@ export default function ContentCalendar() {
     if (!clientId) return
     setLoading(true)
 
-    const [shootsRes, draftsRes, reviewsRes] = await Promise.all([
-      // Shoots for this client
+    const [shootsRes, projectShootsRes, draftsRes, reviewsRes] = await Promise.all([
+      // Legacy shoots for this client
       supabase
         .from('shoots')
         .select('id, title, description, shoot_date, shoot_time, location, status')
         .eq('client_id', clientId)
+        .neq('status', 'cancelled'),
+
+      // Project-level shoots (scheduled via project/workflow view)
+      supabase
+        .from('project_shoots')
+        .select('id, title, shoot_date, shoot_time, location, status, projects!inner(id, name, client_id)')
+        .eq('projects.client_id', clientId)
         .neq('status', 'cancelled'),
 
       // Content drafts
@@ -280,7 +287,7 @@ export default function ContentCalendar() {
 
     const items = []
 
-    // Shoots
+    // Shoots (legacy)
     ;(shootsRes.data || []).forEach((s) => {
       if (!s.shoot_date) return
       items.push({
@@ -291,6 +298,22 @@ export default function ContentCalendar() {
         dateLabel:   format(parseISO(s.shoot_date), 'EEE, MMM d yyyy') + (s.shoot_time ? ` at ${fmtTime(s.shoot_time)}` : ''),
         location:    s.location,
         time:        s.shoot_time ? fmtTime(s.shoot_time) : null,
+      })
+    })
+
+    // Project-level shoots
+    ;(projectShootsRes.data || []).forEach((s) => {
+      if (!s.shoot_date) return
+      const displayTitle = s.title || `${s.projects?.name || 'Project'} — Shoot`
+      items.push({
+        id:        `pshoot-${s.id}`,
+        kind:      'shoot',
+        title:     displayTitle,
+        date:      parseISO(s.shoot_date),
+        dateLabel: format(parseISO(s.shoot_date), 'EEE, MMM d yyyy') + (s.shoot_time ? ` at ${fmtTime(s.shoot_time)}` : ''),
+        location:  s.location,
+        time:      s.shoot_time ? fmtTime(s.shoot_time) : null,
+        status:    s.status,
       })
     })
 
@@ -335,6 +358,22 @@ export default function ContentCalendar() {
     if (clientId) loadData()
     else if (clientResolved) setLoading(false)
   }, [clientId, clientResolved, loadData])
+
+  // Real-time: reload when any project_shoot changes (INSERT / UPDATE / DELETE)
+  // The RLS policy on project_shoots ensures we only ever receive rows belonging
+  // to this client's projects, so no additional client-side filtering is needed.
+  useEffect(() => {
+    if (!clientId) return
+    const channel = supabase
+      .channel(`project-shoots-client-${clientId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'project_shoots' },
+        () => loadData()
+      )
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [clientId, loadData])
 
   // ── Actions ──────────────────────────────────────────────────────────────────
   const handleApprove = async (item) => {

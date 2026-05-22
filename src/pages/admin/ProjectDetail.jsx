@@ -1,32 +1,48 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   ArrowLeft, Loader2, Check, Trash2, X, Plus,
   CalendarDays, MessageSquare, Film, StickyNote,
   AlertCircle, MapPin, Upload, FileVideo, Eye,
-  Camera, Scissors, Pencil, Download, PlayCircle, User
+  Camera, Scissors, Pencil, Download, PlayCircle, User,
+  Sparkles, ThumbsUp, ThumbsDown,
 } from 'lucide-react'
 import { useProject, updateProject } from '../../hooks/useProjects'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
+import { notify, notifyAdmins } from '../../lib/notify'
 import Avatar from '../../components/ui/Avatar'
 import { format, parseISO } from 'date-fns'
 import { fmtTime } from '../../lib/time'
-import { forceDownload } from '../../lib/r2'
+import { forceDownload, uploadToR2 } from '../../lib/r2'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const DISPLAY_STAGES = [
-  { key: 'briefing',        label: 'Setup & Planning' },
+  { key: 'pitch',           label: 'Pitch' },
+  { key: 'production',      label: 'Shoot' },
   { key: 'post_production', label: 'Editing' },
   { key: 'review',          label: 'Review' },
-  { key: 'ready_to_post',   label: 'Ready to Post' },
   { key: 'delivered',       label: 'Delivered' },
 ]
 
+// Map all DB stage values to the nearest DISPLAY_STAGES key
+const STAGE_DISPLAY_MAP = {
+  pitch:           'pitch',
+  briefing:        'production',
+  pre_production:  'production',
+  production:      'production',
+  post_production: 'post_production',
+  review:          'review',
+  revisions:       'review',
+  ready_to_post:   'delivered',
+  delivered:       'delivered',
+}
+
 const STAGE_CURRENT_LABELS = {
+  pitch:           'Pitch — Awaiting Approval',
   briefing:        'Setup & Planning',
-  pre_production:  'Setup & Planning',
-  production:      'Setup & Planning',
+  pre_production:  'Pre-Production',
+  production:      'Shoot / Footage Upload',
   post_production: 'Editing',
   review:          'In Review',
   revisions:       'Revisions',
@@ -36,12 +52,15 @@ const STAGE_CURRENT_LABELS = {
 
 // Who needs to act at each stage
 const WHOS_UP = {
-  briefing:        { who: 'admin',    label: 'Admin',    msg: 'Set up the project and begin when ready.' },
-  post_production: { who: 'editor',   label: 'Editor',   msg: 'Upload the first cut for client review.' },
-  review:          { who: 'client',   label: 'Client',   msg: 'Waiting for client to review and approve.' },
-  revisions:       { who: 'editor',   label: 'Editor',   msg: 'Client requested changes — upload a revision.' },
-  ready_to_post:   { who: 'admin',    label: 'Admin',    msg: 'Client approved! Post it online and mark complete.' },
-  delivered:       { who: 'done',     label: 'Complete', msg: 'Project delivered.' },
+  pitch:           { who: 'client',     label: 'Client / Admin', msg: 'Awaiting pitch approval before work begins.' },
+  briefing:        { who: 'admin',      label: 'Admin',          msg: 'Set up the project and begin when ready.' },
+  pre_production:  { who: 'admin',      label: 'Admin',          msg: 'Schedule the shoot.' },
+  production:      { who: 'creative',   label: 'Photographer',   msg: 'Upload footage + notes after the shoot.' },
+  post_production: { who: 'editor',     label: 'Editor',         msg: 'Upload the first cut — it goes to the photographer first.' },
+  review:          { who: 'varies',     label: 'Review Cycle',   msg: 'Photographer → Client → Editor until approved.' },
+  revisions:       { who: 'editor',     label: 'Editor',         msg: 'Client requested changes — upload a revision.' },
+  ready_to_post:   { who: 'admin',      label: 'Admin',          msg: 'Client approved! Post it online and mark complete.' },
+  delivered:       { who: 'done',       label: 'Complete',       msg: 'Project delivered.' },
 }
 
 const TYPE_LABELS = {
@@ -75,19 +94,21 @@ const STATUS_LABELS = {
 }
 
 const REVISION_STATUS_LABELS = {
-  pending_admin_review:    'Admin Review',
-  pending_creative_review: 'Creative Review',
-  pending_client_review:   'Client Review',
-  pending_editor:          'Back to Editor',
-  approved:                'Approved',
+  pending_photographer_review: 'Photographer Review',
+  pending_admin_review:        'Admin Review',
+  pending_creative_review:     'Creative Review',   // legacy
+  pending_client_review:       'Client Review',
+  pending_editor:              'Back to Editor',
+  approved:                    'Approved',
 }
 
 const REVISION_STATUS_COLORS = {
-  pending_admin_review:    'bg-orange-50 text-orange-700',
-  pending_creative_review: 'bg-amber-50 text-amber-700',
-  pending_client_review:   'bg-blue-50 text-blue-700',
-  pending_editor:          'bg-purple-50 text-purple-700',
-  approved:                'bg-green-50 text-green-700',
+  pending_photographer_review: 'bg-amber-50 text-amber-700',
+  pending_admin_review:        'bg-orange-50 text-orange-700',
+  pending_creative_review:     'bg-amber-50 text-amber-700',
+  pending_client_review:       'bg-blue-50 text-blue-700',
+  pending_editor:              'bg-purple-50 text-purple-700',
+  approved:                    'bg-green-50 text-green-700',
 }
 
 function fmtBytes(bytes) {
@@ -177,14 +198,109 @@ function InlineField({ label, value, displayValue, type = 'text', onSave, icon: 
   )
 }
 
+// ── Pitch Approval Panel (admin) ──────────────────────────────────────────────
+function PitchApprovalPanel({ project, profile, onApproved, onRefresh }) {
+  const [approving,  setApproving]  = useState(false)
+  const [notes,      setNotes]      = useState(project.pitch_notes || '')
+  const [saving,     setSaving]     = useState(false)
+  const [error,      setError]      = useState('')
+
+  const handleApprove = async () => {
+    setApproving(true); setError('')
+    try {
+      await updateProject(project.id, {
+        stage:             'pre_production',
+        pitch_approved_by: profile.id,
+        pitch_approved_at: new Date().toISOString(),
+      })
+      // Notify the creative
+      if (project.creative_id) {
+        await notify({
+          profileId: project.creative_id, actorId: profile.id, type: 'pitch_approved',
+          title: `"${project.name}" pitch approved — schedule the shoot`,
+          body:  'The pitch has been approved. Schedule the shoot and begin production.',
+          link:  `/projects/${project.id}`,
+        })
+      }
+      // Notify client
+      if (project.client_id) {
+        const { data: c } = await supabase.from('clients').select('profile_id').eq('id', project.client_id).maybeSingle()
+        if (c?.profile_id) {
+          await notify({
+            profileId: c.profile_id, actorId: profile.id, type: 'pitch_approved',
+            title: `"${project.name}" is approved and in motion!`,
+            body:  'Your project has been approved by the admin. Work is beginning.',
+            link:  `/my-projects`,
+          })
+        }
+      }
+      onApproved()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setApproving(false)
+    }
+  }
+
+  const handleSaveNotes = async () => {
+    setSaving(true)
+    await updateProject(project.id, { pitch_notes: notes })
+    setSaving(false)
+    onRefresh()
+  }
+
+  return (
+    <div className="mb-6 bg-gradient-to-br from-accent/5 to-purple-50 border border-accent/20 rounded-2xl p-5">
+      <div className="flex items-center gap-2 mb-3">
+        <Sparkles size={16} className="text-accent" />
+        <h3 className="text-sm font-bold text-text-primary">Pitch Review</h3>
+        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-accent/10 text-accent">Awaiting Approval</span>
+      </div>
+
+      {project.concept && (
+        <div className="bg-white rounded-xl px-4 py-3 mb-3 border border-accent/10">
+          <p className="text-xs text-text-muted font-medium mb-1">Project Brief</p>
+          <p className="text-sm text-text-primary leading-relaxed whitespace-pre-wrap">{project.concept}</p>
+        </div>
+      )}
+
+      <div className="mb-3">
+        <label className="text-xs text-text-muted font-medium mb-1 block">Admin notes / feedback for client</label>
+        <div className="flex gap-2">
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Optional notes visible to the client…"
+            className="input flex-1 min-h-[72px] resize-none text-sm"
+          />
+          <button onClick={handleSaveNotes} disabled={saving} className="btn-secondary self-end px-3 disabled:opacity-50">
+            {saving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+          </button>
+        </div>
+      </div>
+
+      {error && <p className="text-xs text-red-500 mb-2">{error}</p>}
+
+      <button
+        onClick={handleApprove}
+        disabled={approving}
+        className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50"
+      >
+        {approving ? <Loader2 size={14} className="animate-spin" /> : <ThumbsUp size={14} />}
+        Approve Pitch & Begin Pre-Production
+      </button>
+    </div>
+  )
+}
+
 // ── Stage Progress Bar ────────────────────────────────────────────────────────
 function StageBar({ currentStage, isAdmin, onStageClick }) {
   const stageToIdx = {
-    briefing: 0, pre_production: 0, production: 0,
-    post_production: 1,
-    review: 2, revisions: 2,
-    ready_to_post: 3,
-    delivered: 4,
+    pitch: 0,
+    briefing: 1, pre_production: 1, production: 1,
+    post_production: 2,
+    review: 3, revisions: 3,
+    ready_to_post: 4, delivered: 4,
   }
   const effectiveIdx = stageToIdx[currentStage] ?? 0
 
@@ -242,19 +358,25 @@ function WhosUpBanner({ stage, editorProfile, creativeProfile, onBeginProject, i
   if (info.who === 'done') return null
 
   const personName =
-    info.who === 'editor'  ? (editorProfile?.full_name   || 'Editor (unassigned)') :
-    info.who === 'client'  ? 'Client' :
-    info.who === 'admin'   ? 'Admin' : null
+    info.who === 'editor'    ? (editorProfile?.full_name   || 'Editor (unassigned)') :
+    info.who === 'creative'  ? (creativeProfile?.full_name || 'Photographer (unassigned)') :
+    info.who === 'client'    ? 'Client' :
+    info.who === 'varies'    ? null :
+    info.who === 'admin'     ? 'Admin' : null
 
   const colorMap = {
-    admin:  'bg-blue-50 border-blue-200 text-blue-900',
-    editor: 'bg-purple-50 border-purple-200 text-purple-900',
-    client: 'bg-amber-50 border-amber-200 text-amber-900',
+    admin:    'bg-blue-50 border-blue-200 text-blue-900',
+    editor:   'bg-purple-50 border-purple-200 text-purple-900',
+    client:   'bg-amber-50 border-amber-200 text-amber-900',
+    creative: 'bg-green-50 border-green-200 text-green-900',
+    varies:   'bg-gray-50 border-gray-200 text-gray-900',
   }
   const badgeMap = {
-    admin:  'bg-blue-100 text-blue-700',
-    editor: 'bg-purple-100 text-purple-700',
-    client: 'bg-amber-100 text-amber-700',
+    admin:    'bg-blue-100 text-blue-700',
+    editor:   'bg-purple-100 text-purple-700',
+    client:   'bg-amber-100 text-amber-700',
+    creative: 'bg-green-100 text-green-700',
+    varies:   'bg-gray-100 text-gray-700',
   }
 
   return (
@@ -329,6 +451,13 @@ export default function ProjectDetail() {
   const [revisions, setRevisions]       = useState([])
   const [loadingExtras, setLoadingExtras] = useState(false)
 
+  // Direct project media upload
+  const mediaInputRef = useRef(null)
+  const [mediaFiles, setMediaFiles]           = useState([])
+  const [uploadingMedia, setUploadingMedia]   = useState(false)
+  const [mediaUploadError, setMediaUploadError] = useState('')
+  const [mediaDragOver, setMediaDragOver]     = useState(false)
+
   // Assigned creative/editor profiles
   const [creativeProfile, setCreativeProfile] = useState(null)
   const [editorProfile, setEditorProfile]     = useState(null)
@@ -378,20 +507,15 @@ export default function ProjectDetail() {
     if (!newShootDate) return
     setAddingShoot(true)
     try {
-      await supabase.from('project_shoots').insert({
-        project_id:  id,
-        shoot_date:  newShootDate,
-        shoot_time:  newShootTime  || null,
-        location:    newShootLocation || null,
-      })
+      const shootTitle = `${project.name} — Shoot`
+      const timeStr    = newShootTime || '09:00'
+      const startAt    = new Date(`${newShootDate}T${timeStr}:00`)
+      const endAt      = new Date(startAt.getTime() + 2 * 60 * 60 * 1000)
 
-      // Auto-create a calendar event for this shoot
-      const timeStr   = newShootTime || '09:00'
-      const startAt   = new Date(`${newShootDate}T${timeStr}:00`)
-      const endAt     = new Date(startAt.getTime() + 2 * 60 * 60 * 1000) // default 2hr block
+      // 1. Create calendar event
       const { data: { user: authUser } } = await supabase.auth.getUser()
       const { data: evtData } = await supabase.from('calendar_events').insert({
-        title:      `${project.name} — Shoot`,
+        title:      shootTitle,
         event_type: 'in_person',
         start_at:   startAt.toISOString(),
         end_at:     endAt.toISOString(),
@@ -400,9 +524,31 @@ export default function ProjectDetail() {
         created_by: authUser.id,
       }).select().single()
 
-      // Add creative + editor as members so they see it
+      // 2. Insert the project shoot, linking back to the calendar event
+      await supabase.from('project_shoots').insert({
+        project_id:        id,
+        shoot_date:        newShootDate,
+        shoot_time:        newShootTime  || null,
+        location:          newShootLocation || null,
+        title:             shootTitle,
+        status:            'scheduled',
+        calendar_event_id: evtData?.id || null,
+      })
+
+      // 3. Add team members + client to calendar_event_members so everyone sees it
       if (evtData) {
         const memberIds = [project.creative_id, project.editor_id].filter(Boolean)
+
+        // Resolve client's profile_id (clients table links to profiles via profile_id)
+        if (project.client_id) {
+          const { data: clientRow } = await supabase
+            .from('clients')
+            .select('profile_id')
+            .eq('id', project.client_id)
+            .maybeSingle()
+          if (clientRow?.profile_id) memberIds.push(clientRow.profile_id)
+        }
+
         if (memberIds.length) {
           await supabase.from('calendar_event_members').insert(
             memberIds.map((profile_id) => ({ event_id: evtData.id, profile_id }))
@@ -421,7 +567,20 @@ export default function ProjectDetail() {
   }
 
   const handleDeleteShoot = async (shootId) => {
+    // Look up the linked calendar event before deleting so we can clean it up
+    const { data: shootRow } = await supabase
+      .from('project_shoots')
+      .select('calendar_event_id')
+      .eq('id', shootId)
+      .maybeSingle()
+
     await supabase.from('project_shoots').delete().eq('id', shootId)
+
+    if (shootRow?.calendar_event_id) {
+      // Cascade deletes calendar_event_members automatically (FK on delete cascade)
+      await supabase.from('calendar_events').delete().eq('id', shootRow.calendar_event_id)
+    }
+
     fetchShoots()
   }
 
@@ -495,14 +654,24 @@ export default function ProjectDetail() {
     }
   }
 
-  const handleStageClick = async (stage) => {
+  const handleStageClick = async (displayStageKey) => {
     if (!isAdmin) return
-    await updateProject(id, { stage })
+    // Map display stage keys back to real DB values
+    const dbStage = {
+      pitch:           'pitch',
+      production:      'production',
+      post_production: 'post_production',
+      review:          'review',
+      delivered:       'delivered',
+    }[displayStageKey] || displayStageKey
+    await updateProject(id, { stage: dbStage })
     refetch()
   }
 
   const handleBeginProject = async () => {
-    await updateProject(id, { stage: 'post_production' })
+    // "Begin Project" from briefing/pre_production → move to production
+    const next = project.stage === 'pitch' ? 'pre_production' : 'production'
+    await updateProject(id, { stage: next })
     refetch()
   }
 
@@ -552,6 +721,40 @@ export default function ProjectDetail() {
   const handleSaveField = async (field, value) => {
     await updateProject(id, { [field]: value || null })
     refetch()
+  }
+
+  const handleMediaUpload = async () => {
+    if (!mediaFiles.length) return
+    setUploadingMedia(true)
+    setMediaUploadError('')
+    try {
+      for (const file of mediaFiles) {
+        const { publicUrl } = await uploadToR2({
+          file,
+          category:    'footage',
+          clientName:  project.clients?.name || project.clients?.contact_name || 'client',
+          projectName: project.name,
+          folderType:  'projects',
+        })
+        const { error: dbErr } = await supabase.from('shoot_uploads').insert({
+          project_id:  id,
+          client_id:   project.client_id || null,
+          file_name:   file.name,
+          file_url:    publicUrl,
+          file_size:   file.size,
+          uploaded_by: profile.id,
+        })
+        if (dbErr) throw new Error(dbErr.message)
+      }
+      // Refresh uploads list
+      const { data } = await supabase.from('shoot_uploads').select('*').eq('project_id', id).order('created_at')
+      setShootUploads(data || [])
+      setMediaFiles([])
+    } catch (err) {
+      setMediaUploadError(err.message)
+    } finally {
+      setUploadingMedia(false)
+    }
   }
 
   if (loading) return (
@@ -634,6 +837,16 @@ export default function ProjectDetail() {
         onBeginProject={handleBeginProject}
         isAdmin={isAdmin}
       />
+
+      {/* ── Pitch Approval Panel (admin can approve or push to client) ───── */}
+      {project.stage === 'pitch' && isAdmin && (
+        <PitchApprovalPanel
+          project={project}
+          profile={profile}
+          onApproved={() => { updateProject(id, { stage: 'pre_production', pitch_approved_by: profile.id, pitch_approved_at: new Date().toISOString() }); refetch() }}
+          onRefresh={refetch}
+        />
+      )}
 
       {/* Mark as Posted */}
       {project.stage === 'ready_to_post' && isAdmin && (
@@ -932,7 +1145,7 @@ export default function ProjectDetail() {
         {/* Left (wider) */}
         <div className="lg:col-span-2 space-y-5">
 
-          {/* Shoot Uploads */}
+          {/* Footage Uploads */}
           <div className="bg-white rounded-2xl border border-border p-5">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
@@ -940,12 +1153,76 @@ export default function ProjectDetail() {
               </h2>
               <span className="text-xs text-text-muted">{shootUploads.length} file{shootUploads.length !== 1 ? 's' : ''}</span>
             </div>
+
+            {/* Drop zone — always visible, click to open file picker */}
+            <div
+              onDragOver={(e) => { e.preventDefault(); setMediaDragOver(true) }}
+              onDragLeave={() => setMediaDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault()
+                setMediaDragOver(false)
+                setMediaFiles((prev) => [...prev, ...Array.from(e.dataTransfer.files)])
+              }}
+              onClick={() => !uploadingMedia && mediaInputRef.current?.click()}
+              className={`border-2 border-dashed rounded-xl p-5 text-center transition-all mb-4 ${
+                uploadingMedia
+                  ? 'opacity-50 cursor-not-allowed border-border'
+                  : mediaDragOver
+                  ? 'border-accent bg-accent/5 cursor-copy'
+                  : 'border-border hover:border-accent/50 hover:bg-surface-2/50 cursor-pointer'
+              }`}
+            >
+              <Upload size={20} className="mx-auto text-text-muted mb-1.5" />
+              <p className="text-sm font-medium text-text-primary">
+                Drop files here or <span className="text-accent">click to browse</span>
+              </p>
+              <p className="text-xs text-text-muted mt-0.5">Videos, photos, and more from your computer or camera roll</p>
+              <input
+                ref={mediaInputRef}
+                type="file"
+                multiple
+                accept="video/*,image/*,.mov,.mp4,.avi,.mkv,.raw,.cr2,.arw,.zip"
+                className="hidden"
+                onChange={(e) => setMediaFiles((prev) => [...prev, ...Array.from(e.target.files)])}
+              />
+            </div>
+
+            {/* Staged files + upload button */}
+            {mediaFiles.length > 0 && (
+              <div className="mb-4 space-y-2">
+                {mediaFiles.map((f, i) => (
+                  <div key={i} className="flex items-center gap-2 text-xs bg-surface-2/60 rounded-lg px-3 py-2">
+                    <Film size={12} className="text-text-muted shrink-0" />
+                    <span className="flex-1 truncate text-text-primary">{f.name}</span>
+                    <span className="text-text-muted shrink-0">{fmtBytes(f.size)}</span>
+                    {!uploadingMedia && (
+                      <button onClick={(e) => { e.stopPropagation(); setMediaFiles((prev) => prev.filter((_, j) => j !== i)) }}>
+                        <X size={12} className="text-text-muted hover:text-red-500" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {mediaUploadError && <p className="text-xs text-red-500">{mediaUploadError}</p>}
+                <button
+                  onClick={handleMediaUpload}
+                  disabled={uploadingMedia}
+                  className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {uploadingMedia
+                    ? <><Loader2 size={14} className="animate-spin" /> Uploading…</>
+                    : <><Upload size={14} /> Upload {mediaFiles.length} file{mediaFiles.length !== 1 ? 's' : ''}</>
+                  }
+                </button>
+              </div>
+            )}
+
+            {/* Existing uploads */}
             {loadingExtras ? (
               <Loader2 size={16} className="animate-spin text-text-muted" />
             ) : shootUploads.length === 0 ? (
               <p className="text-sm text-text-muted">No footage uploaded yet.</p>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-1">
                 {shootUploads.map((f) => (
                   <div key={f.id} className="flex items-center gap-3 py-2 border-b border-border last:border-0">
                     <div className="w-8 h-8 rounded-lg bg-surface-2 flex items-center justify-center shrink-0">
@@ -953,8 +1230,17 @@ export default function ProjectDetail() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-text-primary truncate">{f.file_name}</p>
-                      <p className="text-xs text-text-muted">{fmtBytes(f.file_size)} · Uploaded {new Date(f.created_at).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })} EST</p>
+                      <p className="text-xs text-text-muted">{fmtBytes(f.file_size)} · {new Date(f.created_at).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })} EST</p>
                     </div>
+                    {f.file_url && (
+                      <button
+                        onClick={() => forceDownload(f.file_url, f.file_name)}
+                        className="text-text-muted hover:text-accent transition-colors shrink-0"
+                        title="Download"
+                      >
+                        <Download size={13} />
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>

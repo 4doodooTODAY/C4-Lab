@@ -4,7 +4,7 @@ import {
   ArrowLeft, Loader2, Upload, Check, Film, StickyNote, Send,
   Download, FileVideo, CalendarDays, MapPin, Eye,
   ChevronRight, X, MessageSquare, Users, ExternalLink,
-  AlertCircle, CheckCircle2, Clock, Zap,
+  AlertCircle, CheckCircle2, Clock, Zap, Plus,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
@@ -27,48 +27,51 @@ function fmtBytes(bytes) {
 }
 
 const STAGES = [
-  { key: 'briefing',        label: 'Setup & Planning' },
+  { key: 'pitch',          label: 'Pitch' },
+  { key: 'production',     label: 'Shoot' },
   { key: 'post_production', label: 'Editing' },
-  { key: 'review',          label: 'Review' },
-  { key: 'ready_to_post',   label: 'Ready to Post' },
-  { key: 'delivered',       label: 'Delivered' },
+  { key: 'review',         label: 'Review' },
+  { key: 'delivered',      label: 'Delivered' },
 ]
 
 // Normalize stages to canonical display key
 const STAGE_KEY_MAP = {
-  briefing:        'briefing',
-  pre_production:  'briefing',
-  planning:        'briefing',
-  production:      'briefing',
+  pitch:           'pitch',
+  briefing:        'production',   // legacy — treat as pre-production
+  pre_production:  'production',
+  planning:        'production',
+  production:      'production',
   post_production: 'post_production',
   review:          'review',
   revisions:       'review',
-  ready_to_post:   'ready_to_post',
+  ready_to_post:   'delivered',
   delivered:       'delivered',
 }
 
 const STAGE_DESCRIPTIONS = {
-  briefing:        'Admin is planning the project — editing begins soon.',
+  pitch:           'Waiting for client approval before work begins.',
+  production:      'Shoot scheduled. Upload footage after the shoot.',
   post_production: 'Footage is ready — time to edit.',
   review:          'Revision is under review.',
-  ready_to_post:   'Client approved! Awaiting admin to post online.',
   delivered:       'Project complete!',
 }
 
 const REVISION_STATUS_LABELS = {
-  pending_admin_review:    'Pending Admin Approval',
-  pending_creative_review: 'Needs Your Review',
-  pending_client_review:   'Client Reviewing',
-  pending_editor:          'Awaiting Revisions',
-  approved:                'Approved',
+  pending_photographer_review: 'Needs Your Review',
+  pending_admin_review:        'Pending Admin Approval',
+  pending_creative_review:     'Needs Your Review',    // legacy
+  pending_client_review:       'Client Reviewing',
+  pending_editor:              'Awaiting Revisions',
+  approved:                    'Approved',
 }
 
 const REVISION_STATUS_COLORS = {
-  pending_admin_review:    'bg-orange-50 text-orange-700 border-orange-200',
-  pending_creative_review: 'bg-amber-50 text-amber-700 border-amber-200',
-  pending_client_review:   'bg-blue-50 text-blue-700 border-blue-200',
-  pending_editor:          'bg-purple-50 text-purple-700 border-purple-200',
-  approved:                'bg-green-50 text-green-700 border-green-200',
+  pending_photographer_review: 'bg-amber-50 text-amber-700 border-amber-200',
+  pending_admin_review:        'bg-orange-50 text-orange-700 border-orange-200',
+  pending_creative_review:     'bg-amber-50 text-amber-700 border-amber-200',
+  pending_client_review:       'bg-blue-50 text-blue-700 border-blue-200',
+  pending_editor:              'bg-purple-50 text-purple-700 border-purple-200',
+  approved:                    'bg-green-50 text-green-700 border-green-200',
 }
 
 // ── Stage Pipeline Bar ────────────────────────────────────────────────────────
@@ -155,46 +158,56 @@ function WhosUpBar({ stage, editorProfile, creativeProfile }) {
 // ── Action Banner ─────────────────────────────────────────────────────────────
 
 function ActionBanner({ project, uploads, revisions, isCreative, isEditor, navigate }) {
-  const stage             = STAGE_KEY_MAP[project.stage] || project.stage
-  const pendingReview     = revisions.find((r) => r.status === 'pending_creative_review')
-  const pendingAdminRev   = revisions.find((r) => r.status === 'pending_admin_review')
-  const latestRev         = [...revisions].sort((a, b) => b.revision_number - a.revision_number)[0]
-  const hasUploads        = uploads.length > 0
+  const stage           = STAGE_KEY_MAP[project.stage] || project.stage
+  const latestRev       = [...revisions].sort((a, b) => b.revision_number - a.revision_number)[0]
+  const hasUploads      = uploads.length > 0
 
-  // If first edit is waiting on admin approval, show waiting banner to editor/creative
-  if (pendingAdminRev && (isCreative || isEditor)) {
+  // Pitch: both creative and editor see a "pending approval" banner
+  if (project.stage === 'pitch') {
     return (
-      <div className="mb-4 rounded-2xl border border-orange-200 bg-orange-50 px-5 py-4 flex items-start gap-3">
-        <div className="w-9 h-9 rounded-xl bg-orange-100 flex items-center justify-center shrink-0 mt-0.5">
-          <Eye size={18} className="text-orange-600" />
+      <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 flex items-start gap-3">
+        <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center shrink-0 mt-0.5">
+          <Eye size={18} className="text-amber-600" />
         </div>
         <div>
-          <p className="text-sm font-bold text-orange-800">Waiting for admin approval</p>
-          <p className="text-xs text-orange-600 mt-0.5">Your edit has been submitted. Admin will review it before it goes to the client.</p>
+          <p className="text-sm font-bold text-amber-800">Waiting for client approval</p>
+          <p className="text-xs text-amber-600 mt-0.5">This project pitch has been submitted. The client or admin needs to approve it before work begins.</p>
         </div>
       </div>
     )
   }
 
+  // Photographer (creative): needs to review a revision
+  const pendingPhotographerReview = revisions.find(
+    (r) => r.status === 'pending_photographer_review' || r.status === 'pending_creative_review'
+  )
+
   let banner = null
 
   if (isCreative && !isEditor) {
-    if (pendingReview) {
+    if (pendingPhotographerReview) {
       banner = {
         variant: 'accent',
         icon: <FileVideo size={18} />,
-        title: `${revisionLabel(pendingReview.revision_number)} is ready for your review`,
-        body: 'Leave comments before sending to the client.',
+        title: `${revisionLabel(pendingPhotographerReview.revision_number)} needs your review`,
+        body: 'Leave timeline notes for the client before sending it over.',
         action: {
           label: 'Review Now →',
-          onClick: () => navigate(`/projects/${project.id}/revision/${pendingReview.id}`),
+          onClick: () => navigate(`/projects/${project.id}/revision/${pendingPhotographerReview.id}`),
         },
+      }
+    } else if (stage === 'production') {
+      banner = {
+        variant: 'amber',
+        icon: <Upload size={18} />,
+        title: 'Upload your shoot footage',
+        body: 'Upload all files from the shoot, write your notes, then submit to the editor.',
       }
     } else {
       banner = {
         variant: 'green',
         icon: <CheckCircle2 size={18} />,
-        title: 'You\'re all caught up',
+        title: "You're all caught up",
         body: 'Nothing needs your attention right now.',
       }
     }
@@ -203,32 +216,26 @@ function ActionBanner({ project, uploads, revisions, isCreative, isEditor, navig
       banner = {
         variant: 'accent',
         icon: <Upload size={18} />,
-        title: 'Footage is ready',
-        body: 'Upload your initial cut when you\'re done editing.',
+        title: 'Footage is ready — start editing',
+        body: 'Upload your initial cut when done. It will go to the photographer for review first.',
       }
-    } else if (latestRev && latestRev.status === 'pending_editor') {
-      const label = revisionLabel(latestRev.revision_number)
-      const isInitialCut = latestRev.revision_number === 1
+    } else if (latestRev?.status === 'pending_editor') {
       banner = {
         variant: 'red',
         icon: <AlertCircle size={18} />,
-        title: isInitialCut
-          ? 'Client sent edits on your initial cut'
-          : `${label} sent back with feedback`,
-        body: 'Review the client\'s comments and upload a revised cut.',
+        title: `Client feedback received on ${revisionLabel(latestRev.revision_number)}`,
+        body: "Address the accepted comments and upload a revised cut.",
         action: {
           label: 'View Feedback →',
           onClick: () => navigate(`/projects/${project.id}/revision/${latestRev.id}`),
         },
       }
-    } else if (latestRev && latestRev.status === 'pending_client_review' && stage === 'post_production') {
-      // Stage updated to post_production by client "Send to Editor" but revision status
-      // update may have been blocked by RLS — show a clear message anyway
+    } else if (latestRev?.status === 'pending_client_review' && stage === 'post_production') {
       banner = {
         variant: 'red',
         icon: <AlertCircle size={18} />,
-        title: 'Client sent your cut back for edits',
-        body: 'Check the revision comments and upload a revised cut.',
+        title: 'Client returned your cut for edits',
+        body: 'Check the comments and upload a revised cut.',
         action: {
           label: 'View Comments →',
           onClick: () => navigate(`/projects/${project.id}/revision/${latestRev.id}`),
@@ -238,7 +245,7 @@ function ActionBanner({ project, uploads, revisions, isCreative, isEditor, navig
       banner = {
         variant: 'green',
         icon: <CheckCircle2 size={18} />,
-        title: 'You\'re all caught up',
+        title: "You're all caught up",
         body: 'Nothing needs your attention right now.',
       }
     }
@@ -375,7 +382,16 @@ function RevisionCommentsList({ revisionId }) {
 
 // ── Project Overview Card ─────────────────────────────────────────────────────
 
-function ProjectOverviewCard({ project, projectShoots, creativeProfile, editorProfile }) {
+function ProjectOverviewCard({
+  project, projectShoots, creativeProfile, editorProfile,
+  // optional shoot management (passed when the viewer is a creative/admin)
+  canManageShoots,
+  showAddShoot, setShowAddShoot,
+  newShootDate, setNewShootDate,
+  newShootTime, setNewShootTime,
+  newShootLocation, setNewShootLocation,
+  addingShoot, onAddShoot, onDeleteShoot,
+}) {
   return (
     <div className="bg-white rounded-2xl border border-border p-5">
       <h2 className="text-sm font-semibold text-text-primary mb-4">Project Overview</h2>
@@ -395,32 +411,112 @@ function ProjectOverviewCard({ project, projectShoots, creativeProfile, editorPr
         )}
 
         {/* Shoot dates from project_shoots */}
-        {projectShoots.length > 0 && (
+        {(projectShoots.length > 0 || canManageShoots) && (
           <div>
-            <p className="text-xs text-text-muted flex items-center gap-1 mb-1">
-              <CalendarDays size={11} /> Shoot Date{projectShoots.length > 1 ? 's' : ''}
-            </p>
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-xs text-text-muted flex items-center gap-1">
+                <CalendarDays size={11} /> Shoot Date{projectShoots.length !== 1 ? 's' : ''}
+              </p>
+              {canManageShoots && !showAddShoot && (
+                <button
+                  onClick={() => setShowAddShoot(true)}
+                  className="text-[11px] text-accent hover:underline flex items-center gap-0.5"
+                >
+                  <Plus size={10} /> Add
+                </button>
+              )}
+            </div>
+
             <div className="space-y-1">
               {projectShoots.map((shoot) => (
-                <div key={shoot.id} className="flex items-center gap-2">
-                  <p className="text-sm font-semibold text-text-primary">
-                    {shoot.shoot_date
-                      ? format(parseISO(shoot.shoot_date), 'MMMM d, yyyy')
-                      : '—'}
-                  </p>
-                  {shoot.location && (
-                    <p className="text-xs text-text-muted flex items-center gap-0.5">
-                      <MapPin size={10} /> {shoot.location}
+                <div key={shoot.id} className="flex items-center justify-between gap-2 group">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-text-primary">
+                      {shoot.shoot_date ? format(parseISO(shoot.shoot_date), 'MMMM d, yyyy') : '—'}
                     </p>
+                    {shoot.shoot_time && (
+                      <p className="text-xs text-text-muted">at {shoot.shoot_time.slice(0, 5)}</p>
+                    )}
+                    {shoot.location && (
+                      <p className="text-xs text-text-muted flex items-center gap-0.5">
+                        <MapPin size={10} /> {shoot.location}
+                      </p>
+                    )}
+                    {shoot.status && shoot.status !== 'scheduled' && (
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                        shoot.status === 'completed' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'
+                      }`}>{shoot.status}</span>
+                    )}
+                  </div>
+                  {canManageShoots && (
+                    <button
+                      onClick={() => onDeleteShoot(shoot.id)}
+                      className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-red-500 transition-opacity"
+                      title="Remove shoot"
+                    >
+                      <X size={12} />
+                    </button>
                   )}
                 </div>
               ))}
             </div>
+
+            {/* Inline add shoot form */}
+            {canManageShoots && showAddShoot && (
+              <div className="mt-3 bg-surface-2 rounded-xl p-3 space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[11px] text-text-muted mb-1 block">Date *</label>
+                    <input
+                      type="date"
+                      value={newShootDate}
+                      onChange={(e) => setNewShootDate(e.target.value)}
+                      className="input text-xs w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-text-muted mb-1 block">Time</label>
+                    <input
+                      type="time"
+                      value={newShootTime}
+                      onChange={(e) => setNewShootTime(e.target.value)}
+                      className="input text-xs w-full"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[11px] text-text-muted mb-1 block">Location</label>
+                  <input
+                    type="text"
+                    value={newShootLocation}
+                    onChange={(e) => setNewShootLocation(e.target.value)}
+                    placeholder="Optional"
+                    className="input text-xs w-full"
+                  />
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <button
+                    onClick={onAddShoot}
+                    disabled={!newShootDate || addingShoot}
+                    className="btn-primary text-xs flex-1 flex items-center justify-center gap-1 disabled:opacity-50"
+                  >
+                    {addingShoot ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />}
+                    Save Shoot
+                  </button>
+                  <button
+                    onClick={() => { setShowAddShoot(false); setNewShootDate(''); setNewShootTime(''); setNewShootLocation('') }}
+                    className="btn-secondary text-xs px-3"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
         {/* Location (project-level fallback) */}
-        {projectShoots.length === 0 && project.location && (
+        {projectShoots.length === 0 && !canManageShoots && project.location && (
           <div>
             <p className="text-xs text-text-muted flex items-center gap-1 mb-1">
               <MapPin size={11} /> Location
@@ -572,6 +668,30 @@ function ShootDeliverySection({ project, uploads, shootNotes, onRefresh }) {
     setSendError('')
     try {
       await updateProject(project.id, { stage: 'post_production' })
+
+      // Notify the editor that footage is ready
+      if (project.editor_id) {
+        const { notify: notifyFn } = await import('../../lib/notify')
+        await notifyFn({
+          profileId: project.editor_id,
+          actorId:   profile.id,
+          type:      'footage_uploaded',
+          title:     `Footage ready for "${project.name}"`,
+          body:      `${uploads.length} file${uploads.length !== 1 ? 's' : ''} uploaded. Start editing when ready.`,
+          link:      `/projects/${project.id}`,
+        })
+      }
+
+      // Notify admins too
+      const { notifyAdmins: notifyAdminsFn } = await import('../../lib/notify')
+      await notifyAdminsFn({
+        actorId: profile.id,
+        type:    'footage_uploaded',
+        title:   `Footage submitted for "${project.name}"`,
+        body:    `${profile.full_name} uploaded shoot footage. Editor has been notified.`,
+        link:    `/projects/${project.id}`,
+      })
+
       onRefresh()
     } catch (err) {
       setSendError(err.message || 'Failed to send — check permissions.')
@@ -909,6 +1029,186 @@ function SourceFootageSection({ uploads, shootNotes }) {
   )
 }
 
+// ── Footage Uploads Section (admin + creative — upload any files to the project) ─
+
+function ProjectMediaSection({ project, uploads, onRefresh }) {
+  const { profile } = useAuth()
+  const fileInputRef = useRef()
+
+  const [files,       setFiles]       = useState([])
+  const [uploading,   setUploading]   = useState(false)
+  const [uploadStats, setUploadStats] = useState(null)
+  const [progress,    setProgress]    = useState({})
+  const [error,       setError]       = useState('')
+  const [showAll,     setShowAll]     = useState(false)
+  const [dragging,    setDragging]    = useState(false)
+
+  const addFiles = (incoming) => setFiles((prev) => [...prev, ...Array.from(incoming)])
+
+  const handleUpload = async () => {
+    if (!files.length) return
+    setUploading(true)
+    setError('')
+    const prog = {}
+    files.forEach((f) => { prog[f.name] = 0 })
+    setProgress({ ...prog })
+
+    try {
+      for (const file of files) {
+        const { publicUrl } = await uploadToR2({
+          file,
+          category:    'footage',
+          clientName:  project.clients?.name || '',
+          projectName: project.name,
+          folderType:  'projects',
+          onProgress:  (p) => setProgress((prev) => ({ ...prev, [file.name]: p })),
+          onStats:     (s) => setUploadStats(s),
+        })
+        const { error: dbErr } = await supabase.from('shoot_uploads').insert({
+          project_id:  project.id,
+          file_name:   file.name,
+          file_url:    publicUrl,
+          file_size:   file.size,
+          uploaded_by: profile.id,
+        })
+        if (dbErr) throw new Error(dbErr.message)
+        setProgress((prev) => ({ ...prev, [file.name]: 100 }))
+      }
+      setFiles([])
+      setUploadStats(null)
+      onRefresh()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const totalSize = uploads.reduce((acc, f) => acc + (f.file_size || 0), 0)
+  const visible   = showAll ? uploads : uploads.slice(0, 3)
+
+  return (
+    <div className="bg-white rounded-2xl border border-border p-5 space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+          <Upload size={14} className="text-text-muted" /> Footage Uploads
+        </h2>
+        <span className="text-xs text-text-muted">{uploads.length} file{uploads.length !== 1 ? 's' : ''}</span>
+      </div>
+
+      {/* Drop zone — always visible */}
+      <div
+        onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => { e.preventDefault(); setDragging(false); addFiles(e.dataTransfer.files) }}
+        onClick={() => !uploading && fileInputRef.current?.click()}
+        className={`border-2 border-dashed rounded-xl p-5 text-center transition-all ${
+          uploading
+            ? 'opacity-50 cursor-not-allowed border-border'
+            : dragging
+            ? 'border-accent bg-accent/5 cursor-copy'
+            : 'border-border hover:border-accent/50 hover:bg-surface-2/50 cursor-pointer'
+        }`}
+      >
+        <Upload size={20} className="mx-auto text-text-muted mb-1.5" />
+        <p className="text-sm font-medium text-text-primary">
+          Drop files here or <span className="text-accent">click to browse</span>
+        </p>
+        <p className="text-xs text-text-muted mt-0.5">Videos, photos, and more from your computer or camera roll</p>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept="video/*,image/*,.mov,.mp4,.avi,.mkv,.raw,.cr2,.arw,.zip"
+          className="hidden"
+          onChange={(e) => addFiles(e.target.files)}
+        />
+      </div>
+
+      {/* Staged files + upload button */}
+      {files.length > 0 && (
+        <div className="space-y-2">
+          {files.map((f, i) => (
+            <div key={i} className="flex items-center gap-2 text-xs bg-surface-2/60 rounded-lg px-3 py-2">
+              <Film size={12} className="text-text-muted shrink-0" />
+              <span className="flex-1 truncate text-text-primary">{f.name}</span>
+              <span className="text-text-muted shrink-0">{fmtBytes(f.size)}</span>
+              {progress[f.name] > 0 && progress[f.name] < 100 && (
+                <span className="text-accent font-medium shrink-0">{progress[f.name]}%</span>
+              )}
+              {progress[f.name] === 100 && <Check size={12} className="text-green-500 shrink-0" />}
+              {!uploading && (
+                <button onClick={(e) => { e.stopPropagation(); setFiles((prev) => prev.filter((_, j) => j !== i)) }}>
+                  <X size={12} className="text-text-muted hover:text-red-500" />
+                </button>
+              )}
+            </div>
+          ))}
+
+          {uploading && uploadStats && (
+            <div className="flex items-center gap-3 text-xs text-text-muted">
+              <div className="flex-1 h-1 bg-surface-3 rounded-full overflow-hidden">
+                <div className="h-full bg-accent rounded-full transition-all duration-200"
+                  style={{ width: `${Math.min(...files.map((f) => progress[f.name] || 0))}%` }} />
+              </div>
+              <span className="shrink-0 font-medium">{fmtSpeed(uploadStats.speed)}</span>
+              {uploadStats.eta != null && <span className="shrink-0">{fmtEta(uploadStats.eta)}</span>}
+            </div>
+          )}
+
+          {error && <p className="text-xs text-red-500">{error}</p>}
+
+          <button
+            onClick={handleUpload}
+            disabled={uploading}
+            className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            {uploading
+              ? <><Loader2 size={14} className="animate-spin" /> Uploading…</>
+              : <><Upload size={14} /> Upload {files.length} file{files.length !== 1 ? 's' : ''}</>
+            }
+          </button>
+        </div>
+      )}
+
+      {/* Existing uploads */}
+      {uploads.length === 0 && files.length === 0 && (
+        <p className="text-xs text-text-muted italic">No footage uploaded yet.</p>
+      )}
+      {uploads.length > 0 && (
+        <div>
+          {uploads.length > 3 && (
+            <button
+              onClick={() => setShowAll((v) => !v)}
+              className="text-xs text-accent hover:text-accent/80 font-medium transition-colors mb-2"
+            >
+              {showAll ? 'Show less' : `Show all ${uploads.length} files`}
+            </button>
+          )}
+          <div className="rounded-xl border border-border divide-y divide-border">
+            {visible.map((f) => (
+              <div key={f.id} className="flex items-center gap-3 px-3 py-2.5">
+                <Film size={13} className="text-text-muted shrink-0" />
+                <span className="text-sm truncate flex-1 text-text-primary">{f.file_name}</span>
+                <span className="text-xs text-text-muted shrink-0">{fmtBytes(f.file_size)}</span>
+                {f.file_url && (
+                  <button
+                    onClick={() => forceDownload(f.file_url, f.file_name)}
+                    className="text-text-muted hover:text-accent transition-colors shrink-0"
+                    title="Download"
+                  >
+                    <Download size={13} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Admin Review Section ──────────────────────────────────────────────────────
 
 function AdminReviewSection({ revision, project, onRefresh }) {
@@ -1095,27 +1395,44 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
       })
 
       if (isAdminRework) {
-        // Update the existing revision file and send straight to client
-        // (admin already reviewed once — this correction goes directly to client)
+        // Admin already reviewed — send straight to client
         const { error: e } = await supabase.from('project_revisions')
           .update({ video_url: publicUrl, status: 'pending_client_review' })
           .eq('id', latestRev.id)
         if (e) throw new Error(e.message)
       } else {
-        // Determine where this revision goes first
-        const goesToAdmin = project.admin_review_required && nextRevNum === 1
-        const status = goesToAdmin ? 'pending_admin_review' : 'pending_creative_review'
-
+        // New revision → goes to photographer first for review, then client
         const { error: e } = await supabase.from('project_revisions').insert({
           project_id:      project.id,
           revision_number: nextRevNum,
           video_url:       publicUrl,
-          status,
+          status:          'pending_photographer_review',
           uploaded_by:     profile.id,
         })
         if (e) throw new Error(e.message)
 
         await updateProject(project.id, { stage: 'review', revision_count: nextRevNum })
+
+        // Notify photographer and admins
+        const revLabel = nextRevNum === 1 ? 'Initial Cut' : `Revision ${nextRevNum - 1}`
+        const { notify: notifyFn, notifyAdmins: notifyAdminsFn } = await import('../../lib/notify')
+        if (project.creative_id) {
+          await notifyFn({
+            profileId: project.creative_id,
+            actorId:   profile.id,
+            type:      'revision_uploaded',
+            title:     `${revLabel} ready for your review — "${project.name}"`,
+            body:      'Leave your timeline notes before the client sees it.',
+            link:      `/projects/${project.id}`,
+          })
+        }
+        await notifyAdminsFn({
+          actorId: profile.id,
+          type:    'revision_uploaded',
+          title:   `${revLabel} uploaded for "${project.name}"`,
+          body:    'Photographer review is next.',
+          link:    `/projects/${project.id}`,
+        })
       }
 
       // Save editor note
@@ -1427,6 +1744,13 @@ export default function ProjectWorkflow() {
   const [loading,        setLoading]        = useState(true)
   const [error,          setError]          = useState('')
 
+  // Shoot scheduling (creative can add/delete shoots for their project)
+  const [showAddShoot,     setShowAddShoot]     = useState(false)
+  const [newShootDate,     setNewShootDate]     = useState('')
+  const [newShootTime,     setNewShootTime]     = useState('')
+  const [newShootLocation, setNewShootLocation] = useState('')
+  const [addingShoot,      setAddingShoot]      = useState(false)
+
   const fetchAll = async () => {
     if (!id) return
     setLoading(true)
@@ -1509,6 +1833,88 @@ export default function ProjectWorkflow() {
 
   useEffect(() => { fetchAll() }, [id])
 
+  const fetchShoots = () =>
+    supabase.from('project_shoots').select('*').eq('project_id', id).order('shoot_date')
+      .then(({ data }) => setProjectShoots(data || []))
+
+  const handleAddShoot = async () => {
+    if (!newShootDate || !project) return
+    setAddingShoot(true)
+    try {
+      const shootTitle = `${project.name} — Shoot`
+      const timeStr    = newShootTime || '09:00'
+      const startAt    = new Date(`${newShootDate}T${timeStr}:00`)
+      const endAt      = new Date(startAt.getTime() + 2 * 60 * 60 * 1000)
+
+      // 1. Create calendar event
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+      const { data: evtData } = await supabase.from('calendar_events').insert({
+        title:      shootTitle,
+        event_type: 'in_person',
+        start_at:   startAt.toISOString(),
+        end_at:     endAt.toISOString(),
+        all_day:    false,
+        location:   newShootLocation || null,
+        created_by: authUser.id,
+      }).select().single()
+
+      // 2. Insert the project shoot, linking back to the calendar event
+      await supabase.from('project_shoots').insert({
+        project_id:        id,
+        shoot_date:        newShootDate,
+        shoot_time:        newShootTime  || null,
+        location:          newShootLocation || null,
+        title:             shootTitle,
+        status:            'scheduled',
+        calendar_event_id: evtData?.id || null,
+      })
+
+      // 3. Add creative, editor, and client to calendar_event_members
+      if (evtData) {
+        const memberIds = [project.creative_id, project.editor_id].filter(Boolean)
+
+        if (project.clients?.id) {
+          const { data: clientRow } = await supabase
+            .from('clients')
+            .select('profile_id')
+            .eq('id', project.clients.id)
+            .maybeSingle()
+          if (clientRow?.profile_id) memberIds.push(clientRow.profile_id)
+        }
+
+        if (memberIds.length) {
+          await supabase.from('calendar_event_members').insert(
+            memberIds.map((profile_id) => ({ event_id: evtData.id, profile_id }))
+          )
+        }
+      }
+
+      setNewShootDate('')
+      setNewShootTime('')
+      setNewShootLocation('')
+      setShowAddShoot(false)
+      fetchShoots()
+    } finally {
+      setAddingShoot(false)
+    }
+  }
+
+  const handleDeleteShoot = async (shootId) => {
+    const { data: shootRow } = await supabase
+      .from('project_shoots')
+      .select('calendar_event_id')
+      .eq('id', shootId)
+      .maybeSingle()
+
+    await supabase.from('project_shoots').delete().eq('id', shootId)
+
+    if (shootRow?.calendar_event_id) {
+      await supabase.from('calendar_events').delete().eq('id', shootRow.calendar_event_id)
+    }
+
+    fetchShoots()
+  }
+
   if (loading) {
     return (
       <div className="flex justify-center py-24">
@@ -1532,7 +1938,7 @@ export default function ProjectWorkflow() {
   }
 
   const isAdmin    = profile?.role === 'admin'
-  const isCreative = project.creative_id === profile?.id || isAdmin
+  const isCreative = profile?.role === 'creative' || project.creative_id === profile?.id || isAdmin
   const isEditor   = project.editor_id   === profile?.id || isAdmin
   return (
     <div className="p-8 max-w-4xl">
@@ -1606,6 +2012,18 @@ export default function ProjectWorkflow() {
             projectShoots={projectShoots}
             creativeProfile={creativeProfile}
             editorProfile={editorProfile}
+            canManageShoots={isCreative}
+            showAddShoot={showAddShoot}
+            setShowAddShoot={setShowAddShoot}
+            newShootDate={newShootDate}
+            setNewShootDate={setNewShootDate}
+            newShootTime={newShootTime}
+            setNewShootTime={setNewShootTime}
+            newShootLocation={newShootLocation}
+            setNewShootLocation={setNewShootLocation}
+            addingShoot={addingShoot}
+            onAddShoot={handleAddShoot}
+            onDeleteShoot={handleDeleteShoot}
           />
 
           {/* Admin Review Gate — shown to admin when first edit is pending their approval */}
@@ -1619,6 +2037,15 @@ export default function ProjectWorkflow() {
               />
             ) : null
           })()}
+
+          {/* Project Media — upload any videos/photos directly to the project */}
+          {isCreative && (
+            <ProjectMediaSection
+              project={project}
+              uploads={uploads.filter((u) => !u.shoot_id)}
+              onRefresh={fetchAll}
+            />
+          )}
 
           {/* 3a. Source Footage — visible to any editor role (incl. creative+editor combo) */}
           {isEditor && (

@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Loader2, MessageSquare, Check, X, Plus,
-  Send, ThumbsUp
+  Send, ThumbsUp, Camera,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import { notify, notifyMany, notifyAdmins } from '../lib/notify'
 import Avatar from '../components/ui/Avatar'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -219,12 +220,13 @@ export default function VideoRevisionReview() {
 
   useEffect(() => { fetchAll() }, [fetchAll])
 
-  const myRole    = profile?.role
-  const myId      = profile?.id
-  const isAdmin   = myRole === 'admin'
-  const isCreative = myRole === 'creative' || (project && (project.creative_id === myId || project.editor_id === myId))
-  const isClient  = myRole === 'client'
-  const isEditor  = project && project.editor_id === myId
+  const myRole         = profile?.role
+  const myId           = profile?.id
+  const isAdmin        = myRole === 'admin'
+  const isPhotographer = myRole === 'creative' || (project && project.creative_id === myId)
+  const isEditor       = project && project.editor_id === myId
+  const isCreative     = isPhotographer || isEditor  // legacy compat
+  const isClient       = myRole === 'client'
 
   // ── Timeline click → seek + popover ──────────────────────────────────────
   const handleTimelineClick = (e) => {
@@ -275,8 +277,8 @@ export default function VideoRevisionReview() {
     fetchAll()
   }
 
-  // ── Creative: submit for client review ────────────────────────────────────
-  const handleSubmitForClient = async () => {
+  // ── Photographer: done reviewing — hand off to client ─────────────────────
+  const handlePhotographerDone = async () => {
     setSubmittingAction(true)
     setActionError('')
     try {
@@ -284,16 +286,41 @@ export default function VideoRevisionReview() {
         .update({ status: 'pending_client_review' })
         .eq('id', revisionId)
       if (e) throw new Error(e.message)
+
+      // Notify the client
+      const projectLink = `/projects/${project.id}`
+      if (project.client_id) {
+        const { data: clientRow } = await supabase
+          .from('clients').select('profile_id').eq('id', project.client_id).maybeSingle()
+        if (clientRow?.profile_id) {
+          await notify({
+            profileId: clientRow.profile_id, actorId: myId,
+            type: 'photographer_reviewed',
+            title: `Your ${revisionLabel(revNum)} is ready to review`,
+            body: `The photographer has left their notes on "${project.name}". Watch the video and send your feedback.`,
+            link: `/projects/${project.id}/revision/${revisionId}`,
+          })
+        }
+      }
+      await notifyAdmins({
+        actorId: myId, type: 'photographer_reviewed',
+        title: `Photographer review complete on "${project.name}"`,
+        body: `${revisionLabel(revNum)} is now with the client.`,
+        link: projectLink,
+      })
+
       fetchAll()
     } catch (err) {
       setActionError(err.message || 'Failed — check permissions')
-      console.error('Submit for client review failed:', err)
     } finally {
       setSubmittingAction(false)
     }
   }
 
-  // ── Client: send to editor ─────────────────────────────────────────────────
+  // ── Legacy: creative submit for client review (kept for compat) ───────────
+  const handleSubmitForClient = handlePhotographerDone
+
+  // ── Client: send feedback to editor ──────────────────────────────────────
   const handleSendToEditor = async () => {
     setSubmittingAction(true)
     setActionError('')
@@ -308,10 +335,26 @@ export default function VideoRevisionReview() {
         .eq('id', project.id)
       if (e2) throw new Error(e2.message)
 
+      // Notify editor
+      const projectLink = `/projects/${project.id}`
+      if (project.editor_id) {
+        await notify({
+          profileId: project.editor_id, actorId: myId,
+          type: 'client_feedback_sent',
+          title: `Client sent feedback on "${project.name}"`,
+          body: `Review the comments and upload a revised cut.`,
+          link: `/projects/${project.id}/revision/${revisionId}`,
+        })
+      }
+      await notifyAdmins({
+        actorId: myId, type: 'client_feedback_sent',
+        title: `Client feedback sent to editor on "${project.name}"`,
+        link: projectLink,
+      })
+
       fetchAll()
     } catch (err) {
-      setActionError(err.message || 'Failed — check permissions (see console)')
-      console.error('Send to editor failed:', err)
+      setActionError(err.message || 'Failed — check permissions')
     } finally {
       setSubmittingAction(false)
     }
@@ -395,18 +438,19 @@ export default function VideoRevisionReview() {
   const clientComments   = comments.filter((c) => c.author_role === 'client')
 
   const REVISION_STATUS_LABELS = {
-    pending_admin_review:    'Admin Review',
-    pending_creative_review: 'Creative Review',
-    pending_client_review:   'Client Review',
-    pending_editor:          'Awaiting Editor',
-    approved:                'Approved',
+    pending_photographer_review: 'Photographer Review',
+    pending_creative_review:     'Creative Review',  // legacy
+    pending_client_review:       'Client Review',
+    pending_editor:              'Awaiting Editor',
+    approved:                    'Approved',
   }
 
   const STATUS_BADGE_COLORS = {
-    pending_creative_review: 'bg-amber-500/20 text-amber-300',
-    pending_client_review:   'bg-blue-500/20 text-blue-300',
-    pending_editor:          'bg-purple-500/20 text-purple-300',
-    approved:                'bg-green-500/20 text-green-300',
+    pending_photographer_review: 'bg-amber-500/20 text-amber-300',
+    pending_creative_review:     'bg-amber-500/20 text-amber-300',
+    pending_client_review:       'bg-blue-500/20 text-blue-300',
+    pending_editor:              'bg-purple-500/20 text-purple-300',
+    approved:                    'bg-green-500/20 text-green-300',
   }
 
   return (
@@ -575,21 +619,39 @@ export default function VideoRevisionReview() {
               <p className="text-xs text-red-400 mb-2">{actionError}</p>
             )}
 
-            {/* Creative: submit for client review */}
-            {(isCreative || isAdmin) && revStatus === 'pending_creative_review' && (
-              <button
-                onClick={handleSubmitForClient}
-                disabled={submittingAction}
-                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition-all disabled:opacity-50"
-              >
-                {submittingAction ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                Submit for Client Review
-              </button>
+            {/* Photographer: done reviewing — hand off to client */}
+            {(isPhotographer || isAdmin) && (revStatus === 'pending_photographer_review' || revStatus === 'pending_creative_review') && (
+              <>
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 mb-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Camera size={12} className="text-amber-300" />
+                    <p className="text-xs text-amber-300 font-semibold">Your review is needed</p>
+                  </div>
+                  <p className="text-xs text-white/50">Click the timeline to leave timestamped notes for the client. When done, send it to them below.</p>
+                </div>
+                <button
+                  onClick={handlePhotographerDone}
+                  disabled={submittingAction}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition-all disabled:opacity-50"
+                >
+                  {submittingAction ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                  Done — Send to Client
+                </button>
+              </>
             )}
 
-            {/* Client: send to editor or approve */}
+            {/* Client: review photographer's notes, add your own, then send or approve */}
             {(isClient || isAdmin) && revStatus === 'pending_client_review' && (
               <>
+                {creativeComments.length > 0 && (
+                  <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-3 mb-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Camera size={12} className="text-purple-300" />
+                      <p className="text-xs text-purple-300 font-semibold">Photographer left {creativeComments.length} note{creativeComments.length !== 1 ? 's' : ''}</p>
+                    </div>
+                    <p className="text-xs text-white/50">Accept or decline each note, then add your own if needed.</p>
+                  </div>
+                )}
                 {!canRevise && (
                   <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-3 mb-1">
                     <p className="text-xs text-orange-300 font-semibold mb-0.5">Maximum revisions reached</p>
@@ -617,12 +679,12 @@ export default function VideoRevisionReview() {
               </>
             )}
 
-            {/* Editor: read-only notice */}
+            {/* Editor: summary of accepted comments to fix */}
             {isEditor && !isAdmin && revStatus === 'pending_editor' && (
               <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3">
-                <p className="text-xs text-amber-300 font-medium mb-1">Comments to address</p>
+                <p className="text-xs text-amber-300 font-medium mb-1">Upload the next revision</p>
                 <p className="text-xs text-white/40">
-                  {comments.filter((c) => c.status === 'accepted').length} accepted comment{comments.filter((c) => c.status === 'accepted').length !== 1 ? 's' : ''} to address in your next revision.
+                  {comments.filter((c) => c.status === 'accepted').length} accepted note{comments.filter((c) => c.status === 'accepted').length !== 1 ? 's' : ''} to address. Go to the project page to upload your revised cut.
                 </p>
               </div>
             )}

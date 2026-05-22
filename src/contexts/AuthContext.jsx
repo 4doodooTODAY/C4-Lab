@@ -41,6 +41,14 @@ export function AuthProvider({ children }) {
       if (!mounted) return
 
       if (!session) {
+        // If there's a ?code= in the URL, Supabase is still exchanging an invite/recovery token.
+        // Stay in loading state — SIGNED_IN will fire once the exchange completes.
+        // Redirecting to /login now would strip the code from the URL and break the flow.
+        if (event === 'INITIAL_SESSION') {
+          const hasCode = new URLSearchParams(window.location.search).has('code')
+          const hasHashToken = window.location.hash.includes('access_token')
+          if (hasCode || hasHashToken) return
+        }
         setUser(null)
         setProfile(null)
         clearCachedProfile()

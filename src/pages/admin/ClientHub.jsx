@@ -610,7 +610,7 @@ function ContentTab({ clientId, shoots, projects, onRefetchProjects }) {
       name:        draft.title || `${DRAFT_TYPE_LABELS[draft.type] || 'Content'} Project`,
       client_id:   draft.client_id || clientId,
       draft_id:    draft.id,
-      stage:       'briefing',
+      stage:       'pitch',
       target_date: draft.target_date || null,
       due_date:    draft.target_date || null,
       shoot_id:    draft.shoot_id || null,

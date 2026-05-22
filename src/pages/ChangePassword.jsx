@@ -51,7 +51,16 @@ export default function ChangePassword() {
       )
       const update = supabase.auth.updateUser({ password })
       const { error: updateError } = await Promise.race([update, timeout])
-      if (updateError) { setError(updateError.message); setLoading(false); return }
+      if (updateError) {
+        const msg = updateError.message || ''
+        if (msg.toLowerCase().includes('session') || msg.toLowerCase().includes('token')) {
+          setError('Your invite link has expired. Ask your admin to resend the invite.')
+        } else {
+          setError(updateError.message)
+        }
+        setLoading(false)
+        return
+      }
 
       // Mark password changed (fire-and-forget)
       supabase.from('profiles').update({ must_change_password: false }).eq('id', user.id).then(() => {})
