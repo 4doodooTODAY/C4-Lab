@@ -1365,7 +1365,8 @@ function UploadPhotoRevisionSection({ project, revisions, onRefresh }) {
   const stage     = STAGE_KEY_MAP[project.stage] || project.stage
   const latestRev = [...revisions].sort((a, b) => b.revision_number - a.revision_number)[0]
   const nextRevNum = latestRev ? latestRev.revision_number + 1 : 1
-  const canUpload = stage === 'post_production' || (latestRev && latestRev.status === 'pending_editor')
+  // Photo projects can upload at any active stage (production or post_production), or when client has returned feedback
+  const canUpload = ['production', 'post_production'].includes(stage) || (latestRev && latestRev.status === 'pending_editor')
   const pendingAdminRev = revisions.find((r) => r.status === 'pending_admin_review')
   if (!canUpload || pendingAdminRev) return null
 
