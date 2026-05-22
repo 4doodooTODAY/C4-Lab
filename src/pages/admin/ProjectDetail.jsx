@@ -18,7 +18,7 @@ import { forceDownload, uploadToR2 } from '../../lib/r2'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const DISPLAY_STAGES = [
-  { key: 'pitch',           label: 'Pitch' },
+  { key: 'pitch',           label: 'Not Started' },
   { key: 'production',      label: 'Shoot' },
   { key: 'post_production', label: 'Editing' },
   { key: 'review',          label: 'Review' },
@@ -198,37 +198,23 @@ function InlineField({ label, value, displayValue, type = 'text', onSave, icon: 
   )
 }
 
-// ── Pitch Approval Panel (admin) ──────────────────────────────────────────────
-function PitchApprovalPanel({ project, profile, onApproved, onRefresh }) {
-  const [approving,  setApproving]  = useState(false)
-  const [notes,      setNotes]      = useState(project.pitch_notes || '')
-  const [saving,     setSaving]     = useState(false)
-  const [error,      setError]      = useState('')
+// ── Start Project Panel (admin) — replaces legacy "Pitch" stage ───────────────
+function PitchApprovalPanel({ project, profile, onApproved }) {
+  const [starting, setStarting] = useState(false)
+  const [error,    setError]    = useState('')
 
-  const handleApprove = async () => {
-    setApproving(true); setError('')
+  const handleStart = async () => {
+    setStarting(true); setError('')
     try {
-      await updateProject(project.id, {
-        stage:             'pre_production',
-        pitch_approved_by: profile.id,
-      })
-      // Notify the creative
-      if (project.creative_id) {
-        await notify({
-          profileId: project.creative_id, actorId: profile.id, type: 'pitch_approved',
-          title: `"${project.name}" pitch approved — schedule the shoot`,
-          body:  'The pitch has been approved. Schedule the shoot and begin production.',
-          link:  `/projects/${project.id}`,
-        })
-      }
+      await updateProject(project.id, { stage: 'pre_production' })
       // Notify client
       if (project.client_id) {
         const { data: c } = await supabase.from('clients').select('profile_id').eq('id', project.client_id).maybeSingle()
         if (c?.profile_id) {
           await notify({
             profileId: c.profile_id, actorId: profile.id, type: 'pitch_approved',
-            title: `"${project.name}" is approved and in motion!`,
-            body:  'Your project has been approved by the admin. Work is beginning.',
+            title: `"${project.name}" is underway!`,
+            body:  'Your project has been kicked off and work is beginning.',
             link:  `/my-projects`,
           })
         }
@@ -237,56 +223,27 @@ function PitchApprovalPanel({ project, profile, onApproved, onRefresh }) {
     } catch (err) {
       setError(err.message)
     } finally {
-      setApproving(false)
+      setStarting(false)
     }
   }
 
-  const handleSaveNotes = async () => {
-    setSaving(true)
-    await updateProject(project.id, { pitch_notes: notes })
-    setSaving(false)
-    onRefresh()
-  }
-
   return (
-    <div className="mb-6 bg-gradient-to-br from-accent/5 to-purple-50 border border-accent/20 rounded-2xl p-5">
-      <div className="flex items-center gap-2 mb-3">
-        <Sparkles size={16} className="text-accent" />
-        <h3 className="text-sm font-bold text-text-primary">Pitch Review</h3>
-        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-accent/10 text-accent">Awaiting Approval</span>
+    <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-5">
+      <div className="flex items-center gap-2 mb-2">
+        <Sparkles size={16} className="text-amber-600" />
+        <h3 className="text-sm font-bold text-text-primary">Project Not Started</h3>
       </div>
-
-      {project.concept && (
-        <div className="bg-white rounded-xl px-4 py-3 mb-3 border border-accent/10">
-          <p className="text-xs text-text-muted font-medium mb-1">Project Brief</p>
-          <p className="text-sm text-text-primary leading-relaxed whitespace-pre-wrap">{project.concept}</p>
-        </div>
-      )}
-
-      <div className="mb-3">
-        <label className="text-xs text-text-muted font-medium mb-1 block">Admin notes / feedback for client</label>
-        <div className="flex gap-2">
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Optional notes visible to the client…"
-            className="input flex-1 min-h-[72px] resize-none text-sm"
-          />
-          <button onClick={handleSaveNotes} disabled={saving} className="btn-secondary self-end px-3 disabled:opacity-50">
-            {saving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
-          </button>
-        </div>
-      </div>
-
+      <p className="text-xs text-text-muted mb-4">
+        This project is waiting to be kicked off. Click below to move it into Pre-Production and start the workflow.
+      </p>
       {error && <p className="text-xs text-red-500 mb-2">{error}</p>}
-
       <button
-        onClick={handleApprove}
-        disabled={approving}
+        onClick={handleStart}
+        disabled={starting}
         className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50"
       >
-        {approving ? <Loader2 size={14} className="animate-spin" /> : <ThumbsUp size={14} />}
-        Approve Pitch & Begin Pre-Production
+        {starting ? <Loader2 size={14} className="animate-spin" /> : <ThumbsUp size={14} />}
+        Kick Off Project & Begin Pre-Production
       </button>
     </div>
   )
@@ -842,7 +799,7 @@ export default function ProjectDetail() {
         <PitchApprovalPanel
           project={project}
           profile={profile}
-          onApproved={() => { updateProject(id, { stage: 'pre_production', pitch_approved_by: profile.id }); refetch() }}
+          onApproved={() => { refetch() }}
           onRefresh={refetch}
         />
       )}
