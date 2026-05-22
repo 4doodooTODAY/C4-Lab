@@ -286,7 +286,7 @@ function NewDraftModal({ clientId, shoots, onClose, onCreated }) {
 }
 
 // ── Tab: Overview ──────────────────────────────────────────────────────────────
-function OverviewTab({ client, shoots, drafts, projects, requests }) {
+function OverviewTab({ client, shoots, projects, requests }) {
   const { assignments, loading: aLoading, refetch: refetchA } = useClientCreatives(client.id)
   const [allProfiles, setAllProfiles] = useState([])
   const [adding, setAdding]           = useState(false)
@@ -328,16 +328,15 @@ function OverviewTab({ client, shoots, drafts, projects, requests }) {
   }
 
   const stats = [
-    { label: 'Shoots',   value: shoots.length,                                 color: 'text-blue-600' },
-    { label: 'Drafts',   value: drafts.filter((d) => d.status !== 'scrapped' && d.status !== 'approved').length, color: 'text-amber-600' },
-    { label: 'Projects', value: projects.length,                               color: 'text-purple-600' },
-    { label: 'Requests', value: requests.length,                               color: 'text-green-600' },
+    { label: 'Shoots',   value: shoots.length,    color: 'text-blue-600' },
+    { label: 'Projects', value: projects.length,  color: 'text-purple-600' },
+    { label: 'Requests', value: requests.length,  color: 'text-green-600' },
   ]
 
   return (
     <div className="space-y-6">
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         {stats.map(({ label, value, color }) => (
           <div key={label} className="card p-4 text-center">
             <p className={`text-2xl font-bold ${color}`}>{value}</p>
@@ -1258,7 +1257,6 @@ function FilesTab({ clientId }) {
 const TABS = [
   { id: 'overview', label: 'Overview',  icon: Building2 },
   { id: 'shoots',   label: 'Shoots',    icon: Camera },
-  { id: 'content',  label: 'Concepts',  icon: FileText },
   { id: 'projects', label: 'Projects',  icon: FolderKanban },
   { id: 'files',    label: 'Files',     icon: HardDrive },
   { id: 'requests', label: 'Requests',  icon: Inbox },
@@ -1274,7 +1272,6 @@ export default function ClientHub() {
   const [tab, setTab]           = useState('overview')
 
   const { shoots } = useShoots(id)
-  const { drafts }  = useContentDrafts(id)
 
   useEffect(() => {
     if (!id) return
@@ -1347,11 +1344,10 @@ export default function ClientHub() {
 
       {/* Tab content */}
       {tab === 'overview' && (
-        <OverviewTab client={client} shoots={shoots} drafts={drafts} projects={projects} requests={requests} />
+        <OverviewTab client={client} shoots={shoots} projects={projects} requests={requests} />
       )}
       {tab === 'shoots'   && <ShootsTab   clientId={id} client={client} />}
-      {tab === 'content'  && <ContentTab  clientId={id} shoots={shoots} projects={projects} onRefetchProjects={refetchProjects} />}
-      {tab === 'projects' && <ProjectsTab clientId={id} projects={projects} onRefetch={refetchProjects} />}
+{tab === 'projects' && <ProjectsTab clientId={id} projects={projects} onRefetch={refetchProjects} />}
       {tab === 'files'    && <FilesTab    clientId={id} />}
       {tab === 'requests' && <RequestsTab requests={requests} />}
     </div>
