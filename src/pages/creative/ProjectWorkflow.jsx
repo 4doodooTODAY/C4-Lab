@@ -1921,7 +1921,7 @@ export default function ProjectWorkflow() {
       // 1. Fetch project base data
       const { data: projData, error: projErr } = await supabase
         .from('projects')
-        .select('id, name, stage, shoot_date, shoot_id, location, creative_id, editor_id, revision_count, notes, clients(id, name, contact_name)')
+        .select('id, name, stage, media_type, shoot_date, shoot_id, location, creative_id, editor_id, revision_count, notes, clients(id, name, contact_name)')
         .eq('id', id)
         .single()
       if (projErr) throw projErr
