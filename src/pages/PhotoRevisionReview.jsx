@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Loader2, Send, Check, X, Plus, Image, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowLeft, Loader2, Send, Check, X, Plus, Image, ChevronLeft, ChevronRight, MessageSquare } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import Avatar from '../components/ui/Avatar'
@@ -87,6 +87,8 @@ export default function PhotoRevisionReview() {
   const [comments,   setComments]   = useState([])
   const [loading,    setLoading]    = useState(true)
   const [error,      setError]      = useState('')
+  const [sending,    setSending]    = useState(false)
+  const [approving,  setApproving]  = useState(false)
 
   const [photoIndex,  setPhotoIndex]  = useState(0)
   const [selectedPin, setSelectedPin] = useState(null)
@@ -172,9 +174,39 @@ export default function PhotoRevisionReview() {
   }
 
   const handleApproveAll = async () => {
-    // Mark revision as approved
-    await supabase.from('project_revisions').update({ status: 'approved' }).eq('id', revisionId)
-    setRevision((r) => ({ ...r, status: 'approved' }))
+    setApproving(true)
+    try {
+      await supabase.from('project_revisions').update({ status: 'approved' }).eq('id', revisionId)
+      setRevision((r) => ({ ...r, status: 'approved' }))
+    } finally {
+      setApproving(false)
+    }
+  }
+
+  const handleSendFeedback = async () => {
+    setSending(true)
+    try {
+      await supabase.from('project_revisions')
+        .update({ status: 'pending_editor' })
+        .eq('id', revisionId)
+      setRevision((r) => ({ ...r, status: 'pending_editor' }))
+      if (project?.editor_id) {
+        const { notify } = await import('../lib/notify')
+        const pendingCount = comments.filter((c) => c.status === 'pending').length
+        await notify({
+          profileId: project.editor_id,
+          actorId:   myId,
+          type:      'revision_feedback',
+          title:     `Photo feedback submitted for "${project.name}"`,
+          body:      `The client left ${pendingCount} comment${pendingCount !== 1 ? 's' : ''} on the photos.`,
+          link:      `/projects/${project.id}/photo-revision/${revisionId}`,
+        })
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setSending(false)
+    }
   }
 
   if (loading) return (
@@ -352,19 +384,31 @@ export default function PhotoRevisionReview() {
             </div>
           )}
 
-          {/* Approve panel for clients */}
+          {/* Approve / Send Feedback panel for clients */}
           {isClient && revStatus === 'pending_client_review' && !pendingPin && (
-            <div className="p-3 border-t border-border shrink-0">
-              {commentsOnCurrentPhoto.filter((c) => c.status === 'pending').length > 0 ? (
-                <p className="text-xs text-amber-600 font-medium text-center">
-                  Resolve all pins before approving
-                </p>
+            <div className="p-3 border-t border-border shrink-0 space-y-2">
+              {comments.filter((c) => c.status === 'pending').length > 0 ? (
+                <>
+                  <p className="text-[11px] text-text-muted text-center">
+                    {comments.filter((c) => c.status === 'pending').length} pending comment{comments.filter((c) => c.status === 'pending').length !== 1 ? 's' : ''} across all photos
+                  </p>
+                  <button
+                    onClick={handleSendFeedback}
+                    disabled={sending}
+                    className="w-full btn-primary text-xs flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  >
+                    {sending ? <Loader2 size={11} className="animate-spin" /> : <MessageSquare size={11} />}
+                    Send Feedback to Editor
+                  </button>
+                </>
               ) : (
                 <button
                   onClick={handleApproveAll}
-                  className="w-full btn-primary text-xs flex items-center justify-center gap-1.5"
+                  disabled={approving}
+                  className="w-full btn-primary text-xs flex items-center justify-center gap-1.5 disabled:opacity-50"
                 >
-                  <Check size={12} /> Approve Photos
+                  {approving ? <Loader2 size={11} className="animate-spin" /> : <Check size={12} />}
+                  Approve Photos
                 </button>
               )}
             </div>
