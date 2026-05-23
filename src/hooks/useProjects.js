@@ -9,10 +9,8 @@ const PROJECT_SELECT = `
   admin_review_required,
   draft_id, shoot_id, concept, target_date, client_id,
   clients(id, name, contact_name),
-  project_members(
-    id, role,
-    profiles(id, full_name, role, avatar_url)
-  )
+  creative:profiles!creative_id(id, full_name, avatar_url),
+  editor:profiles!editor_id(id, full_name, avatar_url)
 `
 
 // Pass { userId, isAdmin } to scope results; omit for unrestricted (admin-only pages)

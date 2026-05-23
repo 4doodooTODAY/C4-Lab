@@ -75,9 +75,13 @@ function ProjectCard({ project, onClick }) {
   const isOD   = due && isBefore(due, today)
   const isSoon = due && !isOD && isBefore(due, addDays(today, 7))
 
-  const members = project.project_members || []
-  const visible = members.slice(0, 3)
-  const overflow = members.length - 3
+  // Build team from the actual assignment fields (creative + editor join profiles)
+  const teamMembers = [
+    project.creative ? { id: project.creative_id, full_name: project.creative.full_name, avatar_url: project.creative.avatar_url } : null,
+    project.editor   ? { id: project.editor_id,   full_name: project.editor.full_name,   avatar_url: project.editor.avatar_url   } : null,
+  ].filter(Boolean)
+  const visible  = teamMembers.slice(0, 3)
+  const overflow = teamMembers.length - 3
 
   const clientName = project.clients?.contact_name || project.clients?.name || '—'
 
@@ -124,8 +128,8 @@ function ProjectCard({ project, onClick }) {
           {visible.map((m) => (
             <Avatar
               key={m.id}
-              name={m.profiles?.full_name}
-              url={m.profiles?.avatar_url}
+              name={m.full_name}
+              url={m.avatar_url}
               size={6}
               className="border-2 border-white"
             />
@@ -135,7 +139,7 @@ function ProjectCard({ project, onClick }) {
               +{overflow}
             </div>
           )}
-          {members.length === 0 && (
+          {teamMembers.length === 0 && (
             <span className="text-xs text-text-muted">No team</span>
           )}
         </div>
