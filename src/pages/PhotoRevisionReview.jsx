@@ -299,8 +299,8 @@ export default function PhotoRevisionReview() {
             'bg-surface-2 text-text-muted'
           }`}>
             {revStatus === 'approved'              ? '✓ Approved' :
-             revStatus === 'pending_client_review' ? '👀 Your Review' :
-             revStatus === 'pending_editor'        ? '🔔 Editor\'s Turn' :
+             revStatus === 'pending_client_review' ? (isClient ? '👀 Your Review' : '⏳ Client Reviewing') :
+             revStatus === 'pending_editor'        ? (isEditor || isAdmin ? '🔔 Your Turn' : '⏳ Editor Working') :
              revStatus === 'pending_photographer_review' ? '⏳ Photographer Review' :
              revStatus?.replace(/_/g, ' ')}
           </span>
