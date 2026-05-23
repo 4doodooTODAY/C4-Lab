@@ -302,8 +302,6 @@ function OverviewTab({ client, shoots, projects, requests, onClientUpdated }) {
     contact_name: client.contact_name || '',
     email:        client.email        || '',
     phone:        client.phone        || '',
-    website:      client.website      || '',
-    address:      client.address      || '',
     notes:        client.notes        || '',
   })
 
@@ -315,11 +313,14 @@ function OverviewTab({ client, shoots, projects, requests, onClientUpdated }) {
       contact_name: form.contact_name.trim(),
       email:        form.email.trim(),
       phone:        form.phone.trim(),
-      website:      form.website.trim(),
-      address:      form.address.trim(),
       notes:        form.notes.trim(),
     }).eq('id', client.id)
-    if (error) { setEditErr(error.message); setSavingClient(false); return }
+    if (error) {
+      console.error('Client save error:', error)
+      setEditErr(error.message)
+      setSavingClient(false)
+      return
+    }
     setSavingClient(false)
     setEditing(false)
     onClientUpdated?.()
@@ -396,12 +397,10 @@ function OverviewTab({ client, shoots, projects, requests, onClientUpdated }) {
         {editing ? (
           <div className="space-y-3">
             {[
-              { label: 'Company Name',   key: 'name',          type: 'text',  placeholder: 'Acme Inc.' },
-              { label: 'Contact Name',   key: 'contact_name',  type: 'text',  placeholder: 'Jane Smith' },
-              { label: 'Email',          key: 'email', type: 'email', placeholder: 'jane@acme.com' },
-              { label: 'Phone',          key: 'phone', type: 'tel',   placeholder: '+1 555 000 0000' },
-              { label: 'Website',        key: 'website',       type: 'url',   placeholder: 'https://acme.com' },
-              { label: 'Address',        key: 'address',       type: 'text',  placeholder: '123 Main St, City, State' },
+              { label: 'Company Name',   key: 'name',         type: 'text',  placeholder: 'Acme Inc.' },
+              { label: 'Contact Name',   key: 'contact_name', type: 'text',  placeholder: 'Jane Smith' },
+              { label: 'Email',          key: 'email',        type: 'email', placeholder: 'jane@acme.com' },
+              { label: 'Phone',          key: 'phone',        type: 'tel',   placeholder: '+1 555 000 0000' },
             ].map(({ label, key, type, placeholder }) => (
               <div key={key}>
                 <label className="label">{label}</label>
@@ -433,8 +432,6 @@ function OverviewTab({ client, shoots, projects, requests, onClientUpdated }) {
               { label: 'Contact',  value: form.contact_name },
               { label: 'Email',    value: form.email },
               { label: 'Phone',    value: form.phone },
-              { label: 'Website',  value: form.website },
-              { label: 'Address',  value: form.address },
               { label: 'Notes',    value: form.notes },
             ].filter(({ value }) => value).map(({ label, value }) => (
               <div key={label} className="flex gap-2">
@@ -442,7 +439,7 @@ function OverviewTab({ client, shoots, projects, requests, onClientUpdated }) {
                 <span className="font-medium text-text-primary break-all">{value}</span>
               </div>
             ))}
-            {!form.name && !form.contact_name && !form.email && (
+            {!form.name && !form.contact_name && !form.email && !form.phone && !form.notes && (
               <p className="text-text-muted italic text-xs">No details yet — click Edit to add them.</p>
             )}
           </div>
