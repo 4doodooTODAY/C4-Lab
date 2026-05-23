@@ -298,26 +298,26 @@ function OverviewTab({ client, shoots, projects, requests, onClientUpdated }) {
   const [savingClient, setSavingClient] = useState(false)
   const [editErr,      setEditErr]      = useState('')
   const [form, setForm] = useState({
-    name:          client.name          || '',
-    contact_name:  client.contact_name  || '',
-    contact_email: client.contact_email || client.email || '',
-    contact_phone: client.contact_phone || client.phone || '',
-    website:       client.website       || '',
-    address:       client.address       || '',
-    notes:         client.notes         || '',
+    name:         client.name         || '',
+    contact_name: client.contact_name || '',
+    email:        client.email        || '',
+    phone:        client.phone        || '',
+    website:      client.website      || '',
+    address:      client.address      || '',
+    notes:        client.notes        || '',
   })
 
   const handleSaveClient = async () => {
     setSavingClient(true)
     setEditErr('')
     const { error } = await supabase.from('clients').update({
-      name:          form.name.trim(),
-      contact_name:  form.contact_name.trim(),
-      contact_email: form.contact_email.trim(),
-      contact_phone: form.contact_phone.trim(),
-      website:       form.website.trim(),
-      address:       form.address.trim(),
-      notes:         form.notes.trim(),
+      name:         form.name.trim(),
+      contact_name: form.contact_name.trim(),
+      email:        form.email.trim(),
+      phone:        form.phone.trim(),
+      website:      form.website.trim(),
+      address:      form.address.trim(),
+      notes:        form.notes.trim(),
     }).eq('id', client.id)
     if (error) { setEditErr(error.message); setSavingClient(false); return }
     setSavingClient(false)
@@ -398,8 +398,8 @@ function OverviewTab({ client, shoots, projects, requests, onClientUpdated }) {
             {[
               { label: 'Company Name',   key: 'name',          type: 'text',  placeholder: 'Acme Inc.' },
               { label: 'Contact Name',   key: 'contact_name',  type: 'text',  placeholder: 'Jane Smith' },
-              { label: 'Email',          key: 'contact_email', type: 'email', placeholder: 'jane@acme.com' },
-              { label: 'Phone',          key: 'contact_phone', type: 'tel',   placeholder: '+1 555 000 0000' },
+              { label: 'Email',          key: 'email', type: 'email', placeholder: 'jane@acme.com' },
+              { label: 'Phone',          key: 'phone', type: 'tel',   placeholder: '+1 555 000 0000' },
               { label: 'Website',        key: 'website',       type: 'url',   placeholder: 'https://acme.com' },
               { label: 'Address',        key: 'address',       type: 'text',  placeholder: '123 Main St, City, State' },
             ].map(({ label, key, type, placeholder }) => (
@@ -431,8 +431,8 @@ function OverviewTab({ client, shoots, projects, requests, onClientUpdated }) {
             {[
               { label: 'Company',  value: form.name },
               { label: 'Contact',  value: form.contact_name },
-              { label: 'Email',    value: form.contact_email },
-              { label: 'Phone',    value: form.contact_phone },
+              { label: 'Email',    value: form.email },
+              { label: 'Phone',    value: form.phone },
               { label: 'Website',  value: form.website },
               { label: 'Address',  value: form.address },
               { label: 'Notes',    value: form.notes },
@@ -442,7 +442,7 @@ function OverviewTab({ client, shoots, projects, requests, onClientUpdated }) {
                 <span className="font-medium text-text-primary break-all">{value}</span>
               </div>
             ))}
-            {!form.name && !form.contact_name && !form.contact_email && (
+            {!form.name && !form.contact_name && !form.email && (
               <p className="text-text-muted italic text-xs">No details yet — click Edit to add them.</p>
             )}
           </div>
