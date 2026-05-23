@@ -294,9 +294,9 @@ function OverviewTab({ client, shoots, projects, requests, onClientUpdated }) {
   const [selProfile, setSelProfile]   = useState('')
 
   // Client info editing
-  const [editing, setEditing]   = useState(false)
-  const [saving,  setSaving]    = useState(false)
-  const [editErr, setEditErr]   = useState('')
+  const [editing,      setEditing]      = useState(false)
+  const [savingClient, setSavingClient] = useState(false)
+  const [editErr,      setEditErr]      = useState('')
   const [form, setForm] = useState({
     name:          client.name          || '',
     contact_name:  client.contact_name  || '',
@@ -308,7 +308,7 @@ function OverviewTab({ client, shoots, projects, requests, onClientUpdated }) {
   })
 
   const handleSaveClient = async () => {
-    setSaving(true)
+    setSavingClient(true)
     setEditErr('')
     const { error } = await supabase.from('clients').update({
       name:          form.name.trim(),
@@ -319,8 +319,8 @@ function OverviewTab({ client, shoots, projects, requests, onClientUpdated }) {
       address:       form.address.trim(),
       notes:         form.notes.trim(),
     }).eq('id', client.id)
-    if (error) { setEditErr(error.message); setSaving(false); return }
-    setSaving(false)
+    if (error) { setEditErr(error.message); setSavingClient(false); return }
+    setSavingClient(false)
     setEditing(false)
     onClientUpdated?.()
   }
@@ -386,8 +386,8 @@ function OverviewTab({ client, shoots, projects, requests, onClientUpdated }) {
             ? <button onClick={() => setEditing(true)} className="btn-ghost text-xs flex items-center gap-1 text-accent"><Pencil size={12} /> Edit</button>
             : <div className="flex gap-2">
                 <button onClick={() => { setEditing(false); setEditErr('') }} className="btn-ghost text-xs">Cancel</button>
-                <button onClick={handleSaveClient} disabled={saving} className="btn-primary text-xs flex items-center gap-1.5 disabled:opacity-50">
-                  {saving ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />} Save
+                <button onClick={handleSaveClient} disabled={savingClient} className="btn-primary text-xs flex items-center gap-1.5 disabled:opacity-50">
+                  {savingClient ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />} Save
                 </button>
               </div>
           }
