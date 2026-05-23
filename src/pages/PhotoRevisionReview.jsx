@@ -152,7 +152,8 @@ export default function PhotoRevisionReview() {
   const isEditor       = projectEditorIds.includes(myId) || project?.editor_id === myId
   const isClient       = myRole === 'client'
   const canAddPins     = isClient && revision?.status === 'pending_client_review'
-  const canActOnPins   = (isPhotographer || isEditor || isAdmin) && revision?.status !== 'pending_client_review'
+  // Only editors/photographers can accept or decline client comments, and only when it's actually their turn
+  const canActOnPins   = (isPhotographer || isEditor) && revision?.status === 'pending_editor'
 
   // Click on photo to place a pin
   const handlePhotoClick = (e) => {
@@ -423,7 +424,7 @@ export default function PhotoRevisionReview() {
                 index={i}
                 selected={selectedPin?.id === c.id}
                 onSelect={setSelectedPin}
-                canAct={canActOnPins || isAdmin}
+                canAct={canActOnPins}
                 onAccept={(id) => handleStatusChange(id, 'accepted')}
                 onDecline={(id) => handleStatusChange(id, 'declined')}
               />
