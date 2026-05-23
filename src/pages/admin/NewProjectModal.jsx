@@ -35,14 +35,21 @@ export default function NewProjectModal({ onClose, onCreated, prefillDate = null
 
   useEffect(() => {
     if (!form.client_id) { setClientTeam([]); setSelectedEditor(''); return }
-    supabase
-      .from('client_creatives')
-      .select('profile_id, role, profiles(id, full_name, avatar_url, role)')
-      .eq('client_id', form.client_id)
-      .then(({ data }) => {
-        setClientTeam((data || []).map((a) => ({ ...a.profiles, assignedRole: a.role })))
-        setSelectedEditor('')
+    Promise.all([
+      supabase.from('client_creatives')
+        .select('profile_id, role, profiles(id, full_name, avatar_url, role)')
+        .eq('client_id', form.client_id),
+      supabase.from('profiles').select('id, full_name, avatar_url, role').eq('role', 'admin'),
+    ]).then(([{ data: ccData }, { data: admins }]) => {
+      const members = (ccData || []).map((a) => ({ ...a.profiles, assignedRole: a.role }))
+      const memberIds = new Set(members.map((m) => m.id))
+      // Add admins not already in the list
+      ;(admins || []).forEach((a) => {
+        if (!memberIds.has(a.id)) members.push({ ...a, assignedRole: 'admin' })
       })
+      setClientTeam(members)
+      setSelectedEditor('')
+    })
   }, [form.client_id])
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
@@ -159,7 +166,7 @@ export default function NewProjectModal({ onClose, onCreated, prefillDate = null
                   <select className="input" value={selectedEditor} onChange={(e) => setSelectedEditor(e.target.value)}>
                     <option value="">— None —</option>
                     {clientTeam.map((m) => (
-                      <option key={m.id} value={m.id}>{m.full_name}</option>
+                      <option key={m.id} value={m.id}>{m.full_name}{m.role === 'admin' ? ' (admin)' : ''}</option>
                     ))}
                   </select>
                 </div>
