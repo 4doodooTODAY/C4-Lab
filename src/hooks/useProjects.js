@@ -15,21 +15,42 @@ const PROJECT_SELECT = `
   )
 `
 
-export function useProjects() {
+// Pass { userId, isAdmin } to scope results; omit for unrestricted (admin-only pages)
+export function useProjects({ userId, isAdmin } = {}) {
   const [projects, setProjects] = useState([])
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState(null)
 
   const fetchProjects = useCallback(async () => {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('projects')
-      .select(PROJECT_SELECT)
-      .order('created_at', { ascending: false })
-    if (error) setError(error.message)
-    else setProjects(data || [])
-    setLoading(false)
-  }, [])
+    try {
+      // Non-admins only see projects for their assigned clients
+      if (userId && !isAdmin) {
+        const { data: ccRows } = await supabase
+          .from('client_creatives')
+          .select('client_id')
+          .eq('profile_id', userId)
+        const clientIds = (ccRows || []).map((r) => r.client_id)
+        if (!clientIds.length) { setProjects([]); setLoading(false); return }
+        const { data, error } = await supabase
+          .from('projects')
+          .select(PROJECT_SELECT)
+          .in('client_id', clientIds)
+          .order('created_at', { ascending: false })
+        if (error) setError(error.message)
+        else setProjects(data || [])
+      } else {
+        const { data, error } = await supabase
+          .from('projects')
+          .select(PROJECT_SELECT)
+          .order('created_at', { ascending: false })
+        if (error) setError(error.message)
+        else setProjects(data || [])
+      }
+    } finally {
+      setLoading(false)
+    }
+  }, [userId, isAdmin])
 
   useEffect(() => { fetchProjects() }, [fetchProjects])
 

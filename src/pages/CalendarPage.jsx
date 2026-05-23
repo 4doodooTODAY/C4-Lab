@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { format, addMonths, subMonths, parseISO } from 'date-fns'
 import { ChevronLeft, ChevronRight, Loader2, Plus, Camera, FileText, X, MapPin, Clock, FolderKanban, CalendarDays, ExternalLink } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import CalendarGrid from '../components/calendar/CalendarGrid'
 import EventModal from '../components/calendar/EventModal'
+import NewProjectModal from './admin/NewProjectModal'
 import { useCalendarEvents } from '../hooks/useCalendarEvents'
 import { EVENT_TYPES } from '../components/calendar/EventChip'
 import { useAuth } from '../contexts/AuthContext'
@@ -91,8 +92,10 @@ export default function CalendarPage() {
   const { profile, user, isAdmin } = useAuth()
   const isCreative = profile?.role === 'creative' || profile?.role === 'editor'
 
+  const navigate = useNavigate()
   const [currentDate, setCurrentDate] = useState(new Date())
   const [modalState,  setModalState]  = useState(null)
+  const [newProjectDate, setNewProjectDate] = useState(null) // date prefilled into new project modal
   const [shoots,      setShoots]      = useState([])
   const [drafts,      setDrafts]      = useState([])
   const [projects,    setProjects]    = useState([])
@@ -215,10 +218,17 @@ export default function CalendarPage() {
   const nextMonth = () => { setCurrentDate((d) => addMonths(d, 1)); setSelectedAux(null) }
   const goToday   = () => { setCurrentDate(new Date()); setSelectedAux(null) }
 
-  const handleDayClick   = (date)  => {
-    if (!isAdmin) return  // creatives/editors cannot create events
-    setModalState({ date, event: null })
+  const handleDayClick = (date) => {
     setSelectedAux(null)
+    setSelectedRealEvent(null)
+    if (isAdmin) {
+      // Admins get choice: event modal or project — for simplicity open project modal
+      // (they can still use "Add Event" button for calendar events)
+      setNewProjectDate(format(date, 'yyyy-MM-dd'))
+    } else if (isCreative) {
+      // Creatives/editors click a day → create project with that date prefilled
+      setNewProjectDate(format(date, 'yyyy-MM-dd'))
+    }
   }
   const handleEventClick = (event) => {
     // Synthetic events: show detail panel, don't open modal
@@ -313,7 +323,7 @@ export default function CalendarPage() {
         <ReadOnlyEventPanel event={selectedRealEvent} onClose={() => setSelectedRealEvent(null)} />
       )}
 
-      {/* Event modal (only for real calendar events) */}
+      {/* Event modal (admin calendar events) */}
       {modalState && (
         <EventModal
           date={modalState.date}
@@ -321,6 +331,15 @@ export default function CalendarPage() {
           onSave={handleSave}
           onDelete={deleteEvent}
           onClose={() => setModalState(null)}
+        />
+      )}
+
+      {/* New project modal — triggered by day click for all roles */}
+      {newProjectDate && (
+        <NewProjectModal
+          prefillDate={newProjectDate}
+          onClose={() => setNewProjectDate(null)}
+          onCreated={(id) => { setNewProjectDate(null); navigate(`/projects/${id}/creative`) }}
         />
       )}
     </div>

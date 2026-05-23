@@ -488,7 +488,10 @@ function ProjectCard({ project, revisions, clientId, userId, onRefresh }) {
         {!isPitch && revisions.length > 0 && (
           <div className="flex items-center gap-4 text-xs text-gray-400 mb-4 pb-4 border-b border-gray-100">
             <span className="flex items-center gap-1">
-              <Film size={10} /> {revisions.length} cut{revisions.length !== 1 ? 's' : ''} submitted
+              {project.media_type === 'photo'
+                ? <><Camera size={10} /> {revisions.length} photo set{revisions.length !== 1 ? 's' : ''} submitted</>
+                : <><Film size={10} /> {revisions.length} cut{revisions.length !== 1 ? 's' : ''} submitted</>
+              }
             </span>
             <span className="flex items-center gap-1">
               <MessageSquare size={10} /> {revisionsLeft} revision{revisionsLeft !== 1 ? 's' : ''} remaining
