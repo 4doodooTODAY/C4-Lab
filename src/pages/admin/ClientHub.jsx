@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   ArrowLeft, Building2, Users2, CalendarDays, FolderKanban,
-  Inbox, Plus, X, Loader2, Edit2, MapPin, Clock, Check,
+  Inbox, Plus, X, Loader2, Edit2, MapPin, Clock, Check, Pencil,
   Camera, Film, ExternalLink, Trash2, ChevronRight, AlertCircle,
   Link as LinkIcon, FileText, LayoutList, HardDrive, Image, File,
 } from 'lucide-react'
@@ -287,11 +287,43 @@ function NewDraftModal({ clientId, shoots, onClose, onCreated }) {
 }
 
 // ── Tab: Overview ──────────────────────────────────────────────────────────────
-function OverviewTab({ client, shoots, projects, requests }) {
+function OverviewTab({ client, shoots, projects, requests, onClientUpdated }) {
   const { assignments, loading: aLoading, refetch: refetchA } = useClientCreatives(client.id)
   const [allProfiles, setAllProfiles] = useState([])
   const [adding, setAdding]           = useState(false)
   const [selProfile, setSelProfile]   = useState('')
+
+  // Client info editing
+  const [editing, setEditing]   = useState(false)
+  const [saving,  setSaving]    = useState(false)
+  const [editErr, setEditErr]   = useState('')
+  const [form, setForm] = useState({
+    name:          client.name          || '',
+    contact_name:  client.contact_name  || '',
+    contact_email: client.contact_email || client.email || '',
+    contact_phone: client.contact_phone || client.phone || '',
+    website:       client.website       || '',
+    address:       client.address       || '',
+    notes:         client.notes         || '',
+  })
+
+  const handleSaveClient = async () => {
+    setSaving(true)
+    setEditErr('')
+    const { error } = await supabase.from('clients').update({
+      name:          form.name.trim(),
+      contact_name:  form.contact_name.trim(),
+      contact_email: form.contact_email.trim(),
+      contact_phone: form.contact_phone.trim(),
+      website:       form.website.trim(),
+      address:       form.address.trim(),
+      notes:         form.notes.trim(),
+    }).eq('id', client.id)
+    if (error) { setEditErr(error.message); setSaving(false); return }
+    setSaving(false)
+    setEditing(false)
+    onClientUpdated?.()
+  }
   const [selRole, setSelRole]         = useState('creative')
   const [saving, setSaving]           = useState(false)
 
@@ -348,14 +380,73 @@ function OverviewTab({ client, shoots, projects, requests }) {
 
       {/* Client info */}
       <div className="card p-5">
-        <h3 className="text-sm font-semibold text-text-primary mb-3">Client Info</h3>
-        <div className="space-y-2 text-sm">
-          <div className="flex gap-2"><span className="text-text-muted w-28">Company</span><span className="font-medium text-text-primary">{client.name || '—'}</span></div>
-          <div className="flex gap-2"><span className="text-text-muted w-28">Contact</span><span className="font-medium text-text-primary">{client.contact_name || '—'}</span></div>
-          <div className="flex gap-2"><span className="text-text-muted w-28">Email</span><span className="font-medium text-text-primary">{client.contact_email || client.email || '—'}</span></div>
-          <div className="flex gap-2"><span className="text-text-muted w-28">Phone</span><span className="font-medium text-text-primary">{client.contact_phone || client.phone || '—'}</span></div>
-          {client.notes && <div className="flex gap-2"><span className="text-text-muted w-28">Notes</span><span className="text-text-secondary">{client.notes}</span></div>}
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold text-text-primary">Client Info</h3>
+          {!editing
+            ? <button onClick={() => setEditing(true)} className="btn-ghost text-xs flex items-center gap-1 text-accent"><Pencil size={12} /> Edit</button>
+            : <div className="flex gap-2">
+                <button onClick={() => { setEditing(false); setEditErr('') }} className="btn-ghost text-xs">Cancel</button>
+                <button onClick={handleSaveClient} disabled={saving} className="btn-primary text-xs flex items-center gap-1.5 disabled:opacity-50">
+                  {saving ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />} Save
+                </button>
+              </div>
+          }
         </div>
+
+        {editing ? (
+          <div className="space-y-3">
+            {[
+              { label: 'Company Name',   key: 'name',          type: 'text',  placeholder: 'Acme Inc.' },
+              { label: 'Contact Name',   key: 'contact_name',  type: 'text',  placeholder: 'Jane Smith' },
+              { label: 'Email',          key: 'contact_email', type: 'email', placeholder: 'jane@acme.com' },
+              { label: 'Phone',          key: 'contact_phone', type: 'tel',   placeholder: '+1 555 000 0000' },
+              { label: 'Website',        key: 'website',       type: 'url',   placeholder: 'https://acme.com' },
+              { label: 'Address',        key: 'address',       type: 'text',  placeholder: '123 Main St, City, State' },
+            ].map(({ label, key, type, placeholder }) => (
+              <div key={key}>
+                <label className="label">{label}</label>
+                <input
+                  type={type}
+                  className="input"
+                  placeholder={placeholder}
+                  value={form[key]}
+                  onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                />
+              </div>
+            ))}
+            <div>
+              <label className="label">Notes</label>
+              <textarea
+                className="input resize-none"
+                rows={3}
+                placeholder="Internal notes about this client…"
+                value={form.notes}
+                onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+              />
+            </div>
+            {editErr && <p className="text-xs text-red-500">{editErr}</p>}
+          </div>
+        ) : (
+          <div className="space-y-2 text-sm">
+            {[
+              { label: 'Company',  value: form.name },
+              { label: 'Contact',  value: form.contact_name },
+              { label: 'Email',    value: form.contact_email },
+              { label: 'Phone',    value: form.contact_phone },
+              { label: 'Website',  value: form.website },
+              { label: 'Address',  value: form.address },
+              { label: 'Notes',    value: form.notes },
+            ].filter(({ value }) => value).map(({ label, value }) => (
+              <div key={label} className="flex gap-2">
+                <span className="text-text-muted w-20 shrink-0">{label}</span>
+                <span className="font-medium text-text-primary break-all">{value}</span>
+              </div>
+            ))}
+            {!form.name && !form.contact_name && !form.contact_email && (
+              <p className="text-text-muted italic text-xs">No details yet — click Edit to add them.</p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Assigned Creatives */}
@@ -1392,6 +1483,11 @@ export default function ClientHub() {
     setProjects(data || [])
   }, [id])
 
+  const refetchClient = useCallback(async () => {
+    const { data } = await supabase.from('clients').select('*').eq('id', id).single()
+    if (data) setClient(data)
+  }, [id])
+
   if (loading) return (
     <div className="flex justify-center py-20">
       <Loader2 size={22} className="animate-spin text-text-muted" />
@@ -1443,7 +1539,7 @@ export default function ClientHub() {
 
       {/* Tab content */}
       {tab === 'overview' && (
-        <OverviewTab client={client} shoots={shoots} projects={projects} requests={requests} />
+        <OverviewTab client={client} shoots={shoots} projects={projects} requests={requests} onClientUpdated={refetchClient} />
       )}
       {tab === 'shoots'   && <ShootsTab   clientId={id} client={client} />}
 {tab === 'projects' && <ProjectsTab clientId={id} projects={projects} onRefetch={refetchProjects} />}
