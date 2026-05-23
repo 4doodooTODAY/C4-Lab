@@ -220,24 +220,27 @@ function ActionBanner({ project, uploads, revisions, isCreative, isEditor, navig
         body: 'Upload your initial cut when done. It will go to the photographer for review first.',
       }
     } else if (latestRev?.status === 'pending_editor') {
+      const clientLabel = project.clients?.contact_name || project.clients?.name || 'The client'
+      const mediaWord   = project.media_type === 'photo' ? 'photos' : 'this cut'
       banner = {
         variant: 'red',
         icon: <AlertCircle size={18} />,
-        title: `Client feedback received on ${revisionLabel(latestRev.revision_number)}`,
-        body: "Address the accepted comments and upload a revised cut.",
+        title: `🔔 ${clientLabel} sent feedback — it's your turn`,
+        body: `${clientLabel} reviewed ${mediaWord} and left comments. Address them and upload a revised version.`,
         action: {
           label: 'View Feedback →',
           onClick: () => navigate(project.media_type === 'photo' ? `/projects/${project.id}/photo-revision/${latestRev.id}` : `/projects/${project.id}/revision/${latestRev.id}`),
         },
       }
     } else if (latestRev?.status === 'pending_client_review' && stage === 'post_production') {
+      const clientLabel = project.clients?.contact_name || project.clients?.name || 'The client'
       banner = {
-        variant: 'red',
-        icon: <AlertCircle size={18} />,
-        title: 'Client returned your cut for edits',
-        body: 'Check the comments and upload a revised cut.',
+        variant: 'blue',
+        icon: <Clock size={18} />,
+        title: `👀 Waiting for ${clientLabel} to review`,
+        body: `You sent the ${project.media_type === 'photo' ? 'photos' : 'cut'} over. You'll be notified when they leave feedback.`,
         action: {
-          label: 'View Comments →',
+          label: 'View Submission →',
           onClick: () => navigate(project.media_type === 'photo' ? `/projects/${project.id}/photo-revision/${latestRev.id}` : `/projects/${project.id}/revision/${latestRev.id}`),
         },
       }

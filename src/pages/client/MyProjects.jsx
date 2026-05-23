@@ -499,6 +499,41 @@ function ProjectCard({ project, revisions, clientId, userId, onRefresh }) {
           </div>
         )}
 
+        {/* Revision status — whose turn it is */}
+        {!isPitch && !isDelivered && pendingRevision && (
+          <div className={`w-full px-4 py-3 rounded-xl border mb-3 ${
+            pendingRevision.status === 'pending_client_review'
+              ? 'bg-blue-50 border-blue-200'
+              : pendingRevision.status === 'pending_editor'
+              ? 'bg-amber-50 border-amber-200'
+              : 'bg-gray-50 border-gray-100'
+          }`}>
+            {pendingRevision.status === 'pending_client_review' && (
+              <div className="flex items-start gap-2">
+                <span className="text-base leading-none">📸</span>
+                <div>
+                  <p className="text-sm font-semibold text-blue-800">
+                    {project.editor?.full_name ? `${project.editor.full_name} sent you ` : 'Your editor sent '}
+                    {project.media_type === 'photo' ? 'photos' : 'a video'} to review
+                  </p>
+                  <p className="text-xs text-blue-600 mt-0.5">It's your turn — tap below to leave feedback or approve.</p>
+                </div>
+              </div>
+            )}
+            {pendingRevision.status === 'pending_editor' && (
+              <div className="flex items-start gap-2">
+                <span className="text-base leading-none">⏳</span>
+                <div>
+                  <p className="text-sm font-semibold text-amber-800">
+                    Your feedback is with {project.editor?.full_name || 'your editor'}
+                  </p>
+                  <p className="text-xs text-amber-600 mt-0.5">They're working on the changes. You'll be notified when a new version is ready.</p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Primary CTA */}
         {canReview && pendingRevision && (
           <button
@@ -521,7 +556,7 @@ function ProjectCard({ project, revisions, clientId, userId, onRefresh }) {
           </div>
         )}
 
-        {!isPitch && !canReview && !isDelivered && !isReadyToPost && (
+        {!isPitch && !canReview && !isDelivered && !isReadyToPost && !pendingRevision && (
           <div className="w-full py-2.5 px-5 rounded-xl bg-gray-50 border border-gray-100 text-gray-400 text-sm text-center mb-3 flex items-center justify-center gap-2">
             <Clock size={13} /> Your team is on it — we'll notify you when action is needed
           </div>

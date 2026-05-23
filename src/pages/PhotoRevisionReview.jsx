@@ -86,6 +86,7 @@ export default function PhotoRevisionReview() {
   const [project,         setProject]         = useState(null)
   const [comments,        setComments]        = useState([])
   const [projectEditorIds,setProjectEditorIds]= useState([])
+  const [editorName,      setEditorName]      = useState('')
   const [loading,         setLoading]         = useState(true)
   const [error,           setError]           = useState('')
   const [sending,         setSending]         = useState(false)
@@ -121,8 +122,18 @@ export default function PhotoRevisionReview() {
 
       // Fetch editors (needs project_id from revision)
       const { data: editors } = await supabase
-        .from('project_editors').select('profile_id').eq('project_id', rev.projects.id)
+        .from('project_editors')
+        .select('profile_id, profiles(id, full_name)')
+        .eq('project_id', rev.projects.id)
       setProjectEditorIds((editors || []).map((r) => r.profile_id))
+      // Use first editor name for display
+      const firstName = editors?.[0]?.profiles?.full_name
+      if (!firstName && rev.projects.editor_id) {
+        const { data: ep } = await supabase.from('profiles').select('full_name').eq('id', rev.projects.editor_id).single()
+        setEditorName(ep?.full_name || '')
+      } else {
+        setEditorName(firstName || '')
+      }
     } catch (e) {
       setError(e.message)
     } finally {
@@ -232,6 +243,37 @@ export default function PhotoRevisionReview() {
   const revStatus   = revision?.status
   const allResolved = commentsOnCurrentPhoto.every((c) => c.status !== 'pending')
 
+  // "Who's up" banner config based on status + role
+  const whosUpBanner = (() => {
+    const editor = editorName || 'your editor'
+    if (revStatus === 'pending_client_review' && isClient) return {
+      bg: 'bg-blue-50 border-blue-200', icon: '📸', textColor: 'text-blue-800',
+      title: `${editor} sent you photos to review`,
+      sub: 'Click on the photo to pin a comment anywhere, or approve if everything looks great.',
+    }
+    if (revStatus === 'pending_editor' && isClient) return {
+      bg: 'bg-amber-50 border-amber-200', icon: '⏳', textColor: 'text-amber-800',
+      title: `Your feedback is with ${editor}`,
+      sub: "They've been notified and are working on the changes. We'll let you know when a new version is ready.",
+    }
+    if (revStatus === 'pending_client_review' && (isEditor || isPhotographer || isAdmin)) return {
+      bg: 'bg-blue-50 border-blue-200', icon: '👀', textColor: 'text-blue-800',
+      title: 'Waiting for client review',
+      sub: 'The client has been notified. You\'ll be alerted when they respond.',
+    }
+    if (revStatus === 'pending_editor' && (isEditor || isAdmin)) return {
+      bg: 'bg-orange-50 border-orange-200', icon: '🔔', textColor: 'text-orange-800',
+      title: "Client sent feedback — it's your turn",
+      sub: 'Review their pinned comments below and upload a revised set of photos.',
+    }
+    if (revStatus === 'approved') return {
+      bg: 'bg-green-50 border-green-200', icon: '✅', textColor: 'text-green-800',
+      title: 'Photos approved!',
+      sub: isClient ? 'You approved these photos.' : 'The client approved this photo set.',
+    }
+    return null
+  })()
+
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-gray-50">
       {/* Header */}
@@ -249,15 +291,31 @@ export default function PhotoRevisionReview() {
         </div>
         <div className="ml-auto flex items-center gap-2">
           <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
-            revStatus === 'approved'             ? 'bg-green-50 text-green-700' :
-            revStatus === 'pending_client_review'? 'bg-blue-50 text-blue-700'  :
+            revStatus === 'approved'              ? 'bg-green-50 text-green-700' :
+            revStatus === 'pending_client_review' ? 'bg-blue-50 text-blue-700'  :
+            revStatus === 'pending_editor'        ? 'bg-orange-50 text-orange-700' :
             revStatus === 'pending_photographer_review' ? 'bg-amber-50 text-amber-700' :
             'bg-surface-2 text-text-muted'
           }`}>
-            {revStatus?.replace(/_/g, ' ')}
+            {revStatus === 'approved'              ? '✓ Approved' :
+             revStatus === 'pending_client_review' ? '👀 Your Review' :
+             revStatus === 'pending_editor'        ? '🔔 Editor\'s Turn' :
+             revStatus === 'pending_photographer_review' ? '⏳ Photographer Review' :
+             revStatus?.replace(/_/g, ' ')}
           </span>
         </div>
       </div>
+
+      {/* Who's up banner */}
+      {whosUpBanner && (
+        <div className={`px-6 py-3 border-b ${whosUpBanner.bg} flex items-start gap-3 shrink-0`}>
+          <span className="text-lg leading-none mt-0.5">{whosUpBanner.icon}</span>
+          <div>
+            <p className={`text-sm font-semibold ${whosUpBanner.textColor}`}>{whosUpBanner.title}</p>
+            <p className={`text-xs mt-0.5 ${whosUpBanner.textColor} opacity-80`}>{whosUpBanner.sub}</p>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-1 overflow-hidden">
         {/* Photo area */}

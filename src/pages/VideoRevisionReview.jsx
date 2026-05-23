@@ -172,6 +172,7 @@ export default function VideoRevisionReview() {
   const [project,          setProject]          = useState(null)
   const [comments,         setComments]         = useState([])
   const [projectEditorIds, setProjectEditorIds] = useState([])
+  const [editorName,       setEditorName]       = useState('')
   const [loading,          setLoading]          = useState(true)
   const [error,            setError]            = useState('')
 
@@ -208,8 +209,17 @@ export default function VideoRevisionReview() {
 
       // Fetch all editors for this project
       const { data: editors } = await supabase
-        .from('project_editors').select('profile_id').eq('project_id', revRes.data.projects.id)
+        .from('project_editors')
+        .select('profile_id, profiles(id, full_name)')
+        .eq('project_id', revRes.data.projects.id)
       setProjectEditorIds((editors || []).map((r) => r.profile_id))
+      const firstName = editors?.[0]?.profiles?.full_name
+      if (!firstName && revRes.data.projects.editor_id) {
+        const { data: ep } = await supabase.from('profiles').select('full_name').eq('id', revRes.data.projects.editor_id).single()
+        setEditorName(ep?.full_name || '')
+      } else {
+        setEditorName(firstName || '')
+      }
 
       // Attach author_role from profiles join
       const enriched = (commRes.data || []).map((c) => ({
@@ -445,19 +455,49 @@ export default function VideoRevisionReview() {
 
   const REVISION_STATUS_LABELS = {
     pending_photographer_review: 'Photographer Review',
-    pending_creative_review:     'Creative Review',  // legacy
-    pending_client_review:       'Client Review',
-    pending_editor:              'Awaiting Editor',
-    approved:                    'Approved',
+    pending_creative_review:     'Creative Review',
+    pending_client_review:       '👀 Your Review',
+    pending_editor:              "🔔 Editor's Turn",
+    approved:                    '✓ Approved',
   }
 
   const STATUS_BADGE_COLORS = {
     pending_photographer_review: 'bg-amber-500/20 text-amber-300',
     pending_creative_review:     'bg-amber-500/20 text-amber-300',
     pending_client_review:       'bg-blue-500/20 text-blue-300',
-    pending_editor:              'bg-purple-500/20 text-purple-300',
+    pending_editor:              'bg-orange-500/20 text-orange-300',
     approved:                    'bg-green-500/20 text-green-300',
   }
+
+  const editor = editorName || 'your editor'
+  const whosUpBanner = (() => {
+    if (revStatus === 'pending_client_review' && isClient) return {
+      bg: 'bg-blue-900/40 border-blue-500/30', icon: '🎬', textColor: 'text-blue-200',
+      title: `${editor} sent you a video to review`,
+      sub: 'Watch it through, then drop timestamped comments anywhere on the timeline — or approve if it looks great.',
+    }
+    if (revStatus === 'pending_editor' && isClient) return {
+      bg: 'bg-amber-900/30 border-amber-500/30', icon: '⏳', textColor: 'text-amber-200',
+      title: `Your feedback is with ${editor}`,
+      sub: "They've been notified and are working on the changes. We'll let you know when a new cut is ready.",
+    }
+    if (revStatus === 'pending_client_review' && (isEditor || isPhotographer || isAdmin)) return {
+      bg: 'bg-blue-900/40 border-blue-500/30', icon: '👀', textColor: 'text-blue-200',
+      title: 'Waiting for client review',
+      sub: "The client has been notified. You'll be alerted as soon as they respond.",
+    }
+    if (revStatus === 'pending_editor' && (isEditor || isAdmin)) return {
+      bg: 'bg-orange-900/40 border-orange-500/30', icon: '🔔', textColor: 'text-orange-200',
+      title: "Client sent feedback — it's your turn",
+      sub: 'Review their timestamped comments and upload a revised cut when ready.',
+    }
+    if (revStatus === 'approved') return {
+      bg: 'bg-green-900/40 border-green-500/30', icon: '✅', textColor: 'text-green-200',
+      title: 'Video approved!',
+      sub: isClient ? 'You approved this cut.' : 'The client approved this revision.',
+    }
+    return null
+  })()
 
   return (
     <div className="flex flex-col min-h-screen bg-[#0f0f0f] text-white">
@@ -485,6 +525,17 @@ export default function VideoRevisionReview() {
           </div>
         </div>
       </div>
+
+      {/* Who's up banner */}
+      {whosUpBanner && (
+        <div className={`px-5 py-2.5 border-b ${whosUpBanner.bg} flex items-center gap-3 shrink-0`}>
+          <span className="text-base leading-none">{whosUpBanner.icon}</span>
+          <div className="flex-1 min-w-0">
+            <span className={`text-sm font-semibold ${whosUpBanner.textColor}`}>{whosUpBanner.title} </span>
+            <span className={`text-xs ${whosUpBanner.textColor} opacity-75`}>{whosUpBanner.sub}</span>
+          </div>
+        </div>
+      )}
 
       {/* Main area */}
       <div className="flex flex-1 overflow-hidden">
