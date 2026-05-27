@@ -321,6 +321,16 @@ function OverviewTab({ client, shoots, projects, requests, onClientUpdated }) {
       setSavingClient(false)
       return
     }
+
+    // Sync the linked profile's full_name so the client-facing greeting
+    // and display name stay consistent with what admin sets here
+    if (client.profile_id && form.contact_name.trim()) {
+      await supabase
+        .from('profiles')
+        .update({ full_name: form.contact_name.trim() })
+        .eq('id', client.profile_id)
+    }
+
     setSavingClient(false)
     setEditing(false)
     onClientUpdated?.()

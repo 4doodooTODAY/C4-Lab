@@ -197,10 +197,14 @@ export default function CalendarPage() {
     })
   }, [user, currentDate])
 
-  // Filter real events by role, and strip out shoot-linked calendar events
-  // (shoots are already shown as synthetic events from the shoots table —
-  //  showing both would create duplicates like "Garden Shoot" + "Garden Shoot — Shoot")
-  const pureCalendarEvents = allEvents.filter((e) => !e.shoot_id)
+  // Filter real events by role, and strip out shoot-linked calendar events.
+  // Shoots are already shown as synthetic events from the shoots table —
+  // showing the auto-generated calendar event too creates duplicates.
+  // We detect shoot-linked events two ways:
+  //   1. shoot_id column is set (requires SQL column to exist — see setup notes)
+  //   2. Fallback: event_type === 'shoot' (NewShootModal always uses this type)
+  // Using both ensures zero duplicates regardless of DB schema state.
+  const pureCalendarEvents = allEvents.filter((e) => !e.shoot_id && e.event_type !== 'shoot')
   const roleEvents = isAdmin
     ? pureCalendarEvents
     : pureCalendarEvents.filter((e) =>
