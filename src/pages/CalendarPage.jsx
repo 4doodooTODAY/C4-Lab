@@ -134,15 +134,8 @@ export default function CalendarPage() {
         .gte('target_date', monthStart)
         .lt('target_date', nextMonth),
 
-      // Projects with shoot_date in this month
-      supabase
-        .from('projects')
-        .select('id, name, stage, shoot_date, location, clients(name, contact_name)')
-        .not('stage', 'eq', 'delivered')
-        .not('shoot_date', 'is', null)
-        .gte('shoot_date', monthStart)
-        .lt('shoot_date', nextMonth),
-    ]).then(([shootsRes, draftsRes, projectsRes]) => {
+    ]).then(([shootsRes, draftsRes]) => {
+      const projectsRes = { data: [] }
       // Convert shoots to synthetic calendar events
       const shootEvents = (shootsRes.data || []).map((s) => {
         const dateStr  = s.shoot_date

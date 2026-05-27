@@ -74,6 +74,87 @@ const REVISION_STATUS_COLORS = {
   approved:                    'bg-green-50 text-green-700 border-green-200',
 }
 
+// ── Internal Project Notes (admin/creative only — never shown to client) ──────
+function ProjectNotesCard({ projectId }) {
+  const { user, profile } = useAuth()
+  const [notes,   setNotes]   = useState([])
+  const [text,    setText]    = useState('')
+  const [sending, setSending] = useState(false)
+  const bottomRef = useRef(null)
+
+  const fetch = async () => {
+    const { data } = await supabase
+      .from('shoot_notes')
+      .select('id, content, created_at, profile_id, profiles(full_name, role)')
+      .eq('project_id', projectId)
+      .is('shoot_id', null)
+      .order('created_at', { ascending: true })
+    setNotes(data || [])
+  }
+
+  useEffect(() => {
+    if (!projectId) return
+    fetch()
+    const ch = supabase.channel(`proj-notes-${projectId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'shoot_notes', filter: `project_id=eq.${projectId}` }, fetch)
+      .subscribe()
+    return () => supabase.removeChannel(ch)
+  }, [projectId])
+
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [notes])
+
+  const send = async () => {
+    const t = text.trim()
+    if (!t || sending) return
+    setSending(true)
+    setText('')
+    await supabase.from('shoot_notes').insert({ project_id: projectId, profile_id: user?.id, content: t })
+    setSending(false)
+    fetch()
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-border p-5">
+      <p className="text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
+        <StickyNote size={14} className="text-accent" /> Internal Notes
+        <span className="text-xs font-normal text-text-muted">(not visible to client)</span>
+      </p>
+      <div className="space-y-2 max-h-52 overflow-y-auto mb-3 pr-1">
+        {notes.length === 0
+          ? <p className="text-xs text-text-muted text-center py-4">No notes yet.</p>
+          : notes.map((n) => (
+            <div key={n.id} className={`flex gap-2 ${n.profile_id === user?.id ? 'flex-row-reverse' : ''}`}>
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold ${n.profile_id === user?.id ? 'bg-accent text-white' : 'bg-surface-2 text-text-muted'}`}>
+                {(n.profiles?.full_name || '?').charAt(0).toUpperCase()}
+              </div>
+              <div className={`max-w-[80%] ${n.profile_id === user?.id ? 'items-end' : 'items-start'} flex flex-col gap-0.5`}>
+                {n.profile_id !== user?.id && <p className="text-[10px] text-text-muted">{n.profiles?.full_name}</p>}
+                <div className={`px-3 py-2 rounded-xl text-xs ${n.profile_id === user?.id ? 'bg-accent text-white' : 'bg-surface-2 text-text-primary'}`}>
+                  {n.content}
+                </div>
+                <p className="text-[10px] text-text-muted">{format(new Date(n.created_at), 'MMM d, h:mm a')}</p>
+              </div>
+            </div>
+          ))
+        }
+        <div ref={bottomRef} />
+      </div>
+      <div className="flex gap-2">
+        <input
+          className="input text-xs flex-1"
+          placeholder="Add a note…"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), send())}
+        />
+        <button onClick={send} disabled={sending || !text.trim()} className="btn-primary px-3 disabled:opacity-40">
+          {sending ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── Stage Pipeline Bar ────────────────────────────────────────────────────────
 
 function StagePipeline({ currentStage }) {
@@ -2320,6 +2401,9 @@ export default function ProjectWorkflow() {
             creativeProfile={creativeProfile}
             editorProfile={editorProfile}
           />
+
+          {/* 4. Internal Notes (admin/creative/editor only) */}
+          <ProjectNotesCard projectId={project.id} />
         </div>
       </div>
     </div>
