@@ -108,7 +108,10 @@ function ItemDetail({ item, onApprove, onDecline, onClose, updating }) {
         {/* Review project */}
         {item.kind === 'review' && (
           <div className="mt-2">
-            <p className="text-xs text-text-secondary">Your video is ready for review. Click below to watch and leave feedback.</p>
+            {item.revStatus === 'pending_client_review'
+              ? <p className="text-xs text-text-secondary">{item.isPhoto ? 'Your photos are ready' : 'Your video is ready'} — click below to leave feedback or approve.</p>
+              : <p className="text-xs text-text-secondary">Your editor is working on revisions. You'll be notified when a new version is ready.</p>
+            }
           </div>
         )}
 
@@ -127,10 +130,16 @@ function ItemDetail({ item, onApprove, onDecline, onClose, updating }) {
               </button>
             </>
           )}
-          {item.kind === 'review' && (
+          {item.kind === 'review' && item.revStatus === 'pending_client_review' && (
             <button onClick={() => navigate(item.isPhoto ? `/projects/${item.projectId}/photo-revision/${item.revisionId}` : `/projects/${item.projectId}/revision/${item.revisionId}`)}
               className="btn-primary text-xs flex-1 flex items-center justify-center gap-1.5">
               {item.isPhoto ? <><Camera size={11} /> Review Photos</> : <><Film size={11} /> Watch & Review</>}
+            </button>
+          )}
+          {item.kind === 'review' && item.revStatus !== 'pending_client_review' && (
+            <button onClick={() => navigate(item.isPhoto ? `/projects/${item.projectId}/photo-revision/${item.revisionId}` : `/projects/${item.projectId}/revision/${item.revisionId}`)}
+              className="btn-secondary text-xs flex-1 flex items-center justify-center gap-1.5">
+              {item.isPhoto ? <><Camera size={11} /> View Photos</> : <><Film size={11} /> View Revision</>}
             </button>
           )}
         </div>
@@ -277,11 +286,11 @@ export default function ContentCalendar() {
         .eq('client_id', clientId)
         .not('status', 'in', '("scrapped","declined")'),
 
-      // Project revisions pending client review
+      // All active project revisions (any review stage) for this client
       supabase
         .from('project_revisions')
-        .select('id, revision_number, created_at, media_type, projects!inner(id, name, client_id, media_type)')
-        .eq('status', 'pending_client_review')
+        .select('id, revision_number, created_at, media_type, status, projects!inner(id, name, client_id, media_type, due_date, shoot_date)')
+        .in('status', ['pending_client_review', 'pending_editor', 'pending_photographer_review', 'pending_admin_review'])
         .eq('projects.client_id', clientId),
     ])
 
@@ -334,20 +343,36 @@ export default function ContentCalendar() {
       })
     })
 
-    // Revisions pending review
+    // Active project revisions (all review stages)
     ;(reviewsRes.data || []).forEach((r) => {
-      const revNum = r.revision_number
-      const label  = revNum === 1 ? 'Initial Cut' : `Revision ${revNum - 1}`
+      const revNum  = r.revision_number
+      const isPhoto = r.media_type === 'photo' || r.projects?.media_type === 'photo'
+      const mediaWord = isPhoto ? 'Photos' : 'Video'
+
+      // Use due_date or shoot_date from the project as a forward-looking anchor; fall back to created_at
+      const rawDate = r.projects?.due_date || r.projects?.shoot_date || r.created_at
+      const date = rawDate ? new Date(rawDate) : new Date()
+
+      let statusLabel
+      if (r.status === 'pending_client_review') {
+        statusLabel = `${mediaWord} Ready to Review`
+      } else if (r.status === 'pending_editor') {
+        statusLabel = `${mediaWord} — Editor Revising`
+      } else {
+        statusLabel = `${mediaWord} — In Review`
+      }
+
       items.push({
         id:         `review-${r.id}`,
         rawId:      r.id,
         kind:       'review',
-        title:      `${r.projects?.name || 'Project'} — ${label} Ready`,
-        date:       new Date(r.created_at),
-        dateLabel:  format(new Date(r.created_at), 'MMM d'),
+        title:      `${r.projects?.name || 'Project'} — ${statusLabel}`,
+        date,
+        dateLabel:  format(date, 'MMM d'),
         projectId:  r.projects?.id,
         revisionId: r.id,
-        isPhoto:    r.media_type === 'photo' || r.projects?.media_type === 'photo',
+        isPhoto,
+        revStatus:  r.status,
       })
     })
 

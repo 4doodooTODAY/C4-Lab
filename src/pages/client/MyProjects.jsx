@@ -591,12 +591,30 @@ export default function MyProjects() {
   const loadAll = async () => {
     if (!user?.id) return
     setLoading(true)
-    const { data: client } = await supabase
+
+    // Try finding client by profile_id first, then fall back to client_creatives
+    let { data: client } = await supabase
       .from('clients').select('id, name').eq('profile_id', user.id).maybeSingle()
-    if (!client) { setLoading(false); return }
+
+    if (!client) {
+      // Fallback: find via client_creatives (team member assigned to a client)
+      const { data: ccRows } = await supabase
+        .from('client_creatives').select('client_id').eq('profile_id', user.id).limit(1)
+      if (ccRows?.length) {
+        const { data: c } = await supabase
+          .from('clients').select('id, name').eq('id', ccRows[0].client_id).maybeSingle()
+        client = c
+      }
+    }
+
+    if (!client) {
+      console.warn('MyProjects: no client found for user', user.id)
+      setLoading(false)
+      return
+    }
     setClientId(client.id)
 
-    const { data: projData } = await supabase
+    const { data: projData, error: projErr } = await supabase
       .from('projects')
       .select(`
         id, name, stage, status, concept, notes, pitch_notes,
@@ -605,6 +623,8 @@ export default function MyProjects() {
       `)
       .eq('client_id', client.id)
       .order('created_at', { ascending: false })
+
+    if (projErr) console.error('MyProjects: projects fetch error', projErr)
 
     const projects = projData || []
     const projectIds = projects.map((p) => p.id)
