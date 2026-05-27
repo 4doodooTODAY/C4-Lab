@@ -312,11 +312,6 @@ export default function ContentCalendar() {
         : Promise.resolve({ data: [] }),
     ])
 
-    // Debug logging
-    console.log('[Calendar] clientId:', clientId)
-    console.log('[Calendar] shoots:', shootsRes.data, 'error:', shootsRes.error)
-    console.log('[Calendar] projectShoots:', projectShootsRes.data, 'error:', projectShootsRes.error)
-
     // Build project lookup map
     const projectMap = {}
     ;(clientProjects || []).forEach((p) => { projectMap[p.id] = p })
