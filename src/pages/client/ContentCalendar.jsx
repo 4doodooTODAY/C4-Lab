@@ -254,9 +254,17 @@ export default function ContentCalendar() {
       .select('id')
       .eq('profile_id', user.id)
       .maybeSingle()
-      .then(({ data }) => {
-        if (data?.id) setClientId(data.id)
-        setClientResolved(true)
+      .then(async ({ data }) => {
+        if (data?.id) {
+          setClientId(data.id)
+          setClientResolved(true)
+        } else {
+          // Fallback: find via client_creatives
+          const { data: ccRows } = await supabase
+            .from('client_creatives').select('client_id').eq('profile_id', user.id).limit(1)
+          if (ccRows?.length) setClientId(ccRows[0].client_id)
+          setClientResolved(true)
+        }
       })
   }, [user])
 
