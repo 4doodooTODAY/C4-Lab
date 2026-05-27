@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import {
   X, CalendarDays, MapPin, Camera, Upload, Send,
   Loader2, MessageSquare, StickyNote, ChevronDown,
-  ExternalLink, Film, Image, File, HardDrive,
+  ExternalLink, Film, Image, File, HardDrive, Link2, Plus,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -215,6 +215,108 @@ function ShootFiles({ shootId }) {
   )
 }
 
+// ── Inspiration links ─────────────────────────────────────────────────────────
+function InspirationLinks({ shoot, canEdit }) {
+  const [links,   setLinks]   = useState(shoot.inspiration_links || [])
+  const [input,   setInput]   = useState('')
+  const [saving,  setSaving]  = useState(false)
+
+  const addLink = async () => {
+    let url = input.trim()
+    if (!url) return
+    if (!/^https?:\/\//i.test(url)) url = 'https://' + url
+    setSaving(true)
+    const newLinks = [...links, url]
+    const { data } = await supabase
+      .from('shoots')
+      .update({ inspiration_links: newLinks })
+      .eq('id', shoot.id)
+      .select('inspiration_links')
+      .maybeSingle()
+    setLinks(data?.inspiration_links ?? newLinks)
+    setInput('')
+    setSaving(false)
+  }
+
+  const removeLink = async (idx) => {
+    const newLinks = links.filter((_, i) => i !== idx)
+    setSaving(true)
+    const { data } = await supabase
+      .from('shoots')
+      .update({ inspiration_links: newLinks })
+      .eq('id', shoot.id)
+      .select('inspiration_links')
+      .maybeSingle()
+    setLinks(data?.inspiration_links ?? newLinks)
+    setSaving(false)
+  }
+
+  const handleKey = (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); addLink() }
+  }
+
+  return (
+    <div className="space-y-3">
+      {links.length === 0 ? (
+        <div className="text-center py-5 text-xs text-text-muted bg-surface-2/40 rounded-xl">
+          <Link2 size={20} className="mx-auto mb-2 text-text-muted/40" />
+          No inspiration links yet.{canEdit ? ' Add one below.' : ''}
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          {links.map((url, i) => {
+            let display = url
+            try { display = new URL(url).hostname.replace('www.', '') + (new URL(url).pathname !== '/' ? new URL(url).pathname : '') } catch {}
+            return (
+              <div key={i} className="flex items-center gap-2 px-3 py-2.5 bg-surface-2/40 rounded-xl group hover:bg-surface-2 transition-colors">
+                <Link2 size={12} className="text-accent shrink-0" />
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex-1 text-xs text-accent hover:underline truncate"
+                >
+                  {display}
+                </a>
+                {canEdit && (
+                  <button
+                    onClick={() => removeLink(i)}
+                    className="opacity-0 group-hover:opacity-100 p-0.5 text-text-muted hover:text-red-500 transition-all"
+                    title="Remove link"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {canEdit && (
+        <div className="flex gap-2">
+          <input
+            type="url"
+            className="flex-1 text-sm px-3 py-2 rounded-xl border border-border bg-surface-2/50 focus:outline-none focus:border-accent/50 transition-colors placeholder:text-text-muted"
+            placeholder="https://pinterest.com/…"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKey}
+            disabled={saving}
+          />
+          <button
+            onClick={addLink}
+            disabled={!input.trim() || saving}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-accent text-white text-xs font-semibold disabled:opacity-40 hover:bg-accent/90 transition-colors shrink-0"
+          >
+            {saving ? <Loader2 size={13} className="animate-spin" /> : <><Plus size={13} /> Add</>}
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Main modal ────────────────────────────────────────────────────────────────
 export default function ShootDetailModal({ shoot, clientId, clientName, onClose }) {
   const { profile } = useAuth()
@@ -300,7 +402,10 @@ export default function ShootDetailModal({ shoot, clientId, clientName, onClose 
             <div className="flex gap-1 border-b border-border -mx-6 px-6">
               {[
                 { id: 'files', label: 'Files', icon: HardDrive },
-                ...(isClient ? [] : [{ id: 'notes', label: 'Notes & Messages', icon: MessageSquare }]),
+                ...(isClient ? [] : [
+                  { id: 'inspiration', label: 'Inspiration', icon: Link2 },
+                  { id: 'notes', label: 'Notes', icon: MessageSquare },
+                ]),
               ].map(({ id, label, icon: Icon }) => (
                 <button
                   key={id}
@@ -317,6 +422,9 @@ export default function ShootDetailModal({ shoot, clientId, clientName, onClose 
             </div>
 
             {activeSection === 'files' && <ShootFiles shootId={shoot.id} />}
+            {!isClient && activeSection === 'inspiration' && (
+              <InspirationLinks shoot={shoot} canEdit={canSeeCreativeNotes} />
+            )}
             {!isClient && activeSection === 'notes' && <NotesThread shootId={shoot.id} />}
           </div>
         </div>

@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 const SHOOT_SELECT = `
   id, client_id, title, creative_notes,
   shoot_date, shoot_time, location, status,
-  created_by, created_at,
+  inspiration_links, created_by, created_at,
   clients(id, name, contact_name)
 `
 

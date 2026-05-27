@@ -159,7 +159,7 @@ export default function CreativeProjectList() {
               const clientIds = assignments.map((a) => a.client_id)
               const { data } = await supabase
                 .from('shoots')
-                .select('id, title, creative_notes, shoot_date, shoot_time, location, status, client_id, clients(name, contact_name)')
+                .select('id, title, creative_notes, shoot_date, shoot_time, location, status, inspiration_links, client_id, clients(name, contact_name)')
                 .in('client_id', clientIds)
                 .neq('status', 'cancelled')
                 .order('shoot_date', { ascending: true })
