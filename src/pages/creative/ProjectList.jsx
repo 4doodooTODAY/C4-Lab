@@ -135,6 +135,8 @@ export default function CreativeProjectList() {
   const navigate    = useNavigate()
   const myId        = profile?.id
   const isEditor    = profile?.role === 'editor'
+  // Admin in creative-view mode should see all shoots (they aren't in client_creatives)
+  const isAdminRole = profile?.role === 'admin'
 
   const [shoots,       setShoots]       = useState([])
   const [edits,        setEdits]        = useState([])
@@ -148,38 +150,51 @@ export default function CreativeProjectList() {
 
     Promise.all([
       // My Shoots — creatives only, editors skip this
+      // Admin in creative-view mode bypasses client_creatives and sees all shoots
       isEditor
         ? Promise.resolve([])
+        : isAdminRole
+          ? supabase
+              .from('shoots')
+              .select('id, title, creative_notes, shoot_date, shoot_time, location, status, inspiration_links, client_id, clients(name, contact_name)')
+              .neq('status', 'cancelled')
+              .order('shoot_date', { ascending: true })
+              .then(({ data }) => data || [])
+          : supabase
+              .from('client_creatives')
+              .select('client_id')
+              .eq('profile_id', myId)
+              .then(async ({ data: assignments }) => {
+                if (!assignments?.length) return []
+                const clientIds = assignments.map((a) => a.client_id)
+                const { data } = await supabase
+                  .from('shoots')
+                  .select('id, title, creative_notes, shoot_date, shoot_time, location, status, inspiration_links, client_id, clients(name, contact_name)')
+                  .in('client_id', clientIds)
+                  .neq('status', 'cancelled')
+                  .order('shoot_date', { ascending: true })
+                return data || []
+              }),
+
+      // My Edits — projects scoped to assigned clients (admin sees all)
+      isAdminRole
+        ? supabase
+            .from('projects')
+            .select('id, name, stage, editor_id, client_id, clients(name, contact_name)')
+            .order('created_at', { ascending: false })
         : supabase
             .from('client_creatives')
             .select('client_id')
             .eq('profile_id', myId)
-            .then(async ({ data: assignments }) => {
-              if (!assignments?.length) return []
-              const clientIds = assignments.map((a) => a.client_id)
-              const { data } = await supabase
-                .from('shoots')
-                .select('id, title, creative_notes, shoot_date, shoot_time, location, status, inspiration_links, client_id, clients(name, contact_name)')
+            .then(async ({ data: ccRows }) => {
+              const clientIds = (ccRows || []).map((r) => r.client_id).filter(Boolean)
+              if (!clientIds.length) return { data: [] }
+              return supabase
+                .from('projects')
+                .select('id, name, stage, editor_id, client_id, clients(name, contact_name)')
                 .in('client_id', clientIds)
-                .neq('status', 'cancelled')
-                .order('shoot_date', { ascending: true })
-              return data || []
+                .order('created_at', { ascending: false })
             }),
-
-      // My Edits — projects where I'm the editor or creative, scoped to my assigned clients
-      supabase
-        .from('client_creatives')
-        .select('client_id')
-        .eq('profile_id', myId)
-        .then(async ({ data: ccRows }) => {
-          const clientIds = (ccRows || []).map((r) => r.client_id).filter(Boolean)
-          if (!clientIds.length) return { data: [] }
-          return supabase
-            .from('projects')
-            .select('id, name, stage, editor_id, client_id, clients(name, contact_name)')
-            .in('client_id', clientIds)
-            .order('created_at', { ascending: false })
-        }),
 
       // Revisions for edit status badges
       supabase
@@ -247,6 +262,7 @@ export default function CreativeProjectList() {
               clientId={detailShoot.client_id}
               clientName={detailShoot.clients?.name || detailShoot.clients?.contact_name || ''}
               onClose={() => setDetailShoot(null)}
+              onUpdated={(updated) => setShoots((prev) => prev.map((s) => s.id === updated.id ? { ...s, ...updated } : s))}
             />
           )}
         </>

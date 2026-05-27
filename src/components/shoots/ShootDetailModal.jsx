@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import {
   X, CalendarDays, MapPin, Camera, Upload, Send,
-  Loader2, MessageSquare, StickyNote, ChevronDown,
-  ExternalLink, Film, Image, File, HardDrive, Link2, Plus,
+  Loader2, MessageSquare, ExternalLink, Film, Image,
+  File, HardDrive, Link2, Plus, Pencil, Check, Users,
+  AlertCircle,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -31,6 +32,7 @@ function NotesThread({ shootId }) {
   const [loading, setLoading] = useState(true)
   const [text,    setText]    = useState('')
   const [sending, setSending] = useState(false)
+  const [sendErr, setSendErr] = useState('')
   const bottomRef = useRef(null)
 
   const fetchNotes = async () => {
@@ -47,7 +49,6 @@ function NotesThread({ shootId }) {
     if (!shootId) return
     fetchNotes()
 
-    // Realtime subscription
     const channel = supabase
       .channel(`shoot-notes-${shootId}`)
       .on('postgres_changes', {
@@ -67,13 +68,19 @@ function NotesThread({ shootId }) {
     const trimmed = text.trim()
     if (!trimmed || sending) return
     setSending(true)
-    setText('')
-    await supabase.from('shoot_notes').insert({
+    setSendErr('')
+    const { error } = await supabase.from('shoot_notes').insert({
       shoot_id:   shootId,
       profile_id: user?.id,
       content:    trimmed,
     })
     setSending(false)
+    if (error) {
+      console.error('shoot_notes insert:', error)
+      setSendErr('Could not send. Check your permissions.')
+      return
+    }
+    setText('')
     fetchNotes()
   }
 
@@ -91,7 +98,6 @@ function NotesThread({ shootId }) {
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Message list */}
       <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
         {notes.length === 0 ? (
           <div className="text-center py-6">
@@ -103,10 +109,9 @@ function NotesThread({ shootId }) {
             const isMe = n.profile_id === myId
             const name = n.profiles?.full_name || 'Unknown'
             const role = n.profiles?.role
-            const roleLabel = role === 'admin' ? 'Admin' : 'Creative'
+            const roleLabel = role === 'admin' ? 'Admin' : role === 'editor' ? 'Editor' : 'Creative'
             return (
               <div key={n.id} className={`flex gap-2.5 ${isMe ? 'flex-row-reverse' : ''}`}>
-                {/* Avatar */}
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold ${
                   isMe ? 'bg-accent text-white' : 'bg-surface-3 text-text-muted'
                 }`}>
@@ -136,14 +141,19 @@ function NotesThread({ shootId }) {
         <div ref={bottomRef} />
       </div>
 
-      {/* Composer */}
+      {sendErr && (
+        <p className="text-xs text-red-500 flex items-center gap-1.5 bg-red-50 rounded-lg px-3 py-2">
+          <AlertCircle size={12} /> {sendErr}
+        </p>
+      )}
+
       <div className="flex gap-2 pt-2 border-t border-border">
         <textarea
           className="flex-1 text-sm px-3 py-2 rounded-xl border border-border bg-surface-2/50 resize-none focus:outline-none focus:border-accent/50 transition-colors placeholder:text-text-muted"
           rows={2}
           placeholder="Ask a question or add a note…"
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => { setText(e.target.value); setSendErr('') }}
           onKeyDown={handleKey}
           disabled={sending}
         />
@@ -270,20 +280,14 @@ function InspirationLinks({ shoot, canEdit }) {
             return (
               <div key={i} className="flex items-center gap-2 px-3 py-2.5 bg-surface-2/40 rounded-xl group hover:bg-surface-2 transition-colors">
                 <Link2 size={12} className="text-accent shrink-0" />
-                <a
-                  href={url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex-1 text-xs text-accent hover:underline truncate"
-                >
+                <a href={url} target="_blank" rel="noreferrer"
+                  className="flex-1 text-xs text-accent hover:underline truncate">
                   {display}
                 </a>
                 {canEdit && (
-                  <button
-                    onClick={() => removeLink(i)}
+                  <button onClick={() => removeLink(i)}
                     className="opacity-0 group-hover:opacity-100 p-0.5 text-text-muted hover:text-red-500 transition-all"
-                    title="Remove link"
-                  >
+                    title="Remove link">
                     <X size={12} />
                   </button>
                 )}
@@ -318,17 +322,118 @@ function InspirationLinks({ shoot, canEdit }) {
 }
 
 // ── Main modal ────────────────────────────────────────────────────────────────
-export default function ShootDetailModal({ shoot, clientId, clientName, onClose }) {
+export default function ShootDetailModal({ shoot: initialShoot, clientId, clientName, onClose, onUpdated }) {
   const { profile } = useAuth()
-  const [showUpload,   setShowUpload]   = useState(false)
-  const [activeSection, setSection]    = useState('files') // 'files' | 'notes'
+  const [showUpload,    setShowUpload]    = useState(false)
+  const [activeSection, setSection]      = useState('files')
+  const [editMode,      setEditMode]     = useState(false)
+  const [localShoot,    setLocalShoot]   = useState(initialShoot)
+  const [editForm,      setEditForm]     = useState({
+    title:          initialShoot?.title || '',
+    shoot_date:     initialShoot?.shoot_date || '',
+    shoot_time:     initialShoot?.shoot_time || '',
+    location:       initialShoot?.location || '',
+    creative_notes: initialShoot?.creative_notes || '',
+    status:         initialShoot?.status || 'scheduled',
+  })
+  const [teamMembers,    setTeamMembers]    = useState([])
+  const [assignedMember, setAssignedMember] = useState('')
+  const [saving,         setSaving]         = useState(false)
+  const [saveError,      setSaveError]      = useState('')
 
+  const shoot = localShoot || initialShoot
   if (!shoot) return null
 
-  // Determine if user is client
-  const isClient = profile?.role === 'client'
-  // Determine if user is creative or admin
-  const canSeeCreativeNotes = profile?.role === 'admin' || profile?.role === 'creative'
+  const isClient           = profile?.role === 'client'
+  const canSeeCreativeNotes = profile?.role === 'admin' || profile?.role === 'creative' || profile?.role === 'editor'
+  const canEdit            = profile?.role === 'admin'
+
+  // Load team members + current assignee when edit mode opens
+  useEffect(() => {
+    if (!editMode || !clientId) return
+    supabase
+      .from('client_creatives')
+      .select('profile_id, profiles(id, full_name, role)')
+      .eq('client_id', clientId)
+      .then(({ data }) => setTeamMembers((data || []).map((m) => m.profiles).filter(Boolean)))
+
+    if (shoot.calendar_event_id) {
+      supabase
+        .from('calendar_event_members')
+        .select('profile_id')
+        .eq('event_id', shoot.calendar_event_id)
+        .then(({ data }) => { if (data?.[0]) setAssignedMember(data[0].profile_id) })
+    }
+  }, [editMode, clientId])
+
+  const set = (k) => (e) => setEditForm((f) => ({ ...f, [k]: e.target.value }))
+
+  const handleSave = async () => {
+    if (!editForm.title.trim()) return
+    setSaving(true)
+    setSaveError('')
+    try {
+      const payload = {
+        title:          editForm.title.trim(),
+        shoot_date:     editForm.shoot_date || null,
+        shoot_time:     editForm.shoot_time || null,
+        location:       editForm.location || null,
+        creative_notes: editForm.creative_notes || null,
+        status:         editForm.status,
+      }
+      const { error } = await supabase.from('shoots').update(payload).eq('id', shoot.id)
+      if (error) throw error
+
+      // Sync the linked calendar event title, time, location, and assignee
+      if (shoot.calendar_event_id) {
+        const timeStr = editForm.shoot_time || '09:00'
+        const startAt = editForm.shoot_date
+          ? new Date(`${editForm.shoot_date}T${timeStr}:00`)
+          : null
+        const evtUpdate = {
+          title:    `${editForm.title.trim()} — Shoot`,
+          location: editForm.location || null,
+          all_day:  !editForm.shoot_time,
+          ...(startAt ? {
+            start_at: startAt.toISOString(),
+            end_at:   new Date(startAt.getTime() + 4 * 60 * 60 * 1000).toISOString(),
+          } : {}),
+        }
+        await supabase.from('calendar_events').update(evtUpdate).eq('id', shoot.calendar_event_id)
+
+        // Replace assigned member
+        await supabase.from('calendar_event_members').delete().eq('event_id', shoot.calendar_event_id)
+        if (assignedMember) {
+          await supabase.from('calendar_event_members').insert({
+            event_id:   shoot.calendar_event_id,
+            profile_id: assignedMember,
+          })
+        }
+      }
+
+      const updated = { ...shoot, ...payload }
+      setLocalShoot(updated)
+      setEditMode(false)
+      if (onUpdated) onUpdated(updated)
+    } catch (err) {
+      setSaveError(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const cancelEdit = () => {
+    setEditForm({
+      title:          shoot.title || '',
+      shoot_date:     shoot.shoot_date || '',
+      shoot_time:     shoot.shoot_time || '',
+      location:       shoot.location || '',
+      creative_notes: shoot.creative_notes || '',
+      status:         shoot.status || 'scheduled',
+    })
+    setSaveError('')
+    setEditMode(false)
+  }
 
   return (
     <>
@@ -343,94 +448,186 @@ export default function ShootDetailModal({ shoot, clientId, clientName, onClose 
                 <Camera size={16} className="text-accent" />
               </div>
               <div className="min-w-0">
-                <h2 className="text-base font-bold text-text-primary truncate">{shoot.title}</h2>
+                <h2 className="text-base font-bold text-text-primary truncate">
+                  {editMode ? 'Edit Shoot' : shoot.title}
+                </h2>
                 <p className="text-xs text-text-muted mt-0.5">{clientName || '—'}</p>
               </div>
             </div>
-            <button onClick={onClose} className="btn-ghost p-1.5 -mt-1 -mr-1 shrink-0">
-              <X size={16} />
-            </button>
+            <div className="flex items-center gap-1 shrink-0">
+              {canEdit && !editMode && (
+                <button
+                  onClick={() => setEditMode(true)}
+                  className="btn-ghost p-1.5 -mt-1 text-text-muted hover:text-accent"
+                  title="Edit shoot"
+                >
+                  <Pencil size={14} />
+                </button>
+              )}
+              <button onClick={onClose} className="btn-ghost p-1.5 -mt-1 -mr-1">
+                <X size={16} />
+              </button>
+            </div>
           </div>
 
-          <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
-            {/* Status + meta */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <StatusBadge status={shoot.status} />
-              {shoot.shoot_date && (
-                <span className="flex items-center gap-1.5 text-xs text-text-muted">
-                  <CalendarDays size={11} />
-                  {format(parseISO(shoot.shoot_date), 'EEEE, MMMM d yyyy')}
-                  {shoot.shoot_time && (
-                    <span className="font-medium text-text-primary">
-                      · {fmtTime(shoot.shoot_time)}
+          <div className="overflow-y-auto flex-1 px-6 py-5">
+
+            {/* ── EDIT MODE ── */}
+            {editMode ? (
+              <div className="space-y-4">
+                <div>
+                  <label className="label">Shoot Name *</label>
+                  <input className="input" value={editForm.title} onChange={set('title')} placeholder="Shoot name" />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="label">Date</label>
+                    <input type="date" className="input" value={editForm.shoot_date} onChange={set('shoot_date')} />
+                  </div>
+                  <div>
+                    <label className="label">Time</label>
+                    <input type="time" className="input" value={editForm.shoot_time} onChange={set('shoot_time')} />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="label">Location</label>
+                  <input className="input" value={editForm.location} onChange={set('location')} placeholder="Address or venue" />
+                </div>
+
+                <div>
+                  <label className="label">Status</label>
+                  <select className="input" value={editForm.status} onChange={set('status')}>
+                    <option value="scheduled">Scheduled</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+
+                {/* Assigned shooter */}
+                <div>
+                  <label className="label flex items-center gap-1.5"><Users size={11} /> Assigned Photographer / Videographer</label>
+                  {teamMembers.length === 0 ? (
+                    <p className="text-xs text-text-muted mt-1">No team members assigned to this client yet.</p>
+                  ) : (
+                    <select className="input" value={assignedMember} onChange={(e) => setAssignedMember(e.target.value)}>
+                      <option value="">— Unassigned —</option>
+                      {teamMembers.map((m) => (
+                        <option key={m.id} value={m.id}>{m.full_name} ({m.role})</option>
+                      ))}
+                    </select>
+                  )}
+                  {!shoot.calendar_event_id && (
+                    <p className="text-[10px] text-amber-600 mt-1">Assignment requires a linked calendar event. Delete and recreate this shoot to enable team assignment.</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="label">Creative Notes</label>
+                  <p className="text-[10px] text-text-muted mb-1">Only visible to your creative team</p>
+                  <textarea className="input resize-none" rows={3} value={editForm.creative_notes} onChange={set('creative_notes')} placeholder="Shot list, style direction, mood..." />
+                </div>
+
+                {saveError && (
+                  <p className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2 flex items-center gap-1.5">
+                    <AlertCircle size={12} /> {saveError}
+                  </p>
+                )}
+
+                <div className="flex gap-2 pt-1">
+                  <button onClick={cancelEdit} disabled={saving} className="flex-1 btn-secondary">Cancel</button>
+                  <button
+                    onClick={handleSave}
+                    disabled={saving || !editForm.title.trim()}
+                    className="flex-1 btn-primary flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  >
+                    {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                    Save Changes
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* ── VIEW MODE ── */
+              <div className="space-y-5">
+                {/* Status + meta */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <StatusBadge status={shoot.status} />
+                  {shoot.shoot_date && (
+                    <span className="flex items-center gap-1.5 text-xs text-text-muted">
+                      <CalendarDays size={11} />
+                      {format(parseISO(shoot.shoot_date), 'EEEE, MMMM d yyyy')}
+                      {shoot.shoot_time && (
+                        <span className="font-medium text-text-primary">
+                          · {fmtTime(shoot.shoot_time)}
+                        </span>
+                      )}
                     </span>
                   )}
-                </span>
-              )}
-            </div>
+                </div>
 
-            {shoot.location && (
-              <div className="flex items-start gap-2 text-sm text-text-secondary">
-                <MapPin size={14} className="mt-0.5 shrink-0 text-text-muted" />
-                <a
-                  href={`https://maps.google.com/?q=${encodeURIComponent(shoot.location)}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-accent hover:underline transition-colors"
-                >
-                  {shoot.location}
-                </a>
-              </div>
-            )}
+                {shoot.location && (
+                  <div className="flex items-start gap-2 text-sm text-text-secondary">
+                    <MapPin size={14} className="mt-0.5 shrink-0 text-text-muted" />
+                    <a
+                      href={`https://maps.google.com/?q=${encodeURIComponent(shoot.location)}`}
+                      target="_blank" rel="noreferrer"
+                      className="text-accent hover:underline transition-colors"
+                    >
+                      {shoot.location}
+                    </a>
+                  </div>
+                )}
 
-            {shoot.creative_notes && canSeeCreativeNotes && (
-              <div className="bg-surface-2/60 rounded-xl p-4">
-                <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Creative Notes</p>
-                <p className="text-sm text-text-primary leading-relaxed">{shoot.creative_notes}</p>
-              </div>
-            )}
+                {shoot.creative_notes && canSeeCreativeNotes && (
+                  <div className="bg-surface-2/60 rounded-xl p-4">
+                    <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Creative Notes</p>
+                    <p className="text-sm text-text-primary leading-relaxed">{shoot.creative_notes}</p>
+                  </div>
+                )}
 
-            {/* Upload button */}
-            <button
-              onClick={() => setShowUpload(true)}
-              className="w-full btn-primary flex items-center justify-center gap-2 text-sm"
-            >
-              <Upload size={14} /> Upload Clips
-            </button>
-
-            {/* Section tabs */}
-            <div className="flex gap-1 border-b border-border -mx-6 px-6">
-              {[
-                { id: 'files', label: 'Files', icon: HardDrive },
-                ...(isClient ? [] : [
-                  { id: 'inspiration', label: 'Inspiration', icon: Link2 },
-                  { id: 'notes', label: 'Notes', icon: MessageSquare },
-                ]),
-              ].map(({ id, label, icon: Icon }) => (
+                {/* Upload button */}
                 <button
-                  key={id}
-                  onClick={() => setSection(id)}
-                  className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors -mb-px ${
-                    activeSection === id
-                      ? 'border-accent text-accent'
-                      : 'border-transparent text-text-muted hover:text-text-primary'
-                  }`}
+                  onClick={() => setShowUpload(true)}
+                  className="w-full btn-primary flex items-center justify-center gap-2 text-sm"
                 >
-                  <Icon size={11} /> {label}
+                  <Upload size={14} /> Upload Clips
                 </button>
-              ))}
-            </div>
 
-            {activeSection === 'files' && <ShootFiles shootId={shoot.id} />}
-            {!isClient && activeSection === 'inspiration' && (
-              <InspirationLinks shoot={shoot} canEdit={canSeeCreativeNotes} />
+                {/* Section tabs */}
+                <div className="flex gap-1 border-b border-border -mx-6 px-6">
+                  {[
+                    { id: 'files', label: 'Files', icon: HardDrive },
+                    ...(isClient ? [] : [
+                      { id: 'inspiration', label: 'Inspiration', icon: Link2 },
+                      { id: 'notes', label: 'Notes', icon: MessageSquare },
+                    ]),
+                  ].map(({ id, label, icon: Icon }) => (
+                    <button
+                      key={id}
+                      onClick={() => setSection(id)}
+                      className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors -mb-px ${
+                        activeSection === id
+                          ? 'border-accent text-accent'
+                          : 'border-transparent text-text-muted hover:text-text-primary'
+                      }`}
+                    >
+                      <Icon size={11} /> {label}
+                    </button>
+                  ))}
+                </div>
+
+                {activeSection === 'files' && <ShootFiles shootId={shoot.id} />}
+                {!isClient && activeSection === 'inspiration' && (
+                  <InspirationLinks shoot={shoot} canEdit={canSeeCreativeNotes} />
+                )}
+                {!isClient && activeSection === 'notes' && <NotesThread shootId={shoot.id} />}
+              </div>
             )}
-            {!isClient && activeSection === 'notes' && <NotesThread shootId={shoot.id} />}
           </div>
         </div>
       </div>
 
-      {/* Upload modal stacked on top */}
       {showUpload && (
         <ShootUploadModal
           shoot={shoot}

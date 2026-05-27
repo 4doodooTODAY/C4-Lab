@@ -197,10 +197,13 @@ export default function CalendarPage() {
     })
   }, [user, currentDate])
 
-  // Filter real events by role
+  // Filter real events by role, and strip out shoot-linked calendar events
+  // (shoots are already shown as synthetic events from the shoots table —
+  //  showing both would create duplicates like "Garden Shoot" + "Garden Shoot — Shoot")
+  const pureCalendarEvents = allEvents.filter((e) => !e.shoot_id)
   const roleEvents = isAdmin
-    ? allEvents
-    : allEvents.filter((e) =>
+    ? pureCalendarEvents
+    : pureCalendarEvents.filter((e) =>
         (e.calendar_event_members || []).some((m) => m.profile_id === user?.id)
       )
 

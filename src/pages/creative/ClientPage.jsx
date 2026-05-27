@@ -161,7 +161,6 @@ function ShootsTab({ clientId, clientName }) {
           clientName={clientName}
           onClose={() => {
             setDetailShoot(null)
-            // Refresh upload counts after closing
             supabase
               .from('shoot_uploads')
               .select('shoot_id')
@@ -174,6 +173,7 @@ function ShootsTab({ clientId, clientName }) {
                 setUploadCounts(counts)
               })
           }}
+          onUpdated={refetch}
         />
       )}
     </div>

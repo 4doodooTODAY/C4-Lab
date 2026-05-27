@@ -652,6 +652,7 @@ function ShootsTab({ clientId, client }) {
           clientId={clientId}
           clientName={client?.name || ''}
           onClose={() => setDetailShoot(null)}
+          onUpdated={() => refetch()}
         />
       )}
 
