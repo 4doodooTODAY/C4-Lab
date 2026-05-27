@@ -281,12 +281,11 @@ export default function ContentCalendar() {
     const projectIds = (clientProjects || []).map((p) => p.id)
 
     const [shootsRes, projectShootsRes, draftsRes, reviewsRes] = await Promise.all([
-      // Legacy shoots for this client (include null status rows too)
+      // All shoots for this client
       supabase
         .from('shoots')
         .select('id, title, description, shoot_date, shoot_time, location, status')
-        .eq('client_id', clientId)
-        .or('status.neq.cancelled,status.is.null'),
+        .eq('client_id', clientId),
 
       // Project-level shoots — filter by project IDs directly
       projectIds.length
@@ -294,7 +293,6 @@ export default function ContentCalendar() {
             .from('project_shoots')
             .select('id, title, shoot_date, shoot_time, location, status, project_id')
             .in('project_id', projectIds)
-            .or('status.neq.cancelled,status.is.null')
         : Promise.resolve({ data: [] }),
 
       // Content drafts
@@ -313,6 +311,11 @@ export default function ContentCalendar() {
             .in('status', ['pending_client_review', 'pending_editor', 'pending_photographer_review', 'pending_admin_review'])
         : Promise.resolve({ data: [] }),
     ])
+
+    // Debug logging
+    console.log('[Calendar] clientId:', clientId)
+    console.log('[Calendar] shoots:', shootsRes.data, 'error:', shootsRes.error)
+    console.log('[Calendar] projectShoots:', projectShootsRes.data, 'error:', projectShootsRes.error)
 
     // Build project lookup map
     const projectMap = {}
