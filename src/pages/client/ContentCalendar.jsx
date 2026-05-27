@@ -281,12 +281,12 @@ export default function ContentCalendar() {
     const projectIds = (clientProjects || []).map((p) => p.id)
 
     const [shootsRes, projectShootsRes, draftsRes, reviewsRes] = await Promise.all([
-      // Legacy shoots for this client
+      // Legacy shoots for this client (include null status rows too)
       supabase
         .from('shoots')
         .select('id, title, description, shoot_date, shoot_time, location, status')
         .eq('client_id', clientId)
-        .neq('status', 'cancelled'),
+        .or('status.neq.cancelled,status.is.null'),
 
       // Project-level shoots — filter by project IDs directly
       projectIds.length
@@ -294,7 +294,7 @@ export default function ContentCalendar() {
             .from('project_shoots')
             .select('id, title, shoot_date, shoot_time, location, status, project_id')
             .in('project_id', projectIds)
-            .neq('status', 'cancelled')
+            .or('status.neq.cancelled,status.is.null')
         : Promise.resolve({ data: [] }),
 
       // Content drafts
