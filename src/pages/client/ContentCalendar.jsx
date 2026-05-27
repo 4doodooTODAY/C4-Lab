@@ -272,6 +272,14 @@ export default function ContentCalendar() {
     if (!clientId) return
     setLoading(true)
 
+    // First get all project IDs for this client
+    const { data: clientProjects } = await supabase
+      .from('projects')
+      .select('id, name, shoot_date, location, media_type, due_date')
+      .eq('client_id', clientId)
+
+    const projectIds = (clientProjects || []).map((p) => p.id)
+
     const [shootsRes, projectShootsRes, draftsRes, reviewsRes] = await Promise.all([
       // Legacy shoots for this client
       supabase
@@ -280,12 +288,14 @@ export default function ContentCalendar() {
         .eq('client_id', clientId)
         .neq('status', 'cancelled'),
 
-      // Project-level shoots (scheduled via project/workflow view)
-      supabase
-        .from('project_shoots')
-        .select('id, title, shoot_date, shoot_time, location, status, projects!inner(id, name, client_id)')
-        .eq('projects.client_id', clientId)
-        .neq('status', 'cancelled'),
+      // Project-level shoots — filter by project IDs directly
+      projectIds.length
+        ? supabase
+            .from('project_shoots')
+            .select('id, title, shoot_date, shoot_time, location, status, project_id')
+            .in('project_id', projectIds)
+            .neq('status', 'cancelled')
+        : Promise.resolve({ data: [] }),
 
       // Content drafts
       supabase
@@ -295,12 +305,18 @@ export default function ContentCalendar() {
         .not('status', 'in', '("scrapped","declined")'),
 
       // All active project revisions (any review stage) for this client
-      supabase
-        .from('project_revisions')
-        .select('id, revision_number, created_at, media_type, status, projects!inner(id, name, client_id, media_type, due_date, shoot_date)')
-        .in('status', ['pending_client_review', 'pending_editor', 'pending_photographer_review', 'pending_admin_review'])
-        .eq('projects.client_id', clientId),
+      projectIds.length
+        ? supabase
+            .from('project_revisions')
+            .select('id, revision_number, created_at, media_type, status, project_id')
+            .in('project_id', projectIds)
+            .in('status', ['pending_client_review', 'pending_editor', 'pending_photographer_review', 'pending_admin_review'])
+        : Promise.resolve({ data: [] }),
     ])
+
+    // Build project lookup map
+    const projectMap = {}
+    ;(clientProjects || []).forEach((p) => { projectMap[p.id] = p })
 
     const items = []
 
@@ -321,16 +337,34 @@ export default function ContentCalendar() {
     // Project-level shoots
     ;(projectShootsRes.data || []).forEach((s) => {
       if (!s.shoot_date) return
-      const displayTitle = s.title || `${s.projects?.name || 'Project'} — Shoot`
+      const proj = projectMap[s.project_id]
+      const displayTitle = s.title || `${proj?.name || 'Project'} — Shoot`
       items.push({
         id:        `pshoot-${s.id}`,
         kind:      'shoot',
         title:     displayTitle,
         date:      parseISO(s.shoot_date),
         dateLabel: format(parseISO(s.shoot_date), 'EEE, MMM d yyyy') + (s.shoot_time ? ` at ${fmtTime(s.shoot_time)}` : ''),
-        location:  s.location,
+        location:  s.location || proj?.location,
         time:      s.shoot_time ? fmtTime(s.shoot_time) : null,
         status:    s.status,
+      })
+    })
+
+    // Also add shoot_date directly from projects (in case no project_shoots row exists)
+    ;(clientProjects || []).forEach((p) => {
+      if (!p.shoot_date) return
+      // Skip if already covered by a project_shoots row for this project
+      const alreadyCovered = (projectShootsRes.data || []).some((s) => s.project_id === p.id)
+      if (alreadyCovered) return
+      items.push({
+        id:        `proj-shoot-${p.id}`,
+        kind:      'shoot',
+        title:     `${p.name} — Shoot`,
+        date:      parseISO(p.shoot_date),
+        dateLabel: format(parseISO(p.shoot_date), 'EEE, MMM d yyyy'),
+        location:  p.location,
+        time:      null,
       })
     })
 
@@ -353,12 +387,12 @@ export default function ContentCalendar() {
 
     // Active project revisions (all review stages)
     ;(reviewsRes.data || []).forEach((r) => {
-      const revNum  = r.revision_number
-      const isPhoto = r.media_type === 'photo' || r.projects?.media_type === 'photo'
+      const proj    = projectMap[r.project_id]
+      const isPhoto = r.media_type === 'photo' || proj?.media_type === 'photo'
       const mediaWord = isPhoto ? 'Photos' : 'Video'
 
       // Use due_date or shoot_date from the project as a forward-looking anchor; fall back to created_at
-      const rawDate = r.projects?.due_date || r.projects?.shoot_date || r.created_at
+      const rawDate = proj?.due_date || proj?.shoot_date || r.created_at
       const date = rawDate ? new Date(rawDate) : new Date()
 
       let statusLabel
@@ -374,10 +408,10 @@ export default function ContentCalendar() {
         id:         `review-${r.id}`,
         rawId:      r.id,
         kind:       'review',
-        title:      `${r.projects?.name || 'Project'} — ${statusLabel}`,
+        title:      `${proj?.name || 'Project'} — ${statusLabel}`,
         date,
         dateLabel:  format(date, 'MMM d'),
-        projectId:  r.projects?.id,
+        projectId:  r.project_id,
         revisionId: r.id,
         isPhoto,
         revStatus:  r.status,
