@@ -209,8 +209,7 @@ function PinRequestBanner({ requests, messages, onApprove, onDecline }) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function Messages() {
-  const { user, profile } = useAuth()
-  const isAdmin = profile?.role === 'admin'
+  const { user, profile, isAdmin } = useAuth()
 
   const [conversations, setConversations] = useState([])
   const [selectedId, setSelectedId]       = useState(null)

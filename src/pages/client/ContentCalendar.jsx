@@ -528,7 +528,7 @@ export default function ContentCalendar() {
             )}
             {reviewCount > 0 && (
               <span className="text-xs font-medium text-orange-700 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full flex items-center gap-1">
-                <Film size={10} /> {reviewCount} video{reviewCount !== 1 ? 's' : ''} to review
+                <Film size={10} /> {reviewCount} item{reviewCount !== 1 ? 's' : ''} to review
               </span>
             )}
           </div>

@@ -51,12 +51,13 @@ export default function ClientDashboard() {
             .order('created_at', { ascending: false }),
           supabase.from('project_revisions')
             .select('id, project_id, revision_number, status, media_type, projects(id, name, client_id, media_type)')
-            .eq('status', 'pending_client_review'),
+            .eq('status', 'pending_client_review')
+            .eq('projects.client_id', client.id),
           supabase.from('shoots')
             .select('id, title, shoot_date, shoot_time, location, status')
             .eq('client_id', client.id)
             .gte('shoot_date', today)
-            .neq('status', 'cancelled')
+            .or('status.neq.cancelled,status.is.null')
             .order('shoot_date', { ascending: true })
             .limit(3),
         ])

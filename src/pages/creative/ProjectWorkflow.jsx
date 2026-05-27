@@ -1411,14 +1411,30 @@ function UploadPhotoRevisionSection({ project, revisions, onRefresh }) {
 
       await updateProject(project.id, { stage: 'review', revision_count: nextRevNum })
 
-      const { notifyAdmins: notifyAdminsFn } = await import('../../lib/notify')
+      const { notifyAdmins: notifyAdminsFn, notify: notifyFn } = await import('../../lib/notify')
+      const revLabel = nextRevNum === 1 ? 'Initial Photos' : `Revision ${nextRevNum - 1}`
+
       await notifyAdminsFn({
         actorId: profile.id,
         type:    'revision_uploaded',
-        title:   `${nextRevNum === 1 ? 'Initial Photos' : `Revision ${nextRevNum - 1}`} uploaded for "${project.name}"`,
+        title:   `${revLabel} uploaded for "${project.name}"`,
         body:    'Photos are ready for client review.',
         link:    `/projects/${project.id}`,
       })
+
+      // Notify the client directly
+      const { data: clientRow } = await supabase
+        .from('clients').select('profile_id').eq('id', project.client_id).maybeSingle()
+      if (clientRow?.profile_id) {
+        await notifyFn({
+          profileId: clientRow.profile_id,
+          actorId:   profile.id,
+          type:      'revision_ready',
+          title:     `${revLabel} are ready for your review!`,
+          body:      `Your photos for "${project.name}" are ready. Tap to review and leave feedback.`,
+          link:      `/my-projects`,
+        })
+      }
 
       if (editorNote.trim()) {
         await supabase.from('shoot_notes').insert({
