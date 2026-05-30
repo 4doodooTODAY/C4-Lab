@@ -161,20 +161,12 @@ export default function CreativeProjectList() {
               .order('shoot_date', { ascending: true })
               .then(({ data }) => data || [])
           : supabase
-              .from('client_creatives')
-              .select('client_id')
-              .eq('profile_id', myId)
-              .then(async ({ data: assignments }) => {
-                if (!assignments?.length) return []
-                const clientIds = assignments.map((a) => a.client_id)
-                const { data } = await supabase
-                  .from('shoots')
-                  .select('id, title, creative_notes, shoot_date, shoot_time, location, status, inspiration_links, client_id, clients(name, contact_name)')
-                  .in('client_id', clientIds)
-                  .neq('status', 'cancelled')
-                  .order('shoot_date', { ascending: true })
-                return data || []
-              }),
+              .from('shoots')
+              .select('id, title, creative_notes, shoot_date, shoot_time, location, status, inspiration_links, client_id, clients(name, contact_name)')
+              .eq('photographer_id', myId)
+              .neq('status', 'cancelled')
+              .order('shoot_date', { ascending: true })
+              .then(({ data }) => data || []),
 
       // My Edits — projects scoped to assigned clients (admin sees all)
       isAdminRole

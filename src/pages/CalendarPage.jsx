@@ -118,13 +118,17 @@ export default function CalendarPage() {
     const nextMonth   = format(addMonths(currentDate, 1), 'yyyy-MM-01')
 
     Promise.all([
-      // Shoots in this month
-      supabase
-        .from('shoots')
-        .select('id, title, description, shoot_date, shoot_time, location, status, clients(name, contact_name)')
-        .neq('status', 'cancelled')
-        .gte('shoot_date', monthStart)
-        .lt('shoot_date', nextMonth),
+      // Shoots in this month — non-admins only see shoots they're assigned to
+      (() => {
+        let q = supabase
+          .from('shoots')
+          .select('id, title, description, shoot_date, shoot_time, location, status, photographer_id, clients(name, contact_name)')
+          .neq('status', 'cancelled')
+          .gte('shoot_date', monthStart)
+          .lt('shoot_date', nextMonth)
+        if (!isAdmin) q = q.eq('photographer_id', user?.id)
+        return q
+      })(),
 
       // Drafts with target_date in this month
       supabase
