@@ -110,7 +110,7 @@ export default function CalendarPage() {
 
   // Load shoots + drafts for the current month
   useEffect(() => {
-    if (!user) return
+    if (!user || !profile) return
     setAuxLoading(true)
 
     const monthStr    = format(currentDate, 'yyyy-MM')
@@ -199,7 +199,7 @@ export default function CalendarPage() {
       setProjects(projectEvents)
       setAuxLoading(false)
     })
-  }, [user, currentDate])
+  }, [user, profile, currentDate, isAdmin])
 
   // Filter real events by role, and strip out shoot-linked calendar events.
   // Shoots are already shown as synthetic events from the shoots table —
