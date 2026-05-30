@@ -110,31 +110,29 @@ export default function CalendarPage() {
 
   const { events: allEvents, loading, addEvent, updateEvent, deleteEvent } = useCalendarEvents(year, month)
 
-  // ── Load shoots for the current month ──────────────────────────────────────
-  // NOTE: We intentionally do NOT filter by status in the DB query.
-  // PostgreSQL's != operator excludes NULL rows, so .neq('status','cancelled')
-  // would silently drop any shoot with a null status. We filter in JS instead,
-  // where null !== 'cancelled' correctly evaluates to true (shoot is visible).
+  // ── Load shoots — fetch all, filter in JS ───────────────────────────────
+  // We intentionally skip server-side date filtering. Doing date range
+  // comparison in PostgREST has caused edge-case misses. Instead we fetch
+  // all accessible shoots and filter by month in JS — simple, bulletproof.
   useEffect(() => {
     if (!user) return
 
-    const monthStr   = format(currentDate, 'yyyy-MM')
-    const monthStart = `${monthStr}-01`
-    const nextMonth  = format(addMonths(currentDate, 1), 'yyyy-MM-01')
+    const monthStr = format(currentDate, 'yyyy-MM') // e.g. '2026-06'
 
     let q = supabase
       .from('shoots')
       .select('id, title, creative_notes, shoot_date, shoot_time, location, status, photographer_id, clients(name, contact_name)')
-      .gte('shoot_date', monthStart)
-      .lt('shoot_date', nextMonth)
 
-    // Non-admin users only see shoots where they are the assigned photographer
+    // Non-admin: only shoots this user is assigned to as photographer
     if (!isAdmin) q = q.eq('photographer_id', user.id)
 
     q.then(({ data, error }) => {
       if (error) { console.error('[CalendarPage] Shoots fetch error:', error); return }
       const shootEvents = (data || [])
-        .filter((s) => s.status !== 'cancelled')   // JS filter — safely handles null status
+        .filter((s) =>
+          s.status !== 'cancelled' &&           // exclude cancelled (null passes safely in JS)
+          s.shoot_date?.startsWith(monthStr)    // only this month — plain string prefix match
+        )
         .map((s) => {
           const timeStr = s.shoot_time ? s.shoot_time.slice(0, 5) : '09:00'
           const startAt = new Date(`${s.shoot_date}T${timeStr}:00`)
@@ -348,6 +346,23 @@ export default function CalendarPage() {
         onDayClick={handleDayClick}
         onEventClick={handleEventClick}
       />
+
+      {/* ── DEV DEBUG PANEL — remove before launch ── */}
+      {import.meta.env.DEV && (
+        <div className="fixed bottom-4 left-4 z-50 bg-gray-900/95 text-white text-[11px] p-3 rounded-xl max-w-72 shadow-2xl font-mono">
+          <p className="font-bold text-yellow-400 mb-1">📅 Calendar Debug</p>
+          <p>Month: {format(currentDate, 'MMMM yyyy')}</p>
+          <p>isAdmin: <span className={isAdmin ? 'text-green-400' : 'text-red-400'}>{String(isAdmin)}</span></p>
+          <p>user: {user?.id?.slice(0,8)}…</p>
+          <p className="mt-1 text-yellow-300">Shoots in state: {shoots.length}</p>
+          {shoots.length === 0
+            ? <p className="text-red-400">⚠ No shoots loaded</p>
+            : shoots.map((s) => (
+                <p key={s.id} className="text-green-300 truncate">✓ {s.title} ({new Date(s.start_at).toLocaleDateString()})</p>
+              ))
+          }
+        </div>
+      )}
 
       {/* Shoot / Draft / Project detail panel */}
       {selectedAux && (
