@@ -618,8 +618,8 @@ export default function MyProjects() {
       .from('projects')
       .select(`
         id, name, stage, status, concept, notes, pitch_notes,
-        target_date, due_date, shoot_date, location, max_revisions,
-        creative_id, editor_id, media_type
+        target_date, due_date, shoot_date, location,
+        creative_id, editor_id
       `)
       .eq('client_id', client.id)
       .order('created_at', { ascending: false })
@@ -632,7 +632,7 @@ export default function MyProjects() {
 
     const [revRes, profilesRes] = await Promise.all([
       projectIds.length
-        ? supabase.from('project_revisions').select('id, project_id, revision_number, status, media_type').in('project_id', projectIds)
+        ? supabase.from('project_revisions').select('id, project_id, revision_number, status').in('project_id', projectIds)
         : Promise.resolve({ data: [] }),
       profileIds.length
         ? supabase.from('profiles').select('id, full_name').in('id', profileIds)
