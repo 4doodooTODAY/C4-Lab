@@ -347,23 +347,6 @@ export default function CalendarPage() {
         onEventClick={handleEventClick}
       />
 
-      {/* ── DEV DEBUG PANEL — remove before launch ── */}
-      {true && (
-        <div className="fixed bottom-4 left-4 z-50 bg-gray-900/95 text-white text-[11px] p-3 rounded-xl max-w-72 shadow-2xl font-mono">
-          <p className="font-bold text-yellow-400 mb-1">📅 Calendar Debug</p>
-          <p>Month: {format(currentDate, 'MMMM yyyy')}</p>
-          <p>isAdmin: <span className={isAdmin ? 'text-green-400' : 'text-red-400'}>{String(isAdmin)}</span></p>
-          <p>user: {user?.id?.slice(0,8)}…</p>
-          <p className="mt-1 text-yellow-300">Shoots in state: {shoots.length}</p>
-          {shoots.length === 0
-            ? <p className="text-red-400">⚠ No shoots loaded</p>
-            : shoots.map((s) => (
-                <p key={s.id} className="text-green-300 truncate">✓ {s.title} ({new Date(s.start_at).toLocaleDateString()})</p>
-              ))
-          }
-        </div>
-      )}
-
       {/* Shoot / Draft / Project detail panel */}
       {selectedAux && (
         <ShootDraftPanel item={selectedAux} onClose={() => setSelectedAux(null)} />
