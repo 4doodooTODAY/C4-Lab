@@ -622,7 +622,7 @@ export default function MyProjects() {
     const { data: projData, error: projErr } = await supabase
       .from('projects')
       .select(`
-        id, name, stage, status, concept, notes, pitch_notes,
+        id, name, stage, status, concept, notes,
         target_date, due_date, shoot_date, location,
         creative_id, editor_id
       `)
