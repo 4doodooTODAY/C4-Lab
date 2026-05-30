@@ -56,8 +56,8 @@ const WHOS_UP = {
   briefing:        { who: 'admin',      label: 'Admin',          msg: 'Set up the project and begin when ready.' },
   pre_production:  { who: 'admin',      label: 'Admin',          msg: 'Set up the project and assign the team.' },
   production:      { who: 'creative',   label: 'Creative',       msg: 'Upload footage and files for this project.' },
-  post_production: { who: 'editor',     label: 'Editor',         msg: 'Upload the first cut — it goes to the photographer first.' },
-  review:          { who: 'varies',     label: 'Review Cycle',   msg: 'Photographer → Client → Editor until approved.' },
+  post_production: { who: 'editor',     label: 'Editor',         msg: 'Upload the first cut — it goes to the creative for review first.' },
+  review:          { who: 'varies',     label: 'Review Cycle',   msg: 'Creative → Client → Editor until approved.' },
   revisions:       { who: 'editor',     label: 'Editor',         msg: 'Client requested changes — upload a revision.' },
   ready_to_post:   { who: 'admin',      label: 'Admin',          msg: 'Client approved! Post it online and mark complete.' },
   delivered:       { who: 'done',       label: 'Complete',       msg: 'Project delivered.' },
@@ -315,7 +315,7 @@ function WhosUpBanner({ stage, editorProfile, creativeProfile, onBeginProject, i
 
   const personName =
     info.who === 'editor'    ? (editorProfile?.full_name   || 'Editor (unassigned)') :
-    info.who === 'creative'  ? (creativeProfile?.full_name || 'Photographer (unassigned)') :
+    info.who === 'creative'  ? (creativeProfile?.full_name || 'Creative (unassigned)') :
     info.who === 'client'    ? 'Client' :
     info.who === 'varies'    ? null :
     info.who === 'admin'     ? 'Admin' : null
@@ -386,20 +386,6 @@ export default function ProjectDetail() {
 
   const [actionError, setActionError]   = useState('')
 
-  // Shoot dates
-  const [shoots, setShoots]                 = useState([])
-  const [showAddShoot, setShowAddShoot]     = useState(false)
-  const [newShootDate, setNewShootDate]     = useState('')
-  const [newShootTime, setNewShootTime]     = useState('')
-  const [newShootLocation, setNewShootLocation] = useState('')
-  const [addingShoot, setAddingShoot]       = useState(false)
-
-  // Link existing shoot
-  const [clientShoots, setClientShoots]     = useState([])
-  const [showLinkShoot, setShowLinkShoot]   = useState(false)
-  const [linkingShoot, setLinkingShoot]     = useState(false)
-  const [selectedLinkShoot, setSelectedLinkShoot] = useState('')
-
   // Shoot uploads + notes + revisions
   const [shootUploads, setShootUploads] = useState([])
   const [shootNotes, setShootNotes]     = useState([])
@@ -448,115 +434,6 @@ export default function ProjectDetail() {
       setLoadingExtras(false)
     })
   }, [id])
-
-  const fetchShoots = () => {
-    supabase.from('project_shoots').select('*').eq('project_id', id).order('shoot_date')
-      .then(({ data }) => setShoots(data || []))
-  }
-
-  useEffect(() => {
-    if (!id) return
-    fetchShoots()
-  }, [id])
-
-  const handleAddShoot = async () => {
-    if (!newShootDate) return
-    setAddingShoot(true)
-    try {
-      const shootTitle = `${project.name} — Shoot`
-      const timeStr    = newShootTime || '09:00'
-      const startAt    = new Date(`${newShootDate}T${timeStr}:00`)
-      const endAt      = new Date(startAt.getTime() + 2 * 60 * 60 * 1000)
-
-      // 1. Create calendar event
-      const { data: { user: authUser } } = await supabase.auth.getUser()
-      const { data: evtData } = await supabase.from('calendar_events').insert({
-        title:      shootTitle,
-        event_type: 'in_person',
-        start_at:   startAt.toISOString(),
-        end_at:     endAt.toISOString(),
-        all_day:    false,
-        location:   newShootLocation || null,
-        created_by: authUser.id,
-      }).select().single()
-
-      // 2. Insert the project shoot, linking back to the calendar event
-      await supabase.from('project_shoots').insert({
-        project_id:        id,
-        shoot_date:        newShootDate,
-        shoot_time:        newShootTime  || null,
-        location:          newShootLocation || null,
-        title:             shootTitle,
-        status:            'scheduled',
-        calendar_event_id: evtData?.id || null,
-      })
-
-      // 3. Add team members + client to calendar_event_members so everyone sees it
-      if (evtData) {
-        const memberIds = [project.editor_id].filter(Boolean)
-
-        // Resolve client's profile_id (clients table links to profiles via profile_id)
-        if (project.client_id) {
-          const { data: clientRow } = await supabase
-            .from('clients')
-            .select('profile_id')
-            .eq('id', project.client_id)
-            .maybeSingle()
-          if (clientRow?.profile_id) memberIds.push(clientRow.profile_id)
-        }
-
-        if (memberIds.length) {
-          await supabase.from('calendar_event_members').insert(
-            memberIds.map((profile_id) => ({ event_id: evtData.id, profile_id }))
-          )
-        }
-      }
-
-      setNewShootDate('')
-      setNewShootTime('')
-      setNewShootLocation('')
-      setShowAddShoot(false)
-      fetchShoots()
-    } finally {
-      setAddingShoot(false)
-    }
-  }
-
-  const handleDeleteShoot = async (shootId) => {
-    // Look up the linked calendar event before deleting so we can clean it up
-    const { data: shootRow } = await supabase
-      .from('project_shoots')
-      .select('calendar_event_id')
-      .eq('id', shootId)
-      .maybeSingle()
-
-    await supabase.from('project_shoots').delete().eq('id', shootId)
-
-    if (shootRow?.calendar_event_id) {
-      // Cascade deletes calendar_event_members automatically (FK on delete cascade)
-      await supabase.from('calendar_events').delete().eq('id', shootRow.calendar_event_id)
-    }
-
-    fetchShoots()
-  }
-
-  const handleLinkShoot = async () => {
-    if (!selectedLinkShoot) return
-    setLinkingShoot(true)
-    await updateProject(id, { shoot_id: selectedLinkShoot })
-    setShowLinkShoot(false)
-    setSelectedLinkShoot('')
-    setLinkingShoot(false)
-    refetch()
-  }
-
-  useEffect(() => {
-    if (!project?.client_id) return
-    supabase.from('shoots').select('id, title, shoot_date, shoot_time, location, status')
-      .eq('client_id', project.client_id)
-      .order('shoot_date', { ascending: false })
-      .then(({ data }) => setClientShoots(data || []))
-  }, [project?.client_id])
 
   useEffect(() => {
     if (!project) return
@@ -848,142 +725,6 @@ export default function ProjectDetail() {
           </div>
         </div>
 
-        {/* Shoot Dates */}
-        <div>
-          <p className="text-xs text-text-muted mb-2 flex items-center gap-1">
-            <CalendarDays size={11} /> Shoot Dates
-          </p>
-          {project.shoot_id && (() => {
-            const linked = clientShoots.find(s => s.id === project.shoot_id)
-            if (!linked) return null
-            return (
-              <div className="flex items-center gap-2 py-1.5 mb-2 bg-accent/5 rounded-lg px-2">
-                <Camera size={13} className="text-accent shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-accent">{linked.title}</p>
-                  {linked.shoot_date && (
-                    <p className="text-xs text-text-muted">
-                      {format(parseISO(linked.shoot_date), 'MMM d, yyyy')}
-                      {linked.shoot_time && ` · ${fmtTime(linked.shoot_time)}`}
-                    </p>
-                  )}
-                </div>
-                {isAdmin && (
-                  <button onClick={() => updateProject(id, { shoot_id: null }).then(refetch)}
-                    className="text-text-muted hover:text-red-500 transition-colors" title="Unlink">
-                    <X size={12} />
-                  </button>
-                )}
-              </div>
-            )
-          })()}
-          {shoots.length === 0 ? (
-            <p className="text-sm text-text-muted/60 italic mb-2">No shoot dates added yet.</p>
-          ) : (
-            <div className="mb-2">
-              {shoots.map((s) => (
-                <div key={s.id} className="flex items-center gap-2 py-1.5 border-b border-border last:border-0">
-                  <CalendarDays size={13} className="text-text-muted shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <span className="text-sm font-medium text-text-primary">
-                      {format(parseISO(s.shoot_date), 'MMM d, yyyy')}
-                      {s.shoot_time && ` · ${fmtTime(s.shoot_time)}`}
-                    </span>
-                    {s.location && <p className="text-xs text-text-muted truncate">{s.location}</p>}
-                  </div>
-                  {isAdmin && (
-                    <button
-                      onClick={() => handleDeleteShoot(s.id)}
-                      className="text-text-muted hover:text-red-500 transition-colors ml-auto"
-                      title="Remove shoot date"
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-          {isAdmin && (
-            showAddShoot ? (
-              <div className="space-y-2 mt-2">
-                <div className="flex gap-2">
-                  <input
-                    type="date"
-                    className="input text-sm py-1 flex-1"
-                    value={newShootDate}
-                    onChange={(e) => setNewShootDate(e.target.value)}
-                    autoFocus
-                  />
-                  <input
-                    type="time"
-                    className="input text-sm py-1 w-32 shrink-0"
-                    value={newShootTime}
-                    onChange={(e) => setNewShootTime(e.target.value)}
-                    placeholder="Time"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    className="input text-sm py-1 flex-1"
-                    value={newShootLocation}
-                    onChange={(e) => setNewShootLocation(e.target.value)}
-                    placeholder="Location (address or venue)"
-                  />
-                  <button
-                    onClick={handleAddShoot}
-                    disabled={!newShootDate || addingShoot}
-                    className="btn-primary text-xs px-3 py-1.5 flex items-center gap-1 disabled:opacity-50 shrink-0"
-                  >
-                    {addingShoot ? <Loader2 size={12} className="animate-spin" /> : null}
-                    Add
-                  </button>
-                  <button
-                    onClick={() => { setShowAddShoot(false); setNewShootDate(''); setNewShootTime(''); setNewShootLocation('') }}
-                    className="btn-ghost p-1.5 shrink-0"
-                  >
-                    <X size={13} />
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div>
-                <button
-                  onClick={() => setShowAddShoot(true)}
-                  className="text-xs text-accent hover:text-accent/80 font-medium flex items-center gap-1 mt-1"
-                >
-                  <Plus size={12} /> Add Shoot
-                </button>
-                {!showLinkShoot && (
-                  <button onClick={() => setShowLinkShoot(true)}
-                    className="text-xs text-text-muted hover:text-accent font-medium flex items-center gap-1 mt-1">
-                    <Camera size={12} /> Link Existing Shoot
-                  </button>
-                )}
-                {showLinkShoot && (
-                  <div className="flex gap-2 mt-2">
-                    <select className="input text-sm py-1 flex-1" value={selectedLinkShoot}
-                      onChange={e => setSelectedLinkShoot(e.target.value)}>
-                      <option value="">— Select a shoot —</option>
-                      {clientShoots.map(s => (
-                        <option key={s.id} value={s.id}>
-                          {s.title}{s.shoot_date ? ` · ${format(parseISO(s.shoot_date), 'MMM d, yyyy')}` : ''}
-                        </option>
-                      ))}
-                    </select>
-                    <button onClick={handleLinkShoot} disabled={!selectedLinkShoot || linkingShoot}
-                      className="btn-primary text-xs px-3 shrink-0 disabled:opacity-50">
-                      {linkingShoot ? <Loader2 size={12} className="animate-spin" /> : 'Link'}
-                    </button>
-                    <button onClick={() => { setShowLinkShoot(false); setSelectedLinkShoot('') }}
-                      className="btn-ghost p-1.5 shrink-0"><X size={13} /></button>
-                  </div>
-                )}
-              </div>
-            )
-          )}
-        </div>
       </div>
 
       {/* Assigned Team */}
