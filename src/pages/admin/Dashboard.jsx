@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Users2, Inbox, Building2, Loader2, Upload, MessageSquare, FileText, Camera, Film } from 'lucide-react'
+import { Users2, Inbox, Building2, Loader2, Upload, MessageSquare, FileText, Camera, Film, CalendarDays, FolderKanban, Clock } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
-import { format, formatDistanceToNow, startOfWeek, addWeeks, isWithinInterval } from 'date-fns'
+import { format, formatDistanceToNow, startOfWeek, addWeeks, isWithinInterval, isToday, isTomorrow, differenceInDays } from 'date-fns'
 
 // ─── Weekly bar chart (pure SVG, no deps) ─────────────────────────────────────
 function WeeklyChart({ weeks }) {
@@ -140,6 +140,155 @@ function ActivityItem({ item }) {
           {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
         </p>
       </div>
+    </div>
+  )
+}
+
+// ─── Upcoming list ────────────────────────────────────────────────────────────
+function UpcomingList() {
+  const [items,   setItems]   = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const today = new Date().toISOString().split('T')[0]
+    const nowIso = new Date().toISOString()
+
+    Promise.all([
+      // Upcoming shoots
+      supabase
+        .from('shoots')
+        .select('id, title, shoot_date, shoot_time, clients(name, contact_name)')
+        .neq('status', 'cancelled')
+        .neq('status', 'completed')
+        .gte('shoot_date', today)
+        .order('shoot_date', { ascending: true })
+        .limit(15),
+
+      // Projects with due dates coming up
+      supabase
+        .from('projects')
+        .select('id, name, due_date, stage, clients(name, contact_name)')
+        .not('due_date', 'is', null)
+        .not('stage', 'eq', 'delivered')
+        .neq('status', 'archived')
+        .gte('due_date', today)
+        .order('due_date', { ascending: true })
+        .limit(15),
+
+      // Upcoming calendar events (meetings, deadlines — not shoot-type)
+      supabase
+        .from('calendar_events')
+        .select('id, title, start_at, event_type, location')
+        .neq('event_type', 'shoot')
+        .gte('start_at', nowIso)
+        .order('start_at', { ascending: true })
+        .limit(15),
+    ]).then(([shootsRes, projectsRes, eventsRes]) => {
+      const merged = []
+
+      ;(shootsRes.data || []).forEach((s) => {
+        merged.push({
+          id:       `shoot-${s.id}`,
+          type:     'shoot',
+          title:    s.title,
+          client:   s.clients?.contact_name || s.clients?.name || null,
+          date:     new Date(`${s.shoot_date}T${s.shoot_time || '09:00'}:00`),
+          dateStr:  s.shoot_date,
+          link:     null,
+        })
+      })
+
+      ;(projectsRes.data || []).forEach((p) => {
+        merged.push({
+          id:     `project-${p.id}`,
+          type:   'project',
+          title:  p.name,
+          client: p.clients?.contact_name || p.clients?.name || null,
+          date:   new Date(`${p.due_date}T23:59:00`),
+          dateStr: p.due_date,
+          link:   `/projects/${p.id}/creative`,
+        })
+      })
+
+      ;(eventsRes.data || []).forEach((e) => {
+        merged.push({
+          id:     `event-${e.id}`,
+          type:   'event',
+          title:  e.title,
+          client: e.location || null,
+          date:   new Date(e.start_at),
+          dateStr: e.start_at,
+          link:   '/calendar',
+        })
+      })
+
+      merged.sort((a, b) => a.date - b.date)
+      setItems(merged.slice(0, 20))
+      setLoading(false)
+    })
+  }, [])
+
+  const TYPE_META = {
+    shoot:   { icon: Camera,       color: 'text-violet-600', bg: 'bg-violet-50',  label: 'Shoot'    },
+    project: { icon: FolderKanban, color: 'text-accent',     bg: 'bg-accent/10',  label: 'Due Date' },
+    event:   { icon: CalendarDays, color: 'text-blue-600',   bg: 'bg-blue-50',    label: 'Meeting'  },
+  }
+
+  const fmtDate = (date, dateStr) => {
+    if (isToday(date))    return 'Today'
+    if (isTomorrow(date)) return 'Tomorrow'
+    const days = differenceInDays(date, new Date())
+    if (days <= 6) return format(date, 'EEEE') // "Wednesday"
+    return format(date, 'MMM d')
+  }
+
+  if (loading) return (
+    <div className="flex justify-center py-8">
+      <Loader2 size={16} className="animate-spin text-text-muted" />
+    </div>
+  )
+
+  if (items.length === 0) return (
+    <div className="text-center py-8">
+      <Clock size={28} className="mx-auto text-text-muted/30 mb-2" />
+      <p className="text-sm text-text-muted">Nothing coming up — you're clear.</p>
+    </div>
+  )
+
+  return (
+    <div className="divide-y divide-border -my-1">
+      {items.map((item) => {
+        const meta = TYPE_META[item.type]
+        const Icon = meta.icon
+        const dateLabel = fmtDate(item.date)
+        const isUrgent = differenceInDays(item.date, new Date()) <= 1
+
+        const inner = (
+          <div className={`flex items-center gap-3 py-3 ${item.link ? 'hover:bg-surface-2/40 -mx-6 px-6 rounded-xl transition-colors' : ''}`}>
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${meta.bg}`}>
+              <Icon size={14} className={meta.color} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-text-primary truncate">{item.title}</p>
+              {item.client && (
+                <p className="text-xs text-text-muted truncate">{item.client}</p>
+              )}
+            </div>
+            <div className="shrink-0 text-right">
+              <p className={`text-xs font-semibold ${isUrgent ? 'text-red-500' : 'text-text-muted'}`}>
+                {dateLabel}
+              </p>
+              <p className="text-[10px] text-text-muted">{meta.label}</p>
+            </div>
+          </div>
+        )
+
+        return item.link ? (
+          <Link key={item.id} to={item.link}>{inner}</Link>
+        ) : (
+          <div key={item.id}>{inner}</div>
+        )
+      })}
     </div>
   )
 }
@@ -296,6 +445,18 @@ export default function AdminDashboard() {
                 </div>
               </Link>
             ))}
+          </div>
+
+          {/* Upcoming */}
+          <div className="card p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-sm font-semibold text-text-primary">Coming Up</h2>
+                <p className="text-xs text-text-muted mt-0.5">Shoots, due dates, and meetings</p>
+              </div>
+              <Link to="/calendar" className="text-xs text-accent font-medium hover:underline">View calendar →</Link>
+            </div>
+            <UpcomingList />
           </div>
 
           {/* Growth chart */}
