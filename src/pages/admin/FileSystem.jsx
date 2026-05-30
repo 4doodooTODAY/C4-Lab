@@ -30,37 +30,70 @@ function fileType(name = '') {
 }
 
 // ── Storage bar ────────────────────────────────────────────────────────────────
+const R2_FREE_GB   = 10
+const R2_PRICE_PER_GB = 0.015   // $/GB-month after free tier
+
 function StorageBar({ trackedBytes, r2Bytes }) {
-  const pct  = r2Bytes > 0 ? Math.min(100, (trackedBytes / r2Bytes) * 100) : 0
-  const r2GB = r2Bytes / 1_073_741_824
+  const r2GB       = r2Bytes / 1_073_741_824
+  const freeGB     = R2_FREE_GB
+  const paidGB     = Math.max(0, r2GB - freeGB)
+  const monthlyCost = paidGB * R2_PRICE_PER_GB
+
+  // Progress within the 10 GB free tier (capped at 100%)
+  const freePct  = Math.min(100, (r2GB / freeGB) * 100)
+  const overFree = r2GB > freeGB
+
+  // Bar colour: green if well within free, amber if close, red if paying
+  const barColor = overFree
+    ? 'from-red-500 to-red-400'
+    : freePct > 80
+      ? 'from-amber-400 to-amber-300'
+      : 'from-emerald-500 to-emerald-400'
+
   const diff = r2Bytes - trackedBytes
 
   return (
     <div className="card p-5 mb-6">
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-start justify-between mb-4">
+        {/* Left — total usage */}
         <div>
-          <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-0.5">R2 Storage</p>
+          <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-0.5">Cloudflare R2 Storage</p>
           <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-text-primary">{fmtBytes(r2Bytes)}</span>
-            <span className="text-sm text-text-muted">total in Cloudflare R2</span>
+            <span className="text-2xl font-bold text-text-primary">{r2GB.toFixed(2)} GB</span>
+            <span className="text-sm text-text-muted">of {freeGB} GB free</span>
           </div>
+          {diff > 0 && (
+            <p className="text-[11px] text-text-muted mt-0.5">
+              {fmtBytes(trackedBytes)} footage · {fmtBytes(diff)} finished videos
+            </p>
+          )}
         </div>
-        {diff > 0 && (
-          <div className="flex items-center gap-1.5 text-xs text-text-muted bg-surface-2 px-3 py-1.5 rounded-full">
-            <Info size={11} />
-            {fmtBytes(diff)} in finished videos
-          </div>
-        )}
+
+        {/* Right — cost badge */}
+        <div className={`text-right px-4 py-2.5 rounded-xl ${overFree ? 'bg-red-50' : 'bg-emerald-50'}`}>
+          <p className={`text-xs font-semibold uppercase tracking-wider mb-0.5 ${overFree ? 'text-red-500' : 'text-emerald-600'}`}>
+            Est. monthly
+          </p>
+          <p className={`text-xl font-bold ${overFree ? 'text-red-500' : 'text-emerald-600'}`}>
+            {overFree ? `$${monthlyCost.toFixed(2)}` : '$0.00'}
+          </p>
+          {overFree
+            ? <p className="text-[10px] text-red-400">{paidGB.toFixed(2)} GB @ $0.015/GB</p>
+            : <p className="text-[10px] text-emerald-500">{(freeGB - r2GB).toFixed(2)} GB left free</p>
+          }
+        </div>
       </div>
-      <div className="h-2 bg-surface-2 rounded-full overflow-hidden">
+
+      {/* Progress bar — tracks against 10 GB free tier */}
+      <div className="h-2.5 bg-surface-2 rounded-full overflow-hidden">
         <div
-          className="h-full bg-gradient-to-r from-accent to-accent/70 rounded-full transition-all duration-500"
-          style={{ width: `${pct}%` }}
+          className={`h-full bg-gradient-to-r ${barColor} rounded-full transition-all duration-700`}
+          style={{ width: `${freePct}%` }}
         />
       </div>
       <div className="flex justify-between mt-1.5">
-        <span className="text-[10px] text-text-muted">{fmtBytes(trackedBytes)} footage &amp; uploads</span>
-        <span className="text-[10px] text-text-muted">{r2GB.toFixed(2)} GB total</span>
+        <span className="text-[10px] text-text-muted">{r2GB.toFixed(2)} GB used</span>
+        <span className="text-[10px] text-text-muted">{freeGB} GB free tier limit · $0.015/GB after</span>
       </div>
     </div>
   )
