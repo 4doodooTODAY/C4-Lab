@@ -587,14 +587,18 @@ export default function MyProjects() {
   const [revisions,  setRevisions]  = useState([])
   const [clientId,   setClientId]   = useState(null)
   const [loading,    setLoading]    = useState(true)
+  const [fetchError, setFetchError] = useState(null)
 
   const loadAll = async () => {
     if (!user?.id) return
     setLoading(true)
+    setFetchError(null)
 
     // Try finding client by profile_id first, then fall back to client_creatives
-    let { data: client } = await supabase
+    let { data: client, error: clientErr } = await supabase
       .from('clients').select('id, name').eq('profile_id', user.id).maybeSingle()
+
+    if (clientErr) console.error('MyProjects: client lookup error', clientErr)
 
     if (!client) {
       // Fallback: find via client_creatives (team member assigned to a client)
@@ -609,6 +613,7 @@ export default function MyProjects() {
 
     if (!client) {
       console.warn('MyProjects: no client found for user', user.id)
+      setFetchError(`No client account linked to this user (${user.id}). Contact your admin.`)
       setLoading(false)
       return
     }
@@ -624,7 +629,10 @@ export default function MyProjects() {
       .eq('client_id', client.id)
       .order('created_at', { ascending: false })
 
-    if (projErr) console.error('MyProjects: projects fetch error', projErr)
+    if (projErr) {
+      console.error('MyProjects: projects fetch error', projErr)
+      setFetchError(`Projects query failed: ${projErr.message}`)
+    }
 
     const projects = projData || []
     const projectIds = projects.map((p) => p.id)
@@ -660,6 +668,15 @@ export default function MyProjects() {
   if (loading) return (
     <div className="flex justify-center py-24">
       <Loader2 size={22} className="animate-spin text-gray-200" />
+    </div>
+  )
+
+  if (fetchError) return (
+    <div className="min-h-screen bg-gray-50/40 flex items-center justify-center p-6">
+      <div className="max-w-sm text-center">
+        <p className="text-sm font-semibold text-red-500 mb-2">Could not load projects</p>
+        <p className="text-xs text-gray-400">{fetchError}</p>
+      </div>
     </div>
   )
 
