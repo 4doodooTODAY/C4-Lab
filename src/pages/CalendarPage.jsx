@@ -348,7 +348,7 @@ export default function CalendarPage() {
       />
 
       {/* ── DEV DEBUG PANEL — remove before launch ── */}
-      {import.meta.env.DEV && (
+      {true && (
         <div className="fixed bottom-4 left-4 z-50 bg-gray-900/95 text-white text-[11px] p-3 rounded-xl max-w-72 shadow-2xl font-mono">
           <p className="font-bold text-yellow-400 mb-1">📅 Calendar Debug</p>
           <p>Month: {format(currentDate, 'MMMM yyyy')}</p>
