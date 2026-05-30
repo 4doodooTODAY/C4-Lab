@@ -5,6 +5,8 @@ const SHOOT_SELECT = `
   id, client_id, title, creative_notes,
   shoot_date, shoot_time, location, status,
   inspiration_links, calendar_event_id,
+  photographer_id,
+  profiles!photographer_id(id, full_name, role),
   created_by, created_at,
   clients(id, name, contact_name)
 `

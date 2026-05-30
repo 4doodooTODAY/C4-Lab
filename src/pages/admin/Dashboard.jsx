@@ -154,7 +154,7 @@ function UpcomingList() {
     const nowIso = new Date().toISOString()
 
     Promise.all([
-      // Upcoming shoots
+      // Upcoming shoots — status may be null on older rows, or 'scheduled'
       supabase
         .from('shoots')
         .select('id, title, shoot_date, shoot_time, clients(name, contact_name)')
@@ -185,14 +185,17 @@ function UpcomingList() {
         .limit(15),
     ]).then(([shootsRes, projectsRes, eventsRes]) => {
       const merged = []
+      try {
 
       ;(shootsRes.data || []).forEach((s) => {
+        // shoot_time comes as "HH:MM:SS" from Postgres — slice to "HH:MM"
+        const timeStr = s.shoot_time ? s.shoot_time.slice(0, 5) : '09:00'
         merged.push({
           id:       `shoot-${s.id}`,
           type:     'shoot',
           title:    s.title,
           client:   s.clients?.contact_name || s.clients?.name || null,
-          date:     new Date(`${s.shoot_date}T${s.shoot_time || '09:00'}:00`),
+          date:     new Date(`${s.shoot_date}T${timeStr}:00`),
           dateStr:  s.shoot_date,
           link:     null,
         })
@@ -222,8 +225,11 @@ function UpcomingList() {
         })
       })
 
-      merged.sort((a, b) => a.date - b.date)
-      setItems(merged.slice(0, 20))
+        merged.sort((a, b) => a.date - b.date)
+        setItems(merged.slice(0, 20))
+      } catch (err) {
+        console.error('UpcomingList parse error:', err)
+      }
       setLoading(false)
     })
   }, [])

@@ -80,42 +80,44 @@ function NewShootModal({ clientId, onClose, onCreated }) {
     setError('')
     try {
       const payload = {
-        client_id:   clientId,
-        title:       form.title.trim(),
+        client_id:      clientId,
+        title:          form.title.trim(),
         creative_notes: form.creative_notes || null,
-        shoot_date:  form.shoot_date || null,
-        shoot_time:  form.shoot_time || null,
-        location:    form.location || null,
-        status:      form.status,
-        created_by:  user?.id,
+        shoot_date:     form.shoot_date || null,
+        shoot_time:     form.shoot_time || null,
+        location:       form.location || null,
+        status:         form.status,
+        photographer_id: selectedMember || null,
+        created_by:     user?.id,
       }
       const row = await createShoot(payload)
 
-      // Auto-create a calendar event for the shoot
+      // Optionally create a calendar event — non-fatal if it fails
       if (form.shoot_date) {
-        const timeStr = form.shoot_time || '09:00'
-        const startAt = new Date(`${form.shoot_date}T${timeStr}:00`)
-        const endAt   = new Date(startAt.getTime() + 4 * 60 * 60 * 1000) // 4hr block
-        const memberIds = selectedMember ? [selectedMember] : []
-        const { data: evtData } = await supabase.from('calendar_events').insert({
-          title:      `${form.title.trim()} — Shoot`,
-          event_type: 'shoot',
-          start_at:   startAt.toISOString(),
-          end_at:     endAt.toISOString(),
-          all_day:    !form.shoot_time,
-          location:   form.location || null,
-          shoot_id:   row.id,
-          client_id:  clientId,
-          created_by: user?.id,
-        }).select('id').single()
-        if (evtData?.id) {
-          await supabase.from('shoots').update({ calendar_event_id: evtData.id }).eq('id', row.id)
-          // Add selected member to calendar event
-          if (memberIds.length) {
-            await supabase.from('calendar_event_members').insert(
-              memberIds.map((profile_id) => ({ event_id: evtData.id, profile_id }))
-            )
+        try {
+          const timeStr = (form.shoot_time || '09:00').slice(0, 5)
+          const startAt = new Date(`${form.shoot_date}T${timeStr}:00`)
+          const endAt   = new Date(startAt.getTime() + 4 * 60 * 60 * 1000)
+          const { data: evtData } = await supabase.from('calendar_events').insert({
+            title:      `${form.title.trim()} — Shoot`,
+            event_type: 'shoot',
+            start_at:   startAt.toISOString(),
+            end_at:     endAt.toISOString(),
+            all_day:    !form.shoot_time,
+            location:   form.location || null,
+            client_id:  clientId,
+            created_by: user?.id,
+          }).select('id').single()
+          if (evtData?.id) {
+            await supabase.from('shoots').update({ calendar_event_id: evtData.id }).eq('id', row.id)
+            if (selectedMember) {
+              await supabase.from('calendar_event_members').insert({
+                event_id: evtData.id, profile_id: selectedMember,
+              })
+            }
           }
+        } catch (_) {
+          // Calendar event creation is best-effort — shoot was saved successfully
         }
       }
 

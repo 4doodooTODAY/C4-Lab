@@ -337,7 +337,7 @@ export default function ShootDetailModal({ shoot: initialShoot, clientId, client
     status:         initialShoot?.status || 'scheduled',
   })
   const [teamMembers,    setTeamMembers]    = useState([])
-  const [assignedMember, setAssignedMember] = useState('')
+  const [assignedMember, setAssignedMember] = useState(initialShoot?.photographer_id || '')
   const [saving,         setSaving]         = useState(false)
   const [saveError,      setSaveError]      = useState('')
 
@@ -348,7 +348,7 @@ export default function ShootDetailModal({ shoot: initialShoot, clientId, client
   const canSeeCreativeNotes = profile?.role === 'admin' || profile?.role === 'creative' || profile?.role === 'editor'
   const canEdit            = profile?.role === 'admin'
 
-  // Load team members + current assignee when edit mode opens
+  // Load team members for the assignment dropdown when edit opens
   useEffect(() => {
     if (!editMode || !clientId) return
     supabase
@@ -356,14 +356,6 @@ export default function ShootDetailModal({ shoot: initialShoot, clientId, client
       .select('profile_id, profiles(id, full_name, role)')
       .eq('client_id', clientId)
       .then(({ data }) => setTeamMembers((data || []).map((m) => m.profiles).filter(Boolean)))
-
-    if (shoot.calendar_event_id) {
-      supabase
-        .from('calendar_event_members')
-        .select('profile_id')
-        .eq('event_id', shoot.calendar_event_id)
-        .then(({ data }) => { if (data?.[0]) setAssignedMember(data[0].profile_id) })
-    }
   }, [editMode, clientId])
 
   const set = (k) => (e) => setEditForm((f) => ({ ...f, [k]: e.target.value }))
@@ -374,17 +366,18 @@ export default function ShootDetailModal({ shoot: initialShoot, clientId, client
     setSaveError('')
     try {
       const payload = {
-        title:          editForm.title.trim(),
-        shoot_date:     editForm.shoot_date || null,
-        shoot_time:     editForm.shoot_time || null,
-        location:       editForm.location || null,
-        creative_notes: editForm.creative_notes || null,
-        status:         editForm.status,
+        title:           editForm.title.trim(),
+        shoot_date:      editForm.shoot_date || null,
+        shoot_time:      editForm.shoot_time || null,
+        location:        editForm.location || null,
+        creative_notes:  editForm.creative_notes || null,
+        status:          editForm.status,
+        photographer_id: assignedMember || null,
       }
       const { error } = await supabase.from('shoots').update(payload).eq('id', shoot.id)
       if (error) throw error
 
-      // Sync the linked calendar event title, time, location, and assignee
+      // Sync the linked calendar event title, time, location, and assignee (best-effort)
       if (shoot.calendar_event_id) {
         const timeStr = editForm.shoot_time || '09:00'
         const startAt = editForm.shoot_date
@@ -518,9 +511,6 @@ export default function ShootDetailModal({ shoot: initialShoot, clientId, client
                       ))}
                     </select>
                   )}
-                  {!shoot.calendar_event_id && (
-                    <p className="text-[10px] text-amber-600 mt-1">Assignment requires a linked calendar event. Delete and recreate this shoot to enable team assignment.</p>
-                  )}
                 </div>
 
                 <div>
@@ -583,6 +573,16 @@ export default function ShootDetailModal({ shoot: initialShoot, clientId, client
                   <div className="bg-surface-2/60 rounded-xl p-4">
                     <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Creative Notes</p>
                     <p className="text-sm text-text-primary leading-relaxed">{shoot.creative_notes}</p>
+                  </div>
+                )}
+
+                {canSeeCreativeNotes && (
+                  <div className="flex items-center gap-2 text-xs text-text-muted">
+                    <Users size={11} className="shrink-0" />
+                    {shoot.profiles?.full_name
+                      ? <span><span className="font-medium text-text-primary">{shoot.profiles.full_name}</span> assigned</span>
+                      : <span>No photographer assigned</span>
+                    }
                   </div>
                 )}
 
