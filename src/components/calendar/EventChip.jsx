@@ -8,6 +8,7 @@ export const EVENT_TYPES = {
   personal:    { label: 'Personal',    color: '#ea580c' },  // orange
   shoot:       { label: 'Shoot Day',   color: '#8b5cf6' },  // violet
   draft:       { label: 'Content',     color: '#f59e0b' },  // amber
+  project:     { label: 'Due Date',    color: '#0ea5e9' },  // sky blue
 }
 
 export default function EventChip({ event, onClick }) {

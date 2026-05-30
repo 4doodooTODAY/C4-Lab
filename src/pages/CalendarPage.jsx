@@ -110,8 +110,11 @@ export default function CalendarPage() {
 
   const { events: allEvents, loading, addEvent, updateEvent, deleteEvent } = useCalendarEvents(year, month)
 
-  // Load shoots for the current month — separate effect so a slow profile
-  // load doesn't block shoots from appearing
+  // ── Load shoots for the current month ──────────────────────────────────────
+  // NOTE: We intentionally do NOT filter by status in the DB query.
+  // PostgreSQL's != operator excludes NULL rows, so .neq('status','cancelled')
+  // would silently drop any shoot with a null status. We filter in JS instead,
+  // where null !== 'cancelled' correctly evaluates to true (shoot is visible).
   useEffect(() => {
     if (!user) return
 
@@ -122,38 +125,80 @@ export default function CalendarPage() {
     let q = supabase
       .from('shoots')
       .select('id, title, creative_notes, shoot_date, shoot_time, location, status, photographer_id, clients(name, contact_name)')
-      .neq('status', 'cancelled')
       .gte('shoot_date', monthStart)
       .lt('shoot_date', nextMonth)
 
-    // Non-admin: only show shoots assigned to this user
+    // Non-admin users only see shoots where they are the assigned photographer
     if (!isAdmin) q = q.eq('photographer_id', user.id)
 
     q.then(({ data, error }) => {
-      if (error) { console.error('Shoots fetch error:', error.message); return }
-      const shootEvents = (data || []).map((s) => {
-        const dateStr = s.shoot_date
-        const timeStr = s.shoot_time ? s.shoot_time.slice(0, 5) : '09:00'
-        const startAt = new Date(`${dateStr}T${timeStr}:00`)
-        const endAt   = new Date(startAt.getTime() + 4 * 60 * 60 * 1000)
-        return {
-          id:          `_shoot_${s.id}`,
-          title:       s.title,
-          event_type:  'shoot',
-          start_at:    startAt.toISOString(),
-          end_at:      endAt.toISOString(),
-          all_day:     !s.shoot_time,
-          location:    s.location,
-          _isShoot:    true,
-          _concept:    s.creative_notes,
-          _clientName: s.clients?.contact_name || s.clients?.name,
-        }
-      })
+      if (error) { console.error('[CalendarPage] Shoots fetch error:', error); return }
+      const shootEvents = (data || [])
+        .filter((s) => s.status !== 'cancelled')   // JS filter — safely handles null status
+        .map((s) => {
+          const timeStr = s.shoot_time ? s.shoot_time.slice(0, 5) : '09:00'
+          const startAt = new Date(`${s.shoot_date}T${timeStr}:00`)
+          const endAt   = new Date(startAt.getTime() + 4 * 60 * 60 * 1000)
+          return {
+            id:          `_shoot_${s.id}`,
+            title:       s.title,
+            event_type:  'shoot',
+            start_at:    startAt.toISOString(),
+            end_at:      endAt.toISOString(),
+            all_day:     !s.shoot_time,
+            location:    s.location,
+            _isShoot:    true,
+            _concept:    s.creative_notes,
+            _clientName: s.clients?.contact_name || s.clients?.name,
+          }
+        })
       setShoots(shootEvents)
     })
   }, [user, currentDate, isAdmin])
 
-  // Load drafts for the current month
+  // ── Load project due dates for the current month ─────────────────────────
+  // Admin: all projects with a due_date this month
+  // Creative/editor: only projects they are specifically assigned to (editor_id or creative_id)
+  useEffect(() => {
+    if (!user) return
+
+    const monthStr   = format(currentDate, 'yyyy-MM')
+    const monthStart = `${monthStr}-01`
+    const nextMonth  = format(addMonths(currentDate, 1), 'yyyy-MM-01')
+
+    let q = supabase
+      .from('projects')
+      .select('id, name, due_date, stage, editor_id, creative_id, client_id, clients(name, contact_name)')
+      .not('due_date', 'is', null)
+      .gte('due_date', monthStart)
+      .lt('due_date', nextMonth)
+
+    // Non-admin: only projects where this user is the assigned editor or creative
+    if (!isAdmin) {
+      q = q.or(`editor_id.eq.${user.id},creative_id.eq.${user.id}`)
+    }
+
+    q.then(({ data, error }) => {
+      if (error) { console.error('[CalendarPage] Projects fetch error:', error); return }
+      const projectEvents = (data || []).map((p) => {
+        const startAt = new Date(`${p.due_date}T09:00:00`)
+        return {
+          id:          `_project_${p.id}`,
+          title:       p.name,
+          event_type:  'project',
+          start_at:    startAt.toISOString(),
+          end_at:      startAt.toISOString(),
+          all_day:     true,
+          _isProject:  true,
+          _stage:      p.stage,
+          _clientName: p.clients?.contact_name || p.clients?.name,
+        }
+      })
+      setProjects(projectEvents)
+    })
+  }, [user, currentDate, isAdmin])
+
+  // ── Load drafts for the current month ────────────────────────────────────
   useEffect(() => {
     if (!user) return
 
