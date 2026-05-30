@@ -31,8 +31,9 @@ function fileType(name = '') {
 
 // ── Storage bar ────────────────────────────────────────────────────────────────
 function StorageBar({ trackedBytes, r2Bytes }) {
-  const pct = r2Bytes > 0 ? Math.min(100, (trackedBytes / r2Bytes) * 100) : 0
+  const pct  = r2Bytes > 0 ? Math.min(100, (trackedBytes / r2Bytes) * 100) : 0
   const r2GB = r2Bytes / 1_073_741_824
+  const diff = r2Bytes - trackedBytes
 
   return (
     <div className="card p-5 mb-6">
@@ -40,14 +41,16 @@ function StorageBar({ trackedBytes, r2Bytes }) {
         <div>
           <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-0.5">R2 Storage</p>
           <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-text-primary">{fmtBytes(trackedBytes)}</span>
-            <span className="text-sm text-text-muted">tracked of {fmtBytes(r2Bytes)} total</span>
+            <span className="text-2xl font-bold text-text-primary">{fmtBytes(r2Bytes)}</span>
+            <span className="text-sm text-text-muted">total in Cloudflare R2</span>
           </div>
         </div>
-        <div className="flex items-center gap-1.5 text-xs text-text-muted bg-surface-2 px-3 py-1.5 rounded-full">
-          <Info size={11} />
-          Revision videos add ~{fmtBytes(r2Bytes - trackedBytes)}
-        </div>
+        {diff > 0 && (
+          <div className="flex items-center gap-1.5 text-xs text-text-muted bg-surface-2 px-3 py-1.5 rounded-full">
+            <Info size={11} />
+            {fmtBytes(diff)} in finished videos
+          </div>
+        )}
       </div>
       <div className="h-2 bg-surface-2 rounded-full overflow-hidden">
         <div
@@ -56,8 +59,8 @@ function StorageBar({ trackedBytes, r2Bytes }) {
         />
       </div>
       <div className="flex justify-between mt-1.5">
-        <span className="text-[10px] text-text-muted">Footage &amp; uploads</span>
-        <span className="text-[10px] text-text-muted">{r2GB.toFixed(2)} GB in Cloudflare R2</span>
+        <span className="text-[10px] text-text-muted">{fmtBytes(trackedBytes)} footage &amp; uploads</span>
+        <span className="text-[10px] text-text-muted">{r2GB.toFixed(2)} GB total</span>
       </div>
     </div>
   )
@@ -246,8 +249,6 @@ function FinishedRow({ video }) {
 // ── Main page ─────────────────────────────────────────────────────────────────
 const SORT_OPTIONS = ['Newest', 'Oldest', 'Largest', 'Smallest', 'Name']
 const TYPE_OPTIONS = ['All types', 'Video', 'Image', 'Other']
-// Known R2 total from Cloudflare dashboard — update when it changes
-const R2_TOTAL_BYTES = 4.01 * 1_073_741_824
 
 export default function FileSystem() {
   const { isAdmin, profile } = useAuth()
@@ -266,6 +267,7 @@ export default function FileSystem() {
   const [deleting,       setDeleting]       = useState(false)
   const [deleteError,    setDeleteError]    = useState('')
   const [toast,          setToast]          = useState(null)
+  const [r2Total,        setR2Total]        = useState(null) // live from R2
 
   const isCreative = profile?.role === 'creative' || profile?.role === 'editor'
 
@@ -335,6 +337,30 @@ export default function FileSystem() {
       created_at:      r.created_at,
       file_name:       `${r.projects?.name || 'project'} — Final v${r.revision_number}.mp4`,
     })))
+
+    // Fetch live R2 total (admin only — edge function lists all objects)
+    if (isAdmin) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        const r2Res = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/r2-list`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type':  'application/json',
+              'Authorization': `Bearer ${session?.access_token}`,
+              'apikey':        import.meta.env.VITE_SUPABASE_ANON_KEY,
+            },
+          }
+        )
+        if (r2Res.ok) {
+          const { totalSize } = await r2Res.json()
+          if (typeof totalSize === 'number') setR2Total(totalSize)
+        }
+      } catch (e) {
+        console.warn('[FileSystem] r2-list fetch error:', e)
+      }
+    }
 
     setLoading(false)
   }
@@ -446,8 +472,8 @@ export default function FileSystem() {
       ) : (
         <>
           {/* Storage bar — admin only */}
-          {isAdmin && (
-            <StorageBar trackedBytes={totalSize} r2Bytes={R2_TOTAL_BYTES} />
+          {isAdmin && r2Total !== null && (
+            <StorageBar trackedBytes={totalSize} r2Bytes={r2Total} />
           )}
 
           {/* Stats row */}
