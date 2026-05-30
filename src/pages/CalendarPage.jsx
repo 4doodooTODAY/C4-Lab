@@ -110,44 +110,32 @@ export default function CalendarPage() {
 
   const { events: allEvents, loading, addEvent, updateEvent, deleteEvent } = useCalendarEvents(year, month)
 
-  // Load shoots + drafts for the current month
+  // Load shoots for the current month — separate effect so a slow profile
+  // load doesn't block shoots from appearing
   useEffect(() => {
-    if (!user || !profile) return
-    setAuxLoading(true)
+    if (!user) return
 
-    const monthStr    = format(currentDate, 'yyyy-MM')
-    const monthStart  = `${monthStr}-01`
-    const nextMonth   = format(addMonths(currentDate, 1), 'yyyy-MM-01')
+    const monthStr   = format(currentDate, 'yyyy-MM')
+    const monthStart = `${monthStr}-01`
+    const nextMonth  = format(addMonths(currentDate, 1), 'yyyy-MM-01')
 
-    Promise.all([
-      // Shoots in this month — non-admins only see shoots they're assigned to
-      (() => {
-        let q = supabase
-          .from('shoots')
-          .select('id, title, description, shoot_date, shoot_time, location, status, photographer_id, clients(name, contact_name)')
-          .or('status.is.null,status.neq.cancelled')
-          .gte('shoot_date', monthStart)
-          .lt('shoot_date', nextMonth)
-        if (!isAdmin) q = q.eq('photographer_id', user?.id)
-        return q
-      })(),
+    let q = supabase
+      .from('shoots')
+      .select('id, title, creative_notes, shoot_date, shoot_time, location, status, photographer_id, clients(name, contact_name)')
+      .neq('status', 'cancelled')
+      .gte('shoot_date', monthStart)
+      .lt('shoot_date', nextMonth)
 
-      // Drafts with target_date in this month
-      supabase
-        .from('content_drafts')
-        .select('id, type, title, concept, target_date, status, clients(name, contact_name)')
-        .not('status', 'in', '("scrapped")')
-        .gte('target_date', monthStart)
-        .lt('target_date', nextMonth),
+    // Non-admin: only show shoots assigned to this user
+    if (!isAdmin) q = q.eq('photographer_id', user.id)
 
-    ]).then(([shootsRes, draftsRes]) => {
-      const projectsRes = { data: [] }
-      // Convert shoots to synthetic calendar events
-      const shootEvents = (shootsRes.data || []).map((s) => {
-        const dateStr  = s.shoot_date
-        const timeStr  = s.shoot_time ? s.shoot_time.slice(0, 5) : '09:00' // kept as HH:MM for Date parsing only
-        const startAt  = new Date(`${dateStr}T${timeStr}:00`)
-        const endAt    = new Date(startAt.getTime() + 4 * 60 * 60 * 1000)
+    q.then(({ data, error }) => {
+      if (error) { console.error('Shoots fetch error:', error.message); return }
+      const shootEvents = (data || []).map((s) => {
+        const dateStr = s.shoot_date
+        const timeStr = s.shoot_time ? s.shoot_time.slice(0, 5) : '09:00'
+        const startAt = new Date(`${dateStr}T${timeStr}:00`)
+        const endAt   = new Date(startAt.getTime() + 4 * 60 * 60 * 1000)
         return {
           id:          `_shoot_${s.id}`,
           title:       s.title,
@@ -157,51 +145,48 @@ export default function CalendarPage() {
           all_day:     !s.shoot_time,
           location:    s.location,
           _isShoot:    true,
-          _concept:    s.description,
+          _concept:    s.creative_notes,
           _clientName: s.clients?.contact_name || s.clients?.name,
         }
       })
-
-      // Convert drafts to synthetic calendar events
-      const draftEvents = (draftsRes.data || []).map((d) => {
-        const startAt = new Date(`${d.target_date}T12:00:00`)
-        return {
-          id:          `_draft_${d.id}`,
-          title:       d.title || `${(d.type || 'Content').charAt(0).toUpperCase() + (d.type || 'content').slice(1)} Draft`,
-          event_type:  'draft',
-          start_at:    startAt.toISOString(),
-          end_at:      startAt.toISOString(),
-          all_day:     true,
-          _isDraft:    true,
-          _type:       d.type,
-          _concept:    d.concept,
-          _status:     d.status,
-          _clientName: d.clients?.contact_name || d.clients?.name,
-        }
-      })
-
-      const projectEvents = (projectsRes.data || []).map((p) => {
-        const startAt = new Date(`${p.shoot_date}T09:00:00`)
-        return {
-          id:          `_project_${p.id}`,
-          title:       p.name,
-          event_type:  'project',
-          start_at:    startAt.toISOString(),
-          end_at:      startAt.toISOString(),
-          all_day:     true,
-          location:    p.location,
-          _isProject:  true,
-          _stage:      p.stage,
-          _clientName: p.clients?.contact_name || p.clients?.name,
-        }
-      })
-
       setShoots(shootEvents)
-      setDrafts(draftEvents)
-      setProjects(projectEvents)
-      setAuxLoading(false)
     })
-  }, [user, profile, currentDate, isAdmin])
+  }, [user, currentDate, isAdmin])
+
+  // Load drafts for the current month
+  useEffect(() => {
+    if (!user) return
+
+    const monthStr   = format(currentDate, 'yyyy-MM')
+    const monthStart = `${monthStr}-01`
+    const nextMonth  = format(addMonths(currentDate, 1), 'yyyy-MM-01')
+
+    supabase
+      .from('content_drafts')
+      .select('id, type, title, concept, target_date, status, clients(name, contact_name)')
+      .not('status', 'in', '("scrapped")')
+      .gte('target_date', monthStart)
+      .lt('target_date', nextMonth)
+      .then(({ data }) => {
+        const draftEvents = (data || []).map((d) => {
+          const startAt = new Date(`${d.target_date}T12:00:00`)
+          return {
+            id:          `_draft_${d.id}`,
+            title:       d.title || `${(d.type || 'Content').charAt(0).toUpperCase() + (d.type || 'content').slice(1)} Draft`,
+            event_type:  'draft',
+            start_at:    startAt.toISOString(),
+            end_at:      startAt.toISOString(),
+            all_day:     true,
+            _isDraft:    true,
+            _type:       d.type,
+            _concept:    d.concept,
+            _status:     d.status,
+            _clientName: d.clients?.contact_name || d.clients?.name,
+          }
+        })
+        setDrafts(draftEvents)
+      })
+  }, [user, currentDate])
 
   // Filter real events by role, and strip out shoot-linked calendar events.
   // Shoots are already shown as synthetic events from the shoots table —
