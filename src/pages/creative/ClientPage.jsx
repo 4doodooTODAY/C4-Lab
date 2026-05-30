@@ -4,11 +4,10 @@ import {
   ArrowLeft, Camera, FolderKanban, HardDrive, Loader2,
   CalendarDays, MapPin, Film, ExternalLink,
   ChevronRight, Building2, FileVideo, Image, File,
-  FileText, Link as LinkIcon, Upload, FolderOpen, Folder, Check,
+  Upload, Check,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useShoots } from '../../hooks/useShoots'
-import { useContentDrafts } from '../../hooks/useContentDrafts'
 import { format, parseISO, isBefore, startOfDay } from 'date-fns'
 import { fmtTime } from '../../lib/time'
 import { forceDownload } from '../../lib/r2'
@@ -333,117 +332,9 @@ function FilesTab({ clientId }) {
   )
 }
 
-// ── Concepts Tab (read-only view of content drafts) ───────────────────────────
-const DRAFT_TYPE_LABELS = {
-  post: 'Post', reel: 'Reel', story: 'Story', carousel: 'Carousel', other: 'Other',
-}
-const DRAFT_STATUS_COLORS = {
-  pending_client: 'bg-amber-50 text-amber-700',
-  approved:       'bg-green-50 text-green-700',
-  scrapped:       'bg-gray-100 text-gray-500',
-}
-const DRAFT_STATUS_LABELS = {
-  pending_client: 'Awaiting Client',
-  approved:       'Approved',
-  scrapped:       'Scrapped',
-}
-
-function ConceptsTab({ clientId }) {
-  const { drafts, loading } = useContentDrafts(clientId)
-  const [expandedDraft, setExpandedDraft] = useState(null)
-  // Hide approved (moved to projects) and scrapped — same logic as admin side
-  const active = drafts.filter((d) => d.status !== 'scrapped' && d.status !== 'approved')
-
-  if (loading) return <div className="flex justify-center py-10"><Loader2 size={20} className="animate-spin text-text-muted" /></div>
-
-  if (!active.length) return (
-    <div className="card p-10 text-center">
-      <FileText size={32} className="mx-auto text-text-muted/30 mb-3" />
-      <p className="text-sm font-semibold text-text-primary">No concepts yet</p>
-      <p className="text-sm text-text-muted mt-1">The admin will create content concepts for this client.</p>
-    </div>
-  )
-
-  return (
-    <div className="space-y-3">
-      {active.map((d) => {
-        const isExpanded = expandedDraft === d.id
-        return (
-          <div
-            key={d.id}
-            className="card p-4 cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => setExpandedDraft(isExpanded ? null : d.id)}
-          >
-            <div className="flex items-start justify-between gap-3 mb-2">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-surface-3 text-text-muted">
-                  {DRAFT_TYPE_LABELS[d.type] || d.type || 'Draft'}
-                </span>
-                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${DRAFT_STATUS_COLORS[d.status] || 'bg-surface-2 text-text-muted'}`}>
-                  {DRAFT_STATUS_LABELS[d.status] || d.status}
-                </span>
-                {d.target_date && (
-                  <span className="text-[10px] text-text-muted flex items-center gap-1">
-                    <CalendarDays size={9} /> {format(parseISO(d.target_date), 'MMM d, yyyy')}
-                  </span>
-                )}
-              </div>
-              <ChevronRight size={14} className={`text-text-muted shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
-            </div>
-            {d.title && <p className="text-sm font-semibold text-text-primary">{d.title}</p>}
-            {!isExpanded && d.concept && (
-              <p className="text-xs text-text-secondary mt-1 leading-relaxed line-clamp-2">{d.concept}</p>
-            )}
-            {isExpanded && (
-              <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
-                {d.concept && (
-                  <p className="text-xs text-text-secondary leading-relaxed whitespace-pre-wrap">{d.concept}</p>
-                )}
-                {d.shoots?.title && (
-                  <p className="text-xs text-text-muted flex items-center gap-1">
-                    <Camera size={10} /> Linked shoot: {d.shoots.title}
-                  </p>
-                )}
-                {d.inspiration_links?.length > 0 && (
-                  <div className="flex flex-col gap-1 mt-1">
-                    <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wide">Reference Links</p>
-                    {d.inspiration_links.map((link, i) => (
-                      <a key={i} href={link} target="_blank" rel="noreferrer"
-                        className="text-xs text-accent hover:underline flex items-center gap-1 break-all">
-                        <LinkIcon size={10} /> {link}
-                      </a>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-            {!isExpanded && d.shoots?.title && (
-              <p className="text-xs text-text-muted mt-1.5 flex items-center gap-1">
-                <Camera size={10} /> {d.shoots.title}
-              </p>
-            )}
-            {!isExpanded && d.inspiration_links?.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-1.5">
-                {d.inspiration_links.map((link, i) => (
-                  <a key={i} href={link} target="_blank" rel="noreferrer"
-                    className="text-[10px] text-accent hover:underline flex items-center gap-0.5"
-                    onClick={(e) => e.stopPropagation()}>
-                    <LinkIcon size={9} /> ref {i + 1}
-                  </a>
-                ))}
-              </div>
-            )}
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
 // ── Main Page ──────────────────────────────────────────────────────────────────
 const TABS = [
   { id: 'shoots',   label: 'Shoots',   icon: Camera },
-  { id: 'concepts', label: 'Concepts', icon: FileText },
   { id: 'projects', label: 'Projects', icon: FolderKanban },
   { id: 'files',    label: 'Files',    icon: HardDrive },
 ]
@@ -494,7 +385,6 @@ export default function CreativeClientPage() {
       </div>
 
       {tab === 'shoots'   && <ShootsTab   clientId={id} clientName={client?.name} />}
-      {tab === 'concepts' && <ConceptsTab clientId={id} />}
       {tab === 'projects' && <ProjectsTab clientId={id} />}
       {tab === 'files'    && <FilesTab    clientId={id} />}
     </div>

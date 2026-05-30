@@ -2,9 +2,9 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   ArrowLeft, Loader2, Upload, Check, Film, StickyNote, Send,
-  Download, FileVideo, CalendarDays, MapPin, Eye,
+  Download, FileVideo, Eye,
   ChevronRight, X, MessageSquare, Users, ExternalLink,
-  AlertCircle, CheckCircle2, Clock, Zap, Plus, Camera,
+  AlertCircle, CheckCircle2, Clock, Zap, Camera,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
@@ -466,16 +466,7 @@ function RevisionCommentsList({ revisionId }) {
 
 // ── Project Overview Card ─────────────────────────────────────────────────────
 
-function ProjectOverviewCard({
-  project, projectShoots, creativeProfile, editorProfile,
-  // optional shoot management (passed when the viewer is a creative/admin)
-  canManageShoots,
-  showAddShoot, setShowAddShoot,
-  newShootDate, setNewShootDate,
-  newShootTime, setNewShootTime,
-  newShootLocation, setNewShootLocation,
-  addingShoot, onAddShoot, onDeleteShoot,
-}) {
+function ProjectOverviewCard({ project, creativeProfile, editorProfile }) {
   return (
     <div className="bg-white rounded-2xl border border-border p-5">
       <h2 className="text-sm font-semibold text-text-primary mb-4">Project Overview</h2>
@@ -491,121 +482,6 @@ function ProjectOverviewCard({
             {project.clients.contact_name && project.clients.contact_name !== project.clients.name && (
               <p className="text-xs text-text-muted">{project.clients.contact_name}</p>
             )}
-          </div>
-        )}
-
-        {/* Shoot dates from project_shoots */}
-        {(projectShoots.length > 0 || canManageShoots) && (
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <p className="text-xs text-text-muted flex items-center gap-1">
-                <CalendarDays size={11} /> Shoot Date{projectShoots.length !== 1 ? 's' : ''}
-              </p>
-              {canManageShoots && !showAddShoot && (
-                <button
-                  onClick={() => setShowAddShoot(true)}
-                  className="text-[11px] text-accent hover:underline flex items-center gap-0.5"
-                >
-                  <Plus size={10} /> Add
-                </button>
-              )}
-            </div>
-
-            <div className="space-y-1">
-              {projectShoots.map((shoot) => (
-                <div key={shoot.id} className="flex items-center justify-between gap-2 group">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-semibold text-text-primary">
-                      {shoot.shoot_date ? format(parseISO(shoot.shoot_date), 'MMMM d, yyyy') : '—'}
-                    </p>
-                    {shoot.shoot_time && (
-                      <p className="text-xs text-text-muted">at {shoot.shoot_time.slice(0, 5)}</p>
-                    )}
-                    {shoot.location && (
-                      <p className="text-xs text-text-muted flex items-center gap-0.5">
-                        <MapPin size={10} /> {shoot.location}
-                      </p>
-                    )}
-                    {shoot.status && shoot.status !== 'scheduled' && (
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                        shoot.status === 'completed' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'
-                      }`}>{shoot.status}</span>
-                    )}
-                  </div>
-                  {canManageShoots && (
-                    <button
-                      onClick={() => onDeleteShoot(shoot.id)}
-                      className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-red-500 transition-opacity"
-                      title="Remove shoot"
-                    >
-                      <X size={12} />
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {/* Inline add shoot form */}
-            {canManageShoots && showAddShoot && (
-              <div className="mt-3 bg-surface-2 rounded-xl p-3 space-y-2">
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[11px] text-text-muted mb-1 block">Date *</label>
-                    <input
-                      type="date"
-                      value={newShootDate}
-                      onChange={(e) => setNewShootDate(e.target.value)}
-                      className="input text-xs w-full"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] text-text-muted mb-1 block">Time</label>
-                    <input
-                      type="time"
-                      value={newShootTime}
-                      onChange={(e) => setNewShootTime(e.target.value)}
-                      className="input text-xs w-full"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-[11px] text-text-muted mb-1 block">Location</label>
-                  <input
-                    type="text"
-                    value={newShootLocation}
-                    onChange={(e) => setNewShootLocation(e.target.value)}
-                    placeholder="Optional"
-                    className="input text-xs w-full"
-                  />
-                </div>
-                <div className="flex gap-2 pt-1">
-                  <button
-                    onClick={onAddShoot}
-                    disabled={!newShootDate || addingShoot}
-                    className="btn-primary text-xs flex-1 flex items-center justify-center gap-1 disabled:opacity-50"
-                  >
-                    {addingShoot ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />}
-                    Save Shoot
-                  </button>
-                  <button
-                    onClick={() => { setShowAddShoot(false); setNewShootDate(''); setNewShootTime(''); setNewShootLocation('') }}
-                    className="btn-secondary text-xs px-3"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Location (project-level fallback) */}
-        {projectShoots.length === 0 && !canManageShoots && project.location && (
-          <div>
-            <p className="text-xs text-text-muted flex items-center gap-1 mb-1">
-              <MapPin size={11} /> Location
-            </p>
-            <p className="text-sm font-semibold text-text-primary">{project.location}</p>
           </div>
         )}
 
@@ -2039,7 +1915,6 @@ export default function ProjectWorkflow() {
   const navigate    = useNavigate()
 
   const [project,        setProject]        = useState(null)
-  const [projectShoots,  setProjectShoots]  = useState([])
   const [uploads,        setUploads]        = useState([])
   const [shootNotes,     setShootNotes]     = useState([])
   const [revisions,      setRevisions]      = useState([])
@@ -2049,13 +1924,6 @@ export default function ProjectWorkflow() {
   const [projectEditorIds, setProjectEditorIds] = useState([])
   const [loading,        setLoading]        = useState(true)
   const [error,          setError]          = useState('')
-
-  // Shoot scheduling (creative can add/delete shoots for their project)
-  const [showAddShoot,     setShowAddShoot]     = useState(false)
-  const [newShootDate,     setNewShootDate]     = useState('')
-  const [newShootTime,     setNewShootTime]     = useState('')
-  const [newShootLocation, setNewShootLocation] = useState('')
-  const [addingShoot,      setAddingShoot]      = useState(false)
 
   const fetchAll = async () => {
     if (!id) return
@@ -2070,8 +1938,7 @@ export default function ProjectWorkflow() {
       if (projErr) throw projErr
 
       // 2. Fetch everything else in parallel
-      const [shootsRes, uploadsRes, shootUploadsRes, notesRes, revsRes, editorsRes] = await Promise.all([
-        supabase.from('project_shoots').select('*').eq('project_id', id).order('shoot_date'),
+      const [uploadsRes, shootUploadsRes, notesRes, revsRes, editorsRes] = await Promise.all([
         supabase.from('shoot_uploads').select('*, profiles(id, full_name, role)').eq('project_id', id).order('created_at'),
         projData.shoot_id
           ? supabase.from('shoot_uploads').select('*, profiles(id, full_name, role)').eq('shoot_id', projData.shoot_id).order('created_at')
@@ -2125,7 +1992,6 @@ export default function ProjectWorkflow() {
       })
 
       setProject(projData)
-      setProjectShoots(shootsRes.data || [])
       setUploads(dedupedUploads)
       setShootNotes(notesRes.data || [])
       setRevisions(revData)
@@ -2140,88 +2006,6 @@ export default function ProjectWorkflow() {
   }
 
   useEffect(() => { fetchAll() }, [id])
-
-  const fetchShoots = () =>
-    supabase.from('project_shoots').select('*').eq('project_id', id).order('shoot_date')
-      .then(({ data }) => setProjectShoots(data || []))
-
-  const handleAddShoot = async () => {
-    if (!newShootDate || !project) return
-    setAddingShoot(true)
-    try {
-      const shootTitle = `${project.name} — Shoot`
-      const timeStr    = newShootTime || '09:00'
-      const startAt    = new Date(`${newShootDate}T${timeStr}:00`)
-      const endAt      = new Date(startAt.getTime() + 2 * 60 * 60 * 1000)
-
-      // 1. Create calendar event
-      const { data: { user: authUser } } = await supabase.auth.getUser()
-      const { data: evtData } = await supabase.from('calendar_events').insert({
-        title:      shootTitle,
-        event_type: 'in_person',
-        start_at:   startAt.toISOString(),
-        end_at:     endAt.toISOString(),
-        all_day:    false,
-        location:   newShootLocation || null,
-        created_by: authUser.id,
-      }).select().single()
-
-      // 2. Insert the project shoot, linking back to the calendar event
-      await supabase.from('project_shoots').insert({
-        project_id:        id,
-        shoot_date:        newShootDate,
-        shoot_time:        newShootTime  || null,
-        location:          newShootLocation || null,
-        title:             shootTitle,
-        status:            'scheduled',
-        calendar_event_id: evtData?.id || null,
-      })
-
-      // 3. Add creative, editor, and client to calendar_event_members
-      if (evtData) {
-        const memberIds = [project.creative_id, project.editor_id].filter(Boolean)
-
-        if (project.clients?.id) {
-          const { data: clientRow } = await supabase
-            .from('clients')
-            .select('profile_id')
-            .eq('id', project.clients.id)
-            .maybeSingle()
-          if (clientRow?.profile_id) memberIds.push(clientRow.profile_id)
-        }
-
-        if (memberIds.length) {
-          await supabase.from('calendar_event_members').insert(
-            memberIds.map((profile_id) => ({ event_id: evtData.id, profile_id }))
-          )
-        }
-      }
-
-      setNewShootDate('')
-      setNewShootTime('')
-      setNewShootLocation('')
-      setShowAddShoot(false)
-      fetchShoots()
-    } finally {
-      setAddingShoot(false)
-    }
-  }
-
-  const handleDeleteShoot = async (shootId) => {
-    const { data: shootRow } = await supabase
-      .from('project_shoots')
-      .select('calendar_event_id')
-      .eq('id', shootId)
-      .maybeSingle()
-
-    await supabase.from('project_shoots').delete().eq('id', shootId)
-
-    if (shootRow?.calendar_event_id) {
-      await supabase.from('calendar_events').delete().eq('id', shootRow.calendar_event_id)
-    }
-
-    fetchShoots()
-  }
 
   if (loading) {
     return (
@@ -2316,21 +2100,8 @@ export default function ProjectWorkflow() {
           {/* 1. Project Overview */}
           <ProjectOverviewCard
             project={project}
-            projectShoots={projectShoots}
             creativeProfile={creativeProfile}
             editorProfile={editorProfile}
-            canManageShoots={isCreative}
-            showAddShoot={showAddShoot}
-            setShowAddShoot={setShowAddShoot}
-            newShootDate={newShootDate}
-            setNewShootDate={setNewShootDate}
-            newShootTime={newShootTime}
-            setNewShootTime={setNewShootTime}
-            newShootLocation={newShootLocation}
-            setNewShootLocation={setNewShootLocation}
-            addingShoot={addingShoot}
-            onAddShoot={handleAddShoot}
-            onDeleteShoot={handleDeleteShoot}
           />
 
           {/* Admin Review Gate — shown to admin when first edit is pending their approval */}

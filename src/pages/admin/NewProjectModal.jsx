@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { createProject } from '../../hooks/useProjects'
 
-export default function NewProjectModal({ onClose, onCreated, prefillDate = null }) {
+export default function NewProjectModal({ onClose, onCreated }) {
   const { user, isAdmin } = useAuth()
   const [clients,       setClients]    = useState([])
   const [clientTeam,    setClientTeam] = useState([])
@@ -13,7 +13,6 @@ export default function NewProjectModal({ onClose, onCreated, prefillDate = null
     client_id: '',
     media_type: 'video',
     admin_review_required: false,
-    shoot_date: prefillDate || '',
   })
   const [selectedEditor, setSelectedEditor] = useState('')
   const [saving, setSaving] = useState(false)
@@ -69,7 +68,6 @@ export default function NewProjectModal({ onClose, onCreated, prefillDate = null
         editor_id:             selectedEditor || null,
         status:                'active',
         media_type:            form.media_type,
-        shoot_date:            form.shoot_date || null,
       }
       const row = await createProject(payload)
       onCreated(row.id)
@@ -140,17 +138,6 @@ export default function NewProjectModal({ onClose, onCreated, prefillDate = null
                 </button>
               ))}
             </div>
-          </div>
-
-          {/* Shoot date */}
-          <div>
-            <label className="label">Shoot Date <span className="text-text-muted font-normal">(optional)</span></label>
-            <input
-              type="date"
-              className="input"
-              value={form.shoot_date}
-              onChange={set('shoot_date')}
-            />
           </div>
 
           {/* Team — only after client selected */}
