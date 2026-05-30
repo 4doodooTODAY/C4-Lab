@@ -1,15 +1,16 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
   HardDrive, Folder, FolderOpen, Film, Image, File as FileIcon,
-  ExternalLink, Trash2, Loader2, ChevronRight, Search,
-  RefreshCw, Camera, Building2, AlertCircle, X, Trophy, Download,
+  ExternalLink, Trash2, Loader2, Search, RefreshCw, Camera,
+  Building2, AlertCircle, X, Download, ChevronRight, ChevronDown,
+  Filter, SortAsc, Eye, Info,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
-import { format, formatDistanceToNow } from 'date-fns'
-import { parseISO } from 'date-fns'
+import { useAuth } from '../../contexts/AuthContext'
+import { format, formatDistanceToNow, parseISO } from 'date-fns'
 import { forceDownload } from '../../lib/r2'
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Helpers ────────────────────────────────────────────────────────────────────
 function fmtBytes(b) {
   if (!b) return '—'
   if (b >= 1_073_741_824) return (b / 1_073_741_824).toFixed(2) + ' GB'
@@ -22,49 +23,72 @@ function totalBytes(files) {
 }
 
 function fileType(name = '') {
-  const ext = name.split('.').pop()?.toLowerCase()
-  if (['mp4','mov','avi','mkv','webm','m4v'].includes(ext)) return 'video'
-  if (['jpg','jpeg','png','gif','webp','heic','raw','cr2','arw'].includes(ext)) return 'image'
+  const ext = name.split('.').pop()?.toLowerCase() || ''
+  if (['mp4','mov','avi','mkv','webm','m4v','mts','mxf'].includes(ext)) return 'video'
+  if (['jpg','jpeg','png','gif','webp','heic','heif','raw','cr2','cr3','arw','nef','dng','tiff','tif'].includes(ext)) return 'image'
   return 'other'
 }
 
-function FileTypeIcon({ name, size = 14 }) {
-  const t = fileType(name)
-  if (t === 'video') return <Film size={size} className="text-blue-500" />
-  if (t === 'image') return <Image size={size} className="text-purple-500" />
-  return <FileIcon size={size} className="text-gray-400" />
+// ── Storage bar ────────────────────────────────────────────────────────────────
+function StorageBar({ trackedBytes, r2Bytes }) {
+  const pct = r2Bytes > 0 ? Math.min(100, (trackedBytes / r2Bytes) * 100) : 0
+  const r2GB = r2Bytes / 1_073_741_824
+
+  return (
+    <div className="card p-5 mb-6">
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-0.5">R2 Storage</p>
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl font-bold text-text-primary">{fmtBytes(trackedBytes)}</span>
+            <span className="text-sm text-text-muted">tracked of {fmtBytes(r2Bytes)} total</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs text-text-muted bg-surface-2 px-3 py-1.5 rounded-full">
+          <Info size={11} />
+          Revision videos add ~{fmtBytes(r2Bytes - trackedBytes)}
+        </div>
+      </div>
+      <div className="h-2 bg-surface-2 rounded-full overflow-hidden">
+        <div
+          className="h-full bg-gradient-to-r from-accent to-accent/70 rounded-full transition-all duration-500"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <div className="flex justify-between mt-1.5">
+        <span className="text-[10px] text-text-muted">Footage &amp; uploads</span>
+        <span className="text-[10px] text-text-muted">{r2GB.toFixed(2)} GB in Cloudflare R2</span>
+      </div>
+    </div>
+  )
 }
 
-function FileTypeBg({ name }) {
-  const t = fileType(name)
-  if (t === 'video') return 'bg-blue-50'
-  if (t === 'image') return 'bg-purple-50'
-  return 'bg-gray-100'
-}
-
-// ── Delete confirmation ───────────────────────────────────────────────────────
-function DeleteConfirm({ file, onConfirm, onCancel, deleting }) {
+// ── Delete confirmation ────────────────────────────────────────────────────────
+function DeleteModal({ file, onConfirm, onCancel, deleting, error }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onCancel} />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 z-10">
-        <div className="w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
-          <Trash2 size={22} className="text-red-500" />
+        <div className="w-11 h-11 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
+          <Trash2 size={20} className="text-red-500" />
         </div>
         <h2 className="text-base font-bold text-text-primary text-center mb-1">Delete file?</h2>
-        <p className="text-xs text-text-muted text-center mb-1">{file.file_name}</p>
+        <p className="text-xs text-text-muted text-center mb-1 break-all px-2">{file.file_name}</p>
         <p className="text-xs text-red-500 text-center mb-5">
-          This permanently deletes the file from R2 storage and the database. Cannot be undone.
+          Permanently deletes from Cloudflare R2 and this database. Cannot be undone.
         </p>
+        {error && (
+          <p className="text-xs text-red-500 text-center mb-3 bg-red-50 rounded-lg px-3 py-2">{error}</p>
+        )}
         <div className="flex gap-3">
           <button onClick={onCancel} disabled={deleting} className="flex-1 btn-secondary">Cancel</button>
           <button
             onClick={onConfirm}
             disabled={deleting}
-            className="flex-1 py-2 px-4 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            className="flex-1 py-2 px-4 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
           >
             {deleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
-            Delete permanently
+            {deleting ? 'Deleting…' : 'Delete permanently'}
           </button>
         </div>
       </div>
@@ -73,186 +97,300 @@ function DeleteConfirm({ file, onConfirm, onCancel, deleting }) {
 }
 
 // ── File row ──────────────────────────────────────────────────────────────────
-function FileRow({ file, onDelete }) {
+function FileRow({ file, onDelete, canDelete }) {
+  const t = fileType(file.file_name)
+  const iconBg = t === 'video' ? 'bg-blue-50' : t === 'image' ? 'bg-purple-50' : 'bg-gray-100'
+  const Icon   = t === 'video' ? Film : t === 'image' ? Image : FileIcon
+  const iconCl = t === 'video' ? 'text-blue-500' : t === 'image' ? 'text-purple-500' : 'text-gray-400'
+
   return (
-    <div className="flex items-center gap-3 px-4 py-3 hover:bg-surface-2/30 transition-colors group">
-      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${FileTypeBg({ name: file.file_name })}`}>
-        <FileTypeIcon name={file.file_name} size={13} />
+    <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-surface-2/30 transition-colors group border-b border-border/40 last:border-0">
+      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${iconBg}`}>
+        <Icon size={13} className={iconCl} />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm text-text-primary font-medium truncate">{file.file_name}</p>
-        <p className="text-xs text-text-muted">
+        <p className="text-sm text-text-primary font-medium truncate leading-tight">{file.file_name}</p>
+        <p className="text-[11px] text-text-muted leading-tight mt-0.5">
           {fmtBytes(file.file_size)}
-          {file.uploader && ` · by ${file.uploader}`}
+          {file.uploader && ` · ${file.uploader}`}
           {file.created_at && ` · ${formatDistanceToNow(new Date(file.created_at), { addSuffix: true })}`}
         </p>
       </div>
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
         {file.file_url && (
-          <a
-            href={file.file_url}
-            target="_blank"
-            rel="noreferrer"
-            className="p-1.5 text-text-muted hover:text-accent transition-colors rounded-lg hover:bg-accent/5"
-            title="Open file"
-          >
-            <ExternalLink size={13} />
-          </a>
+          <>
+            <a href={file.file_url} target="_blank" rel="noreferrer"
+              className="p-1.5 text-text-muted hover:text-accent transition-colors rounded-lg hover:bg-accent/5" title="Open in new tab">
+              <ExternalLink size={12} />
+            </a>
+            <button onClick={() => forceDownload(file.file_url, file.file_name)}
+              className="p-1.5 text-text-muted hover:text-accent transition-colors rounded-lg hover:bg-accent/5" title="Download">
+              <Download size={12} />
+            </button>
+          </>
         )}
-        <button
-          onClick={() => onDelete(file)}
-          className="p-1.5 text-text-muted hover:text-red-500 transition-colors rounded-lg hover:bg-red-50"
-          title="Delete file"
-        >
-          <Trash2 size={13} />
+        {canDelete && (
+          <button onClick={() => onDelete(file)}
+            className="p-1.5 text-text-muted hover:text-red-500 transition-colors rounded-lg hover:bg-red-50" title="Delete file">
+            <Trash2 size={12} />
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Shoot group inside client folder ─────────────────────────────────────────
+function ShootGroup({ label, date, files, onDelete, canDelete, defaultOpen = true }) {
+  const [open, setOpen] = useState(defaultOpen)
+  const size = totalBytes(files)
+
+  return (
+    <div>
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center gap-2.5 px-4 py-2.5 hover:bg-surface-2/30 transition-colors text-left bg-surface-2/10 border-b border-border/40"
+      >
+        {open ? <ChevronDown size={12} className="text-text-muted shrink-0" /> : <ChevronRight size={12} className="text-text-muted shrink-0" />}
+        <Camera size={12} className="text-text-muted shrink-0" />
+        <span className="text-xs font-semibold text-text-primary flex-1 min-w-0 truncate">{label}</span>
+        {date && <span className="text-[11px] text-text-muted shrink-0">{format(parseISO(date), 'MMM d, yyyy')}</span>}
+        <span className="text-[11px] text-text-muted shrink-0 ml-2">{files.length} file{files.length !== 1 ? 's' : ''} · {fmtBytes(size)}</span>
+      </button>
+      {open && files.map(f => <FileRow key={f.id} file={f} onDelete={onDelete} canDelete={canDelete} />)}
+    </div>
+  )
+}
+
+// ── Client folder ─────────────────────────────────────────────────────────────
+function ClientFolder({ clientName, subtitle, shootGroups, shoots, onDelete, canDelete, defaultOpen = false }) {
+  const [open, setOpen] = useState(defaultOpen)
+  const allFiles = Object.values(shootGroups).flat()
+  const size = totalBytes(allFiles)
+  const fileCount = allFiles.length
+
+  return (
+    <div className="card overflow-hidden mb-3">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center gap-3 p-4 hover:bg-surface-2/30 transition-colors text-left"
+      >
+        <div className="w-9 h-9 rounded-xl bg-accent flex items-center justify-center shrink-0">
+          <Building2 size={15} className="text-white" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-text-primary truncate">{clientName}</p>
+          {subtitle && <p className="text-xs text-text-muted truncate">{subtitle}</p>}
+        </div>
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="text-right">
+            <p className="text-xs font-medium text-text-secondary">{fileCount} file{fileCount !== 1 ? 's' : ''}</p>
+            <p className="text-xs text-text-muted">{fmtBytes(size)}</p>
+          </div>
+          {open
+            ? <FolderOpen size={15} className="text-accent" />
+            : <Folder size={15} className="text-text-muted" />}
+        </div>
+      </button>
+      {open && (
+        <div className="border-t border-border">
+          {Object.entries(shootGroups).map(([shootId, files]) => {
+            const shoot = shoots[shootId]
+            const label = shoot?.title || (shootId === '__unlinked' ? 'Unlinked files' : 'Project footage')
+            return (
+              <ShootGroup
+                key={shootId}
+                label={label}
+                date={shoot?.shoot_date || null}
+                files={files}
+                onDelete={onDelete}
+                canDelete={canDelete}
+                defaultOpen={Object.keys(shootGroups).length === 1}
+              />
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Finished video row ─────────────────────────────────────────────────────────
+function FinishedRow({ video }) {
+  return (
+    <div className="flex items-center gap-3 px-4 py-3 hover:bg-surface-2/30 transition-colors group border-b border-border/40 last:border-0">
+      <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center shrink-0">
+        <Film size={13} className="text-green-600" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-text-primary truncate">{video.project_name}</p>
+        <p className="text-[11px] text-text-muted mt-0.5">
+          {video.client_name} · Final v{video.revision_number}
+          {video.created_at && ` · ${formatDistanceToNow(new Date(video.created_at), { addSuffix: true })}`}
+        </p>
+      </div>
+      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+        <a href={video.video_url} target="_blank" rel="noreferrer"
+          className="p-1.5 text-text-muted hover:text-accent transition-colors rounded-lg hover:bg-accent/5" title="Watch">
+          <Eye size={12} />
+        </a>
+        <button onClick={() => forceDownload(video.video_url, video.file_name)}
+          className="p-1.5 text-text-muted hover:text-accent transition-colors rounded-lg hover:bg-accent/5" title="Download">
+          <Download size={12} />
         </button>
       </div>
     </div>
   )
 }
 
-// ── Folder node ───────────────────────────────────────────────────────────────
-function FolderNode({ label, subtitle, count, size, icon: Icon, iconColor, defaultOpen = false, children }) {
-  const [open, setOpen] = useState(defaultOpen)
-  return (
-    <div className="card overflow-hidden mb-3">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center gap-3 p-4 hover:bg-surface-2/40 transition-colors text-left"
-      >
-        <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${iconColor}`}>
-          <Icon size={16} className="text-white" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-text-primary truncate">{label}</p>
-          {subtitle && <p className="text-xs text-text-muted truncate">{subtitle}</p>}
-        </div>
-        <div className="flex items-center gap-3 shrink-0">
-          <div className="text-right">
-            <p className="text-xs font-medium text-text-muted">{count} file{count !== 1 ? 's' : ''}</p>
-            <p className="text-xs text-text-muted">{fmtBytes(size)}</p>
-          </div>
-          {open
-            ? <FolderOpen size={16} className="text-accent" />
-            : <Folder size={16} className="text-text-muted" />
-          }
-        </div>
-      </button>
-      {open && <div className="border-t border-border">{children}</div>}
-    </div>
-  )
-}
-
-// ── Shoot folder inside client ────────────────────────────────────────────────
-function ShootFolder({ label, date, files, onDelete }) {
-  const [open, setOpen] = useState(true)
-  return (
-    <div className="border-b border-border/50 last:border-0">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-2/30 transition-colors text-left bg-surface-2/20"
-      >
-        <Camera size={13} className="text-text-muted shrink-0" />
-        <div className="flex-1 min-w-0">
-          <span className="text-xs font-semibold text-text-primary">{label}</span>
-          {date && <span className="text-xs text-text-muted ml-2">{format(parseISO(date), 'MMM d, yyyy')}</span>}
-        </div>
-        <div className="flex items-center gap-2 shrink-0 text-xs text-text-muted">
-          <span>{files.length} file{files.length !== 1 ? 's' : ''}</span>
-          <span>{fmtBytes(totalBytes(files))}</span>
-          <ChevronRight size={12} className={`transition-transform ${open ? 'rotate-90' : ''}`} />
-        </div>
-      </button>
-      {open && files.map((f) => <FileRow key={f.id} file={f} onDelete={onDelete} />)}
-    </div>
-  )
-}
-
 // ── Main page ─────────────────────────────────────────────────────────────────
+const SORT_OPTIONS = ['Newest', 'Oldest', 'Largest', 'Smallest', 'Name']
+const TYPE_OPTIONS = ['All types', 'Video', 'Image', 'Other']
+// Known R2 total from Cloudflare dashboard — update when it changes
+const R2_TOTAL_BYTES = 4.01 * 1_073_741_824
+
 export default function FileSystem() {
-  const [allFiles,       setAllFiles]       = useState([])
+  const { isAdmin, profile } = useAuth()
+  const canDelete = isAdmin
+
+  const [footage,        setFootage]        = useState([])
   const [finishedVideos, setFinishedVideos] = useState([])
-  const [clients,        setClients]        = useState({})  // id → { name, contact_name }
-  const [shoots,         setShoots]         = useState({})  // id → { title, shoot_date }
+  const [clientMap,      setClientMap]      = useState({})
+  const [shootMap,       setShootMap]       = useState({})
   const [loading,        setLoading]        = useState(true)
   const [search,         setSearch]         = useState('')
+  const [sortBy,         setSortBy]         = useState('Newest')
+  const [typeFilter,     setTypeFilter]     = useState('All types')
+  const [tab,            setTab]            = useState('footage') // 'footage' | 'finished'
   const [deleteTarget,   setDeleteTarget]   = useState(null)
   const [deleting,       setDeleting]       = useState(false)
   const [deleteError,    setDeleteError]    = useState('')
+  const [toast,          setToast]          = useState(null)
+
+  const isCreative = profile?.role === 'creative' || profile?.role === 'editor'
 
   const load = async () => {
     setLoading(true)
-    const [filesRes, clientsRes, shootsRes, revisionsRes] = await Promise.all([
-      supabase
-        .from('shoot_uploads')
-        .select('id, file_name, file_url, file_size, created_at, shoot_id, project_id, client_id, notes, profiles(full_name)')
-        .order('created_at', { ascending: false }),
-      supabase.from('clients').select('id, name, contact_name'),
-      supabase.from('shoots').select('id, title, shoot_date, client_id'),
-      supabase
-        .from('project_revisions')
-        .select('id, video_url, revision_number, created_at, projects(id, name, client_id, clients(name, contact_name))')
-        .eq('status', 'approved')
-        .not('video_url', 'is', null)
-        .order('created_at', { ascending: false }),
+
+    // For creatives, limit to their assigned clients
+    let clientIds = null
+    if (isCreative) {
+      const { data: cc } = await supabase
+        .from('client_creatives')
+        .select('client_id')
+        .eq('profile_id', profile.id)
+      clientIds = (cc || []).map(r => r.client_id).filter(Boolean)
+      if (!clientIds.length) {
+        setLoading(false)
+        return
+      }
+    }
+
+    // Build footage query
+    let footageQ = supabase
+      .from('shoot_uploads')
+      .select('id, file_name, file_url, file_size, created_at, shoot_id, project_id, client_id, notes, profiles(full_name)')
+      .order('created_at', { ascending: false })
+    if (clientIds) footageQ = footageQ.in('client_id', clientIds)
+
+    // Build finished videos query
+    let finishedQ = supabase
+      .from('project_revisions')
+      .select('id, video_url, revision_number, created_at, projects(id, name, client_id, clients(name, contact_name))')
+      .eq('status', 'approved')
+      .not('video_url', 'is', null)
+      .order('created_at', { ascending: false })
+
+    // Clients + shoots (scoped if creative)
+    let clientsQ = supabase.from('clients').select('id, name, contact_name')
+    let shootsQ  = supabase.from('shoots').select('id, title, shoot_date, client_id')
+    if (clientIds) {
+      clientsQ = clientsQ.in('id', clientIds)
+      shootsQ  = shootsQ.in('client_id', clientIds)
+    }
+
+    const [footageRes, finishedRes, clientsRes, shootsRes] = await Promise.all([
+      footageQ, finishedQ, clientsQ, shootsQ,
     ])
 
-    const clientMap = {}
-    ;(clientsRes.data || []).forEach((c) => { clientMap[c.id] = c })
+    const newClientMap = {}
+    ;(clientsRes.data || []).forEach(c => { newClientMap[c.id] = c })
+    setClientMap(newClientMap)
 
-    const shootMap = {}
-    ;(shootsRes.data || []).forEach((s) => { shootMap[s.id] = s })
+    const newShootMap = {}
+    ;(shootsRes.data || []).forEach(s => { newShootMap[s.id] = s })
+    setShootMap(newShootMap)
 
-    const enriched = (filesRes.data || []).map((f) => ({
+    setFootage((footageRes.data || []).map(f => ({
       ...f,
       uploader: f.profiles?.full_name || null,
-    }))
+    })))
 
-    const finished = (revisionsRes.data || []).map((r) => ({
-      id:          r.id,
-      video_url:   r.video_url,
-      project_name: r.projects?.name || 'Untitled Project',
-      client_name:  r.projects?.clients?.name || r.projects?.clients?.contact_name || 'Unknown Client',
+    setFinishedVideos((finishedRes.data || []).map(r => ({
+      id:              r.id,
+      video_url:       r.video_url,
+      project_name:    r.projects?.name || 'Untitled Project',
+      client_name:     r.projects?.clients?.name || r.projects?.clients?.contact_name || 'Unknown Client',
       revision_number: r.revision_number,
-      created_at:  r.created_at,
-      file_name:   `${r.projects?.name || 'project'} — Final v${r.revision_number}.mp4`,
-    }))
+      created_at:      r.created_at,
+      file_name:       `${r.projects?.name || 'project'} — Final v${r.revision_number}.mp4`,
+    })))
 
-    setAllFiles(enriched)
-    setFinishedVideos(finished)
-    setClients(clientMap)
-    setShoots(shootMap)
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [profile?.id])
 
-  // Filter by search
-  const filtered = search.trim()
-    ? allFiles.filter((f) =>
-        f.file_name?.toLowerCase().includes(search.toLowerCase()) ||
-        clients[f.client_id]?.name?.toLowerCase().includes(search.toLowerCase()) ||
-        shoots[f.shoot_id]?.title?.toLowerCase().includes(search.toLowerCase())
+  // ── Filter + sort footage ────────────────────────────────────────────────────
+  const processedFootage = useMemo(() => {
+    let list = [...footage]
+
+    // Search
+    const q = search.trim().toLowerCase()
+    if (q) {
+      list = list.filter(f =>
+        f.file_name?.toLowerCase().includes(q) ||
+        clientMap[f.client_id]?.name?.toLowerCase().includes(q) ||
+        shootMap[f.shoot_id]?.title?.toLowerCase().includes(q)
       )
-    : allFiles
+    }
 
-  // Build tree: client → shoot → files
-  const tree = {}
-  filtered.forEach((f) => {
-    const clientId = f.client_id || '__unlinked'
-    if (!tree[clientId]) tree[clientId] = {}
+    // Type filter
+    if (typeFilter !== 'All types') {
+      const t = typeFilter.toLowerCase()
+      list = list.filter(f => fileType(f.file_name) === t)
+    }
 
-    const shootId = f.shoot_id || f.project_id || '__unlinked'
-    if (!tree[clientId][shootId]) tree[clientId][shootId] = []
-    tree[clientId][shootId].push(f)
-  })
+    // Sort
+    if (sortBy === 'Newest')   list.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    if (sortBy === 'Oldest')   list.sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+    if (sortBy === 'Largest')  list.sort((a, b) => (b.file_size || 0) - (a.file_size || 0))
+    if (sortBy === 'Smallest') list.sort((a, b) => (a.file_size || 0) - (b.file_size || 0))
+    if (sortBy === 'Name')     list.sort((a, b) => (a.file_name || '').localeCompare(b.file_name || ''))
+
+    return list
+  }, [footage, search, typeFilter, sortBy, clientMap, shootMap])
+
+  // Build client tree from processedFootage
+  const tree = useMemo(() => {
+    const t = {}
+    processedFootage.forEach(f => {
+      const cid = f.client_id || '__unlinked'
+      if (!t[cid]) t[cid] = {}
+      const sid = f.shoot_id || f.project_id || '__unlinked'
+      if (!t[cid][sid]) t[cid][sid] = []
+      t[cid][sid].push(f)
+    })
+    return t
+  }, [processedFootage])
 
   // Stats
-  const totalFiles = allFiles.length
-  const totalSize  = totalBytes(allFiles)
-  const clientCount = Object.keys(tree).filter((k) => k !== '__unlinked').length
+  const totalSize    = totalBytes(footage)
+  const videoCount   = footage.filter(f => fileType(f.file_name) === 'video').length
+  const imageCount   = footage.filter(f => fileType(f.file_name) === 'image').length
+  const clientCount  = Object.keys(tree).filter(k => k !== '__unlinked').length
 
-  // Delete handler
+  // Delete
   const handleDelete = async () => {
     if (!deleteTarget) return
     setDeleting(true)
@@ -264,22 +402,21 @@ export default function FileSystem() {
         {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
+            'Content-Type':  'application/json',
             'Authorization': `Bearer ${session?.access_token}`,
-            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+            'apikey':        import.meta.env.VITE_SUPABASE_ANON_KEY,
           },
-          body: JSON.stringify({
-            uploadId: deleteTarget.id,
-            fileUrl:  deleteTarget.file_url,
-          }),
+          body: JSON.stringify({ uploadId: deleteTarget.id, fileUrl: deleteTarget.file_url }),
         }
       )
       if (!res.ok) {
         const err = await res.json()
         throw new Error(err.error || 'Delete failed')
       }
-      setAllFiles((prev) => prev.filter((f) => f.id !== deleteTarget.id))
+      setFootage(prev => prev.filter(f => f.id !== deleteTarget.id))
       setDeleteTarget(null)
+      setToast('File deleted from R2 and database.')
+      setTimeout(() => setToast(null), 3000)
     } catch (err) {
       setDeleteError(err.message)
     } finally {
@@ -288,146 +425,183 @@ export default function FileSystem() {
   }
 
   return (
-    <div className="p-8 max-w-4xl">
+    <div className="p-6 max-w-5xl">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-text-primary flex items-center gap-2">
-            <HardDrive size={22} className="text-text-muted" /> File System
-          </h1>
-          <p className="text-sm text-text-muted mt-1">All uploaded footage and files — organized by client and shoot</p>
+          <h1 className="text-2xl font-bold text-text-primary">File System</h1>
+          <p className="text-sm text-text-muted mt-0.5">
+            {isCreative ? 'Files for your assigned clients' : 'All uploaded footage — organised by client and shoot'}
+          </p>
         </div>
-        <button onClick={load} className="btn-ghost flex items-center gap-2 text-sm">
-          <RefreshCw size={14} /> Refresh
+        <button onClick={load} className="btn-ghost flex items-center gap-2 text-sm" disabled={loading}>
+          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
         </button>
       </div>
 
-      {/* Stats bar */}
-      {!loading && (
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          {[
-            { label: 'Total files',   value: totalFiles },
-            { label: 'Total storage', value: fmtBytes(totalSize) },
-            { label: 'Clients',       value: clientCount },
-          ].map(({ label, value }) => (
-            <div key={label} className="card p-4 text-center">
-              <p className="text-xl font-bold text-text-primary">{value}</p>
-              <p className="text-xs text-text-muted mt-0.5">{label}</p>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Search */}
-      <div className="relative mb-6">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
-        <input
-          className="input pl-9 w-full"
-          placeholder="Search files, clients, shoots…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        {search && (
-          <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary">
-            <X size={13} />
-          </button>
-        )}
-      </div>
-
       {loading ? (
-        <div className="flex justify-center py-20">
+        <div className="flex justify-center py-24">
           <Loader2 size={22} className="animate-spin text-text-muted" />
         </div>
-      ) : filtered.length === 0 ? (
-        <div className="card p-16 text-center">
-          <HardDrive size={36} className="mx-auto text-text-muted/20 mb-4" />
-          <p className="text-sm font-semibold text-text-primary">{search ? 'No files match your search' : 'No files uploaded yet'}</p>
-          <p className="text-xs text-text-muted mt-1">{search ? 'Try a different search term.' : 'Files will appear here after the first upload.'}</p>
-        </div>
       ) : (
-        <div>
-          {/* ── Finished Products ── */}
-          {finishedVideos.length > 0 && (
-            <FolderNode
-              label="Finished Products"
-              subtitle="All client-approved final videos"
-              count={finishedVideos.length}
-              size={0}
-              icon={Trophy}
-              iconColor="bg-green-500"
-              defaultOpen={true}
-            >
-              {finishedVideos.map((v) => (
-                <div key={v.id} className="flex items-center gap-3 px-4 py-3 hover:bg-surface-2/30 transition-colors group">
-                  <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
-                    <Film size={13} className="text-blue-500" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-text-primary font-medium truncate">{v.project_name}</p>
-                    <p className="text-xs text-text-muted">{v.client_name} · Final v{v.revision_number} · {formatDistanceToNow(new Date(v.created_at), { addSuffix: true })}</p>
-                  </div>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                    <a href={v.video_url} target="_blank" rel="noreferrer"
-                      className="p-1.5 text-text-muted hover:text-accent transition-colors rounded-lg hover:bg-accent/5" title="Open">
-                      <ExternalLink size={13} />
-                    </a>
-                    <button onClick={() => forceDownload(v.video_url, v.file_name)}
-                      className="p-1.5 text-text-muted hover:text-accent transition-colors rounded-lg hover:bg-accent/5" title="Download">
-                      <Download size={13} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </FolderNode>
+        <>
+          {/* Storage bar — admin only */}
+          {isAdmin && (
+            <StorageBar trackedBytes={totalSize} r2Bytes={R2_TOTAL_BYTES} />
           )}
 
-          {Object.entries(tree).map(([clientId, shootGroups]) => {
-            const client = clients[clientId]
-            const clientName = client ? (client.name || client.contact_name || 'Unknown Client') : 'Unlinked Files'
-            const allClientFiles = Object.values(shootGroups).flat()
+          {/* Stats row */}
+          <div className="grid grid-cols-4 gap-3 mb-6">
+            {[
+              { label: 'Total files',    value: footage.length },
+              { label: 'Tracked size',   value: fmtBytes(totalSize) },
+              { label: 'Videos',         value: videoCount },
+              { label: 'Images',         value: imageCount },
+            ].map(({ label, value }) => (
+              <div key={label} className="card p-4 text-center">
+                <p className="text-xl font-bold text-text-primary">{value}</p>
+                <p className="text-xs text-text-muted mt-0.5">{label}</p>
+              </div>
+            ))}
+          </div>
 
-            return (
-              <FolderNode
-                key={clientId}
-                label={clientName}
-                subtitle={client?.contact_name && client.contact_name !== clientName ? client.contact_name : undefined}
-                count={allClientFiles.length}
-                size={totalBytes(allClientFiles)}
-                icon={Building2}
-                iconColor="bg-accent"
-                defaultOpen={Object.keys(tree).length === 1}
+          {/* Tabs */}
+          <div className="flex gap-1 bg-surface-2/50 rounded-xl p-1 mb-5 w-fit">
+            {[
+              { id: 'footage',  label: `Footage (${footage.length})` },
+              { id: 'finished', label: `Finished Videos (${finishedVideos.length})` },
+            ].map(t => (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  tab === t.id
+                    ? 'bg-white text-text-primary shadow-sm'
+                    : 'text-text-muted hover:text-text-primary'
+                }`}
               >
-                {Object.entries(shootGroups).map(([shootId, files]) => {
-                  const shoot = shoots[shootId]
-                  const shootLabel = shoot?.title || (shootId === '__unlinked' ? 'Unlinked files' : 'Project files')
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Search + filters */}
+          {tab === 'footage' && (
+            <div className="flex gap-3 mb-5">
+              <div className="relative flex-1">
+                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+                <input
+                  className="input pl-9 w-full text-sm"
+                  placeholder="Search by file name, client or shoot…"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                />
+                {search && (
+                  <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary">
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+              <select
+                value={typeFilter}
+                onChange={e => setTypeFilter(e.target.value)}
+                className="input text-sm pr-8 shrink-0 w-36"
+              >
+                {TYPE_OPTIONS.map(o => <option key={o}>{o}</option>)}
+              </select>
+              <select
+                value={sortBy}
+                onChange={e => setSortBy(e.target.value)}
+                className="input text-sm pr-8 shrink-0 w-36"
+              >
+                {SORT_OPTIONS.map(o => <option key={o}>{o}</option>)}
+              </select>
+            </div>
+          )}
+
+          {/* ── Footage tab ── */}
+          {tab === 'footage' && (
+            processedFootage.length === 0 ? (
+              <div className="card p-16 text-center">
+                <HardDrive size={36} className="mx-auto text-text-muted/20 mb-4" />
+                <p className="text-sm font-semibold text-text-primary">
+                  {search || typeFilter !== 'All types' ? 'No files match your filters' : 'No files uploaded yet'}
+                </p>
+                <p className="text-xs text-text-muted mt-1">
+                  {search || typeFilter !== 'All types' ? 'Try changing your search or filter.' : 'Files will appear here after the first upload.'}
+                </p>
+              </div>
+            ) : (
+              <div>
+                {Object.entries(tree).map(([clientId, shootGroups]) => {
+                  const client     = clientMap[clientId]
+                  const clientName = client
+                    ? (client.name || client.contact_name || 'Unknown Client')
+                    : 'Unlinked Files'
+                  const subtitle   = client?.contact_name && client.contact_name !== clientName
+                    ? client.contact_name
+                    : undefined
+
                   return (
-                    <ShootFolder
-                      key={shootId}
-                      label={shootLabel}
-                      date={shoot?.shoot_date || null}
-                      files={files}
+                    <ClientFolder
+                      key={clientId}
+                      clientName={clientName}
+                      subtitle={subtitle}
+                      shootGroups={shootGroups}
+                      shoots={shootMap}
                       onDelete={setDeleteTarget}
+                      canDelete={canDelete}
+                      defaultOpen={Object.keys(tree).length === 1}
                     />
                   )
                 })}
-              </FolderNode>
+              </div>
             )
-          })}
-        </div>
+          )}
+
+          {/* ── Finished Videos tab ── */}
+          {tab === 'finished' && (
+            finishedVideos.length === 0 ? (
+              <div className="card p-16 text-center">
+                <Film size={36} className="mx-auto text-text-muted/20 mb-4" />
+                <p className="text-sm font-semibold text-text-primary">No approved final videos yet</p>
+                <p className="text-xs text-text-muted mt-1">Final cuts will appear here once a client approves a revision.</p>
+              </div>
+            ) : (
+              <div className="card overflow-hidden">
+                <div className="px-4 py-3 border-b border-border bg-surface-2/30">
+                  <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">
+                    Client-approved final videos — {finishedVideos.length} total
+                  </p>
+                </div>
+                {finishedVideos.map(v => <FinishedRow key={v.id} video={v} />)}
+              </div>
+            )
+          )}
+        </>
       )}
 
-      {/* Delete confirmation modal */}
+      {/* Delete modal */}
       {deleteTarget && (
-        <DeleteConfirm
+        <DeleteModal
           file={deleteTarget}
           onConfirm={handleDelete}
           onCancel={() => { setDeleteTarget(null); setDeleteError('') }}
           deleting={deleting}
+          error={deleteError}
         />
       )}
 
-      {deleteError && (
-        <div className="fixed bottom-6 right-6 bg-red-500 text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-2 text-sm">
+      {/* Success toast */}
+      {toast && (
+        <div className="fixed bottom-6 right-6 bg-green-600 text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-2 text-sm z-40">
+          ✓ {toast}
+        </div>
+      )}
+
+      {/* Error toast */}
+      {deleteError && !deleteTarget && (
+        <div className="fixed bottom-6 right-6 bg-red-500 text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-2 text-sm z-40">
           <AlertCircle size={14} /> {deleteError}
           <button onClick={() => setDeleteError('')}><X size={13} /></button>
         </div>

@@ -26,6 +26,7 @@ const NAV = {
     { to: '/calendar',  icon: CalendarDays,     label: 'Calendar' },
     { to: '/clients',   icon: Building2,        label: 'Clients' },
     { to: '/projects',  icon: FolderKanban,     label: 'Projects' },
+    { to: '/files',     icon: HardDrive,        label: 'Files' },
     { to: '/messages',  icon: MessageSquare,    label: 'Messages' },
   ],
   editor: [
@@ -33,6 +34,7 @@ const NAV = {
     { to: '/calendar',  icon: CalendarDays,     label: 'Calendar' },
     { to: '/clients',   icon: Building2,        label: 'Clients' },
     { to: '/projects',  icon: FolderKanban,     label: 'Projects' },
+    { to: '/files',     icon: HardDrive,        label: 'Files' },
     { to: '/messages',  icon: MessageSquare,    label: 'Messages' },
   ],
   client: [
