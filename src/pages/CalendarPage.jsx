@@ -123,7 +123,7 @@ export default function CalendarPage() {
         let q = supabase
           .from('shoots')
           .select('id, title, description, shoot_date, shoot_time, location, status, photographer_id, clients(name, contact_name)')
-          .neq('status', 'cancelled')
+          .or('status.is.null,status.neq.cancelled')
           .gte('shoot_date', monthStart)
           .lt('shoot_date', nextMonth)
         if (!isAdmin) q = q.eq('photographer_id', user?.id)

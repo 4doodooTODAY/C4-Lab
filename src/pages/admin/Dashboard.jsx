@@ -157,7 +157,7 @@ function UpcomingList() {
       // Upcoming shoots — status may be null on older rows, or 'scheduled'
       supabase
         .from('shoots')
-        .select('id, title, shoot_date, shoot_time, clients(name, contact_name)')
+        .select('id, title, shoot_date, shoot_time, client_id, clients(name, contact_name)')
         .neq('status', 'cancelled')
         .neq('status', 'completed')
         .gte('shoot_date', today)
@@ -197,7 +197,7 @@ function UpcomingList() {
           client:   s.clients?.contact_name || s.clients?.name || null,
           date:     new Date(`${s.shoot_date}T${timeStr}:00`),
           dateStr:  s.shoot_date,
-          link:     null,
+          link:     s.client_id ? `/admin/clients/${s.client_id}` : '/calendar',
         })
       })
 

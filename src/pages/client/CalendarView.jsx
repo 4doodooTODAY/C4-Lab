@@ -57,22 +57,38 @@ export default function ClientCalendarView() {
         .gte('calendar_events.start_at', rangeStart)
         .lte('calendar_events.start_at', rangeEnd),
 
-      // Shoot dates from their projects
+      // Shoots for this client — query client row first, then their shoots
       supabase
         .from('clients')
-        .select('id, projects(id, name, shoot_date, stage)')
+        .select('id')
         .eq('profile_id', user.id)
-        .maybeSingle(),
-    ]).then(([evRes, clientRes]) => {
+        .maybeSingle()
+        .then(({ data: clientRow }) => {
+          if (!clientRow?.id) return Promise.resolve({ data: [] })
+          const monthStart = startOfMonth(month).toISOString().split('T')[0]
+          const monthEnd   = addDays(endOfMonth(month), 1).toISOString().split('T')[0]
+          return supabase
+            .from('shoots')
+            .select('id, title, shoot_date, shoot_time, location, status')
+            .eq('client_id', clientRow.id)
+            .or('status.is.null,status.neq.cancelled')
+            .gte('shoot_date', monthStart)
+            .lt('shoot_date', monthEnd)
+        }),
+    ]).then(([evRes, shootsRes]) => {
       const calEvents = (evRes.data || [])
         .map((m) => m.calendar_events)
         .filter(Boolean)
       setEvents(calEvents)
 
-      const projects = clientRes.data?.projects || []
-      const shootDates = projects
-        .filter((p) => p.shoot_date)
-        .map((p) => ({ id: `shoot-${p.id}`, title: `${p.name} — Shoot Day`, date: p.shoot_date, type: 'shoot' }))
+      const shootDates = (shootsRes.data || []).map((s) => ({
+        id:       `shoot-${s.id}`,
+        title:    s.title,
+        date:     s.shoot_date,
+        time:     s.shoot_time,
+        location: s.location,
+        type:     'shoot',
+      }))
       setShoots(shootDates)
 
       setLoading(false)
@@ -150,8 +166,8 @@ export default function ClientCalendarView() {
                   <div className="space-y-0.5">
                     {shootItems.slice(0, 2).map((s) => (
                       <div key={s.id} className="flex items-center gap-1">
-                        <div className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
-                        <p className="text-[10px] text-gray-600 truncate font-medium">Shoot Day</p>
+                        <div className="w-1.5 h-1.5 rounded-full bg-violet-500 shrink-0" />
+                        <p className="text-[10px] text-violet-700 truncate font-medium">{s.title}</p>
                       </div>
                     ))}
                     {calItems.slice(0, 2 - shootItems.length).map((e) => (
@@ -182,11 +198,19 @@ export default function ClientCalendarView() {
           ) : (
             <div className="space-y-2">
               {selectedItems.shootItems.map((s) => (
-                <div key={s.id} className="flex items-start gap-3 px-3 py-3 rounded-xl bg-accent/5 border border-accent/10">
-                  <div className="w-2 h-2 rounded-full bg-accent mt-1.5 shrink-0" />
+                <div key={s.id} className="flex items-start gap-3 px-3 py-3 rounded-xl bg-violet-50 border border-violet-100">
+                  <div className="w-2 h-2 rounded-full bg-violet-500 mt-1.5 shrink-0" />
                   <div>
                     <p className="text-sm font-bold text-gray-900">{s.title}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">Shoot Day</p>
+                    <p className="text-xs text-violet-600 font-medium mt-0.5">Shoot</p>
+                    {s.time && (
+                      <p className="text-xs text-gray-400 mt-0.5">{s.time.slice(0, 5)}</p>
+                    )}
+                    {s.location && (
+                      <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
+                        <MapPin size={10} /> {s.location}
+                      </p>
+                    )}
                   </div>
                 </div>
               ))}
