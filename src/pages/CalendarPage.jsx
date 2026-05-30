@@ -90,7 +90,9 @@ function ReadOnlyEventPanel({ event, onClose }) {
 
 export default function CalendarPage() {
   const { profile, user, isAdmin } = useAuth()
-  const isCreative = profile?.role === 'creative' || profile?.role === 'editor'
+  // Admin in creative-view has isAdmin=false (useAuth respects viewMode),
+  // so treat them the same as a real creative for day-click / UI purposes
+  const isCreative = profile?.role === 'creative' || profile?.role === 'editor' || (profile?.role === 'admin' && !isAdmin)
 
   const navigate = useNavigate()
   const [currentDate, setCurrentDate] = useState(new Date())

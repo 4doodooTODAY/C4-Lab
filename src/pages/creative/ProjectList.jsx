@@ -131,12 +131,10 @@ function EditCard({ project, revisions, myId, onClick, onMarkDone }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function CreativeProjectList() {
-  const { profile } = useAuth()
+  const { profile, isAdmin } = useAuth()
   const navigate    = useNavigate()
   const myId        = profile?.id
   const isEditor    = profile?.role === 'editor'
-  // Admin in creative-view mode should see all shoots (they aren't in client_creatives)
-  const isAdminRole = profile?.role === 'admin'
 
   const [shoots,       setShoots]       = useState([])
   const [edits,        setEdits]        = useState([])
@@ -153,7 +151,7 @@ export default function CreativeProjectList() {
       // Admin in creative-view mode bypasses client_creatives and sees all shoots
       isEditor
         ? Promise.resolve([])
-        : isAdminRole
+        : isAdmin
           ? supabase
               .from('shoots')
               .select('id, title, creative_notes, shoot_date, shoot_time, location, status, inspiration_links, client_id, clients(name, contact_name)')
@@ -169,7 +167,7 @@ export default function CreativeProjectList() {
               .then(({ data }) => data || []),
 
       // My Edits — projects scoped to assigned clients (admin sees all)
-      isAdminRole
+      isAdmin
         ? supabase
             .from('projects')
             .select('id, name, stage, editor_id, client_id, clients(name, contact_name)')

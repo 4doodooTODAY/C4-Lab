@@ -30,7 +30,6 @@ export default function Settings() {
   const handleAvatarChange = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
-    if (file.size > 3 * 1024 * 1024) { setAvatarError('Image must be under 3MB'); return }
     if (!file.type.startsWith('image/')) { setAvatarError('Please choose an image file'); return }
 
     setAvatarUploading(true)
@@ -113,7 +112,7 @@ export default function Settings() {
               >
                 {avatarUrl ? 'Change photo' : 'Upload photo'}
               </button>
-              <p className="text-xs text-text-muted mt-0.5">JPG, PNG or GIF · Max 3MB</p>
+              <p className="text-xs text-text-muted mt-0.5">JPG, PNG or GIF</p>
               {avatarError && <p className="text-xs text-red-500 mt-1">{avatarError}</p>}
             </div>
             <input
