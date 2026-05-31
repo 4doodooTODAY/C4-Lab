@@ -693,6 +693,79 @@ export default function ProjectDetail() {
         isAdmin={isAdmin}
       />
 
+      {/* ── Editor action CTA — visible when it's the editor's turn ─── */}
+      {(() => {
+        const isCurrentUserEditor =
+          profile?.role === 'editor' ||
+          editorProfiles.some((ep) => ep.id === profile?.id) ||
+          project.editor_id === profile?.id
+        const isCurrentUserCreative =
+          profile?.role === 'creative' ||
+          project.creative_id === profile?.id
+
+        const stage = project.stage
+        const latestRev = [...revisions].sort((a, b) => b.revision_number - a.revision_number)[0]
+        const needsEditorUpload =
+          (stage === 'post_production' || stage === 'production') &&
+          (!latestRev || latestRev.status === 'pending_editor')
+        const needsCreativeReview =
+          latestRev?.status === 'pending_photographer_review' ||
+          latestRev?.status === 'pending_creative_review'
+
+        if (isCurrentUserEditor && needsEditorUpload) {
+          const isFirstCut = !latestRev || revisions.length === 0
+          return (
+            <div className="mb-6 rounded-2xl border-2 border-accent/30 bg-accent/5 p-5 flex items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center shrink-0">
+                  <FileVideo size={20} className="text-accent" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-text-primary">
+                    {isFirstCut ? "It's your turn — upload the first cut" : "Upload your revised cut"}
+                  </p>
+                  <p className="text-xs text-text-muted mt-0.5">
+                    {isFirstCut
+                      ? 'Edit the footage and upload your initial cut. It goes to the creative for review before the client sees it.'
+                      : 'Address the client feedback and upload your revised version.'}
+                  </p>
+                </div>
+              </div>
+              <Link
+                to={`/projects/${id}/creative`}
+                className="shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-accent text-white text-sm font-bold hover:bg-accent/90 transition-colors shadow-sm whitespace-nowrap"
+              >
+                <Upload size={15} /> {isFirstCut ? 'Upload First Cut →' : 'Upload Revision →'}
+              </Link>
+            </div>
+          )
+        }
+
+        if (isCurrentUserCreative && needsCreativeReview && latestRev) {
+          return (
+            <div className="mb-6 rounded-2xl border-2 border-amber-300 bg-amber-50 p-5 flex items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+                  <Eye size={20} className="text-amber-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-amber-900">Review the edit before the client sees it</p>
+                  <p className="text-xs text-amber-700 mt-0.5">The editor submitted a cut. Leave timeline notes, then pass it to the client.</p>
+                </div>
+              </div>
+              <Link
+                to={`/projects/${id}/creative`}
+                className="shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 text-white text-sm font-bold hover:bg-amber-600 transition-colors shadow-sm whitespace-nowrap"
+              >
+                <Eye size={15} /> Review Now →
+              </Link>
+            </div>
+          )
+        }
+
+        return null
+      })()}
+
       {/* ── Pitch Approval Panel (admin can approve or push to client) ───── */}
       {project.stage === 'pitch' && isAdmin && (
         <PitchApprovalPanel
