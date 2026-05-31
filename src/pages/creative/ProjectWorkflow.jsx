@@ -1331,6 +1331,7 @@ function UploadPhotoRevisionSection({ project, revisions, onRefresh }) {
   const pendingAdminRev = revisions.find((r) => r.status === 'pending_admin_review')
   if (!canUpload || pendingAdminRev) return null
 
+
   const handleUpload = async () => {
     if (photos.length === 0) return
     setUploading(true)
@@ -1552,7 +1553,7 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
     ? latestRev.revision_number  // same number — not a new client revision
     : (latestRev ? latestRev.revision_number + 1 : 1)
 
-  const canUpload = stage === 'post_production' || (latestRev && latestRev.status === 'pending_editor')
+  const canUpload = ['production', 'post_production'].includes(stage) || (latestRev && latestRev.status === 'pending_editor')
   // Don't show upload while awaiting admin review
   const pendingAdminRev = revisions.find((r) => r.status === 'pending_admin_review')
   if (!canUpload || pendingAdminRev) return null
@@ -2030,7 +2031,7 @@ export default function ProjectWorkflow() {
   }
 
   const isCreative = profile?.role === 'creative' || project.creative_id === profile?.id || isAdmin
-  const isEditor   = projectEditorIds.includes(profile?.id) || project.editor_id === profile?.id || isAdmin
+  const isEditor   = profile?.role === 'editor' || projectEditorIds.includes(profile?.id) || project.editor_id === profile?.id || isAdmin
   return (
     <div className="p-8 max-w-4xl">
       {/* Back link */}
