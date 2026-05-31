@@ -28,22 +28,15 @@ async function callEdge(body) {
   return json
 }
 
-// ── Upload a single part via XHR (returns ETag from response header) ──────────
+// ── Upload a single part via XHR ─────────────────────────────────────────────
+// We don't capture ETags here — CORS blocks that header on presigned URLs.
+// The edge function calls ListParts server-side to get real ETags at complete time.
 function uploadPart(url, chunk, onLoaded) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     xhr.open('PUT', url)
-    // No Content-Type on parts — R2 requires absence or exact match
     xhr.upload.onprogress = (e) => { if (e.lengthComputable) onLoaded(e.loaded) }
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        // ETag comes back in the response header (strip quotes)
-        const etag = (xhr.getResponseHeader('ETag') || '').replace(/"/g, '')
-        resolve(etag)
-      } else {
-        reject(new Error(`Part upload failed: HTTP ${xhr.status}`))
-      }
-    }
+    xhr.onload  = () => xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Part upload failed: HTTP ${xhr.status}`))
     xhr.onerror = () => reject(new Error('Part upload network error'))
     xhr.send(chunk)
   })
@@ -108,8 +101,6 @@ async function uploadMultipart({ file, key, contentType, publicUrl, onProgress, 
     partCount:   totalParts,
   })
 
-  const parts = new Array(totalParts)
-
   try {
     // 2. Upload parts in batches of PARALLEL_PARTS
     for (let batchStart = 0; batchStart < totalParts; batchStart += PARALLEL_PARTS) {
@@ -120,16 +111,15 @@ async function uploadMultipart({ file, key, contentType, publicUrl, onProgress, 
         const start  = partIdx * CHUNK_SIZE
         const end    = Math.min(start + CHUNK_SIZE, file.size)
         const chunk  = file.slice(start, end)
-        const etag   = await uploadPart(partUrls[partIdx], chunk, (loaded) => {
+        await uploadPart(partUrls[partIdx], chunk, (loaded) => {
           bytesLoaded[partIdx] = loaded
           reportProgress()
         })
-        parts[partIdx] = { PartNumber: partIdx + 1, ETag: etag }
       }))
     }
 
-    // 3. Complete
-    await callEdge({ action: 'multipart-complete', key, uploadId, parts })
+    // 3. Complete — edge function uses ListParts to get ETags server-side
+    await callEdge({ action: 'multipart-complete', key, uploadId })
     if (onProgress) onProgress(100)
     return { publicUrl, key }
   } catch (err) {

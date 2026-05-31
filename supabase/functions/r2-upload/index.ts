@@ -5,6 +5,7 @@ import {
   UploadPartCommand,
   CompleteMultipartUploadCommand,
   AbortMultipartUploadCommand,
+  ListPartsCommand,
 } from 'npm:@aws-sdk/client-s3'
 import { getSignedUrl } from 'npm:@aws-sdk/s3-request-presigner'
 
@@ -115,14 +116,36 @@ Deno.serve(async (req) => {
     }
 
     // ── Multipart: complete ──────────────────────────────────────────────────
+    // ETags can't be read client-side (CORS blocks the header), so we
+    // ListParts server-side to get the real ETags, then complete.
     if (action === 'multipart-complete') {
-      const { key, uploadId, parts } = body
-      // parts = [{ PartNumber: 1, ETag: '...' }, ...]
+      const { key, uploadId } = body
+
+      // Collect all parts R2 actually received, with their server ETags
+      const parts: { PartNumber: number; ETag: string }[] = []
+      let partMarker: number | undefined
+      do {
+        const listRes = await s3.send(new ListPartsCommand({
+          Bucket:           R2_BUCKET,
+          Key:              key,
+          UploadId:         uploadId,
+          PartNumberMarker: partMarker,
+        }))
+        for (const p of listRes.Parts ?? []) {
+          parts.push({ PartNumber: p.PartNumber!, ETag: p.ETag! })
+        }
+        partMarker = listRes.IsTruncated ? listRes.NextPartNumberMarker : undefined
+      } while (partMarker)
+
+      if (parts.length === 0) throw new Error('No parts found — upload may have failed')
+
+      parts.sort((a, b) => a.PartNumber - b.PartNumber)
+
       await s3.send(new CompleteMultipartUploadCommand({
-        Bucket:           R2_BUCKET,
-        Key:              key,
-        UploadId:         uploadId,
-        MultipartUpload:  { Parts: parts },
+        Bucket:          R2_BUCKET,
+        Key:             key,
+        UploadId:        uploadId,
+        MultipartUpload: { Parts: parts },
       }))
       return new Response(JSON.stringify({ success: true, publicUrl: publicUrlFor(key) }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
