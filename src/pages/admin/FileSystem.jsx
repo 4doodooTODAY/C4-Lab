@@ -3,7 +3,7 @@ import {
   HardDrive, Folder, FolderOpen, Film, Image, File as FileIcon,
   ExternalLink, Trash2, Loader2, Search, RefreshCw, Camera,
   Building2, AlertCircle, X, Download, ChevronRight, ChevronDown,
-  Filter, SortAsc, Eye, Info,
+  Filter, SortAsc, Eye, Info, Sparkles, CheckCircle2,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -301,6 +301,8 @@ export default function FileSystem() {
   const [deleteError,    setDeleteError]    = useState('')
   const [toast,          setToast]          = useState(null)
   const [r2Total,        setR2Total]        = useState(null) // live from R2
+  const [organizing,     setOrganizing]     = useState(false)
+  const [organizeResult, setOrganizeResult] = useState(null)
 
   const isCreative = profile?.role === 'creative' || profile?.role === 'editor'
 
@@ -483,6 +485,30 @@ export default function FileSystem() {
     }
   }
 
+  const handleOrganize = async () => {
+    setOrganizing(true)
+    setOrganizeResult(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session?.access_token}`,
+        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+      }
+      const base = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/r2-organize`
+      const res = await fetch(base, { method: 'POST', headers, body: JSON.stringify({ action: 'reorganize' }) })
+      const data = await res.json()
+      setOrganizeResult(data)
+      setToast(`Done — moved ${data.moved} files, deleted ${data.deletedOrphans} orphaned files.`)
+      setTimeout(() => setToast(null), 6000)
+      load()
+    } catch (err) {
+      setToast(`Organize failed: ${err.message}`)
+    } finally {
+      setOrganizing(false)
+    }
+  }
+
   return (
     <div className="p-6 max-w-5xl">
       {/* Header */}
@@ -493,9 +519,22 @@ export default function FileSystem() {
             {isCreative ? 'Files for your assigned clients' : 'All uploaded footage — organised by client and shoot'}
           </p>
         </div>
-        <button onClick={load} className="btn-ghost flex items-center gap-2 text-sm" disabled={loading}>
-          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <button
+              onClick={handleOrganize}
+              disabled={organizing || loading}
+              className="btn-ghost flex items-center gap-2 text-sm text-accent hover:text-accent/80 disabled:opacity-50"
+              title="Reorganize R2 folder structure and delete orphaned files"
+            >
+              {organizing ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+              {organizing ? 'Cleaning…' : 'Clean Up R2'}
+            </button>
+          )}
+          <button onClick={load} className="btn-ghost flex items-center gap-2 text-sm" disabled={loading}>
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
+          </button>
+        </div>
       </div>
 
       {loading ? (

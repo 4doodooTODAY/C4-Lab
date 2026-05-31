@@ -26,23 +26,34 @@ const s3 = new S3Client({
   credentials: { accessKeyId: R2_ACCESS_KEY, secretAccessKey: R2_SECRET_KEY },
 })
 
-function slugify(str: string): string {
-  return str.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+function sanitize(str: string): string {
+  // Keep the real name — just strip filesystem-unsafe chars
+  return (str || 'Unknown').replace(/[<>:"/\\|?*\x00-\x1f]/g, '').trim() || 'Unknown'
 }
 
 function buildKey(body: any): string {
-  const { filename, category, clientName, projectName, folderType, shootDate } = body
-  const clientSlug  = slugify(clientName || '')
-  const projectSlug = slugify(projectName || 'untitled')
-  const timestamp   = Date.now()
-  const safeName    = filename.replace(/[^a-zA-Z0-9._-]/g, '-')
-  const dateStr     = shootDate ? shootDate.slice(0, 10) : new Date().toISOString().slice(0, 10)
+  const { filename, category, clientName, projectName, folderType } = body
+  const client  = sanitize(clientName  || '')
+  const project = sanitize(projectName || 'Untitled')
+  const safeName = filename  // keep original name, only strip truly unsafe chars
+    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '-')
+    .trim()
 
-  if (folderType === 'tools' || !clientSlug) {
-    return `tools/${category}/${timestamp}-${safeName}`
+  // Determine subfolder from category
+  const folderMap: Record<string, string> = {
+    footage:   'Footage',
+    revisions: 'Cuts',
+    photos:    'Photos',
+    assets:    'Assets',
   }
-  const shootFolder = `${projectSlug} ${dateStr}`
-  return `clients/${clientSlug}/shoots/${shootFolder}/${category}/${timestamp}-${safeName}`
+  const subfolder = folderMap[category] ?? category ?? 'Files'
+
+  if (folderType === 'tools' || !client) {
+    return `_Tools/${subfolder}/${safeName}`
+  }
+
+  // Clean structure: {Client}/{Project}/{Footage|Cuts|Photos}/{filename}
+  return `${client}/${project}/${subfolder}/${safeName}`
 }
 
 function publicUrlFor(key: string): string {
