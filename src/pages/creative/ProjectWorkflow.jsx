@@ -1588,7 +1588,7 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
           project_id:      project.id,
           revision_number: nextRevNum,
           video_url:       publicUrl,
-          status:          'pending_photographer_review',
+          status:          'pending_creative_review',
           uploaded_by:     profile.id,
         })
         if (e) throw new Error(e.message)
