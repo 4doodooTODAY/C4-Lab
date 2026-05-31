@@ -373,31 +373,24 @@ export default function FileSystem() {
       file_name:       `${r.projects?.name || 'project'} — Final v${r.revision_number}.mp4`,
     })))
 
-    // Fetch live R2 total (admin only — edge function lists all objects)
-    if (isAdmin) {
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        const r2Res = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/r2-list`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type':  'application/json',
-              'Authorization': `Bearer ${session?.access_token}`,
-              'apikey':        import.meta.env.VITE_SUPABASE_ANON_KEY,
-            },
-          }
-        )
-        if (r2Res.ok) {
-          const { totalSize } = await r2Res.json()
-          if (typeof totalSize === 'number') setR2Total(totalSize)
-        }
-      } catch (e) {
-        console.warn('[FileSystem] r2-list fetch error:', e)
-      }
-    }
-
     setLoading(false)
+
+    // Fetch live R2 total in the background — don't block page render on this
+    if (isAdmin) {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/r2-list`, {
+          method: 'POST',
+          headers: {
+            'Content-Type':  'application/json',
+            'Authorization': `Bearer ${session?.access_token}`,
+            'apikey':        import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+        })
+          .then(r => r.ok ? r.json() : null)
+          .then(json => { if (json?.totalSize) setR2Total(json.totalSize) })
+          .catch(() => {})
+      })
+    }
   }
 
   useEffect(() => { load() }, [profile?.id])

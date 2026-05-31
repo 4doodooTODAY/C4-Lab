@@ -78,28 +78,20 @@ function uploadSingle(uploadUrl, file, onProgress, onStats) {
 }
 
 // ── Multipart parallel upload for large files ─────────────────────────────────
-async function uploadMultipart({ file, key, contentType, publicUrl, onProgress, onStats }) {
-  const totalParts  = Math.ceil(file.size / CHUNK_SIZE)
+async function uploadMultipart({ file, key, publicUrl, uploadId, partUrls, onProgress, onStats }) {
+  const totalParts  = partUrls.length
   const startTime   = Date.now()
   const bytesLoaded = new Array(totalParts).fill(0)
 
   const reportProgress = () => {
-    const loaded    = bytesLoaded.reduce((a, b) => a + b, 0)
-    const pct       = Math.round((loaded / file.size) * 100)
-    const elapsed   = (Date.now() - startTime) / 1000
-    const speed     = elapsed > 0 ? loaded / elapsed : 0
-    const eta       = speed > 0 ? (file.size - loaded) / speed : null
+    const loaded  = bytesLoaded.reduce((a, b) => a + b, 0)
+    const pct     = Math.round((loaded / file.size) * 100)
+    const elapsed = (Date.now() - startTime) / 1000
+    const speed   = elapsed > 0 ? loaded / elapsed : 0
+    const eta     = speed > 0 ? (file.size - loaded) / speed : null
     if (onProgress) onProgress(pct)
     if (onStats)    onStats({ speed, eta, loaded, total: file.size })
   }
-
-  // 1. Init: create multipart upload + get presigned URLs for all parts
-  const { uploadId, partUrls } = await callEdge({
-    action:      'multipart-init',
-    key,
-    contentType: contentType || 'application/octet-stream',
-    partCount:   totalParts,
-  })
 
   try {
     // 2. Upload parts in batches of PARALLEL_PARTS
@@ -131,32 +123,29 @@ async function uploadMultipart({ file, key, contentType, publicUrl, onProgress, 
 
 // ── Main export ───────────────────────────────────────────────────────────────
 export async function uploadToR2({ file, category, clientName, projectName, folderType, shootDate, onProgress, onStats }) {
-  // Build the file key and public URL up front (edge function needs it for multipart)
-  const initRes = await callEdge({
-    action:      'presign',
+  const fileInfo = {
     filename:    file.name,
     contentType: file.type || 'application/octet-stream',
     category,
-    clientName:  clientName || '',
+    clientName:  clientName  || '',
     projectName: projectName || 'untitled',
-    folderType:  folderType || 'shoots',
-    shootDate:   shootDate  || null,
-  })
-  const { uploadUrl, publicUrl, key } = initRes
-
-  if (file.size >= MULTIPART_MIN) {
-    // Large file: parallel multipart upload
-    return uploadMultipart({
-      file,
-      key,
-      contentType: file.type || 'application/octet-stream',
-      publicUrl,
-      onProgress,
-      onStats,
-    })
+    folderType:  folderType  || 'shoots',
+    shootDate:   shootDate   || null,
   }
 
-  // Small file: simple single PUT
+  if (file.size >= MULTIPART_MIN) {
+    // Large file: multipart-init builds the key + creates the upload in one call
+    const totalParts = Math.ceil(file.size / CHUNK_SIZE)
+    const { uploadId, partUrls, key, publicUrl } = await callEdge({
+      action: 'multipart-init',
+      partCount: totalParts,
+      ...fileInfo,
+    })
+    return uploadMultipart({ file, key, publicUrl, uploadId, partUrls, onProgress, onStats })
+  }
+
+  // Small file: single presigned PUT
+  const { uploadUrl, publicUrl, key } = await callEdge({ action: 'presign', ...fileInfo })
   await uploadSingle(uploadUrl, file, onProgress, onStats)
   return { publicUrl, key }
 }
