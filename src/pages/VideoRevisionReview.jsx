@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Loader2, MessageSquare, Check, X, Plus,
-  Send, ThumbsUp, Camera,
+  Send, ThumbsUp, Camera, Download,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -747,9 +747,23 @@ export default function VideoRevisionReview() {
             )}
 
             {revStatus === 'approved' && (
-              <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-3 text-center">
-                <p className="text-sm font-semibold text-green-400">Approved!</p>
-                <p className="text-xs text-white/40 mt-0.5">This revision has been approved.</p>
+              <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-4 text-center">
+                <p className="text-sm font-semibold text-green-400 mb-0.5">Approved! 🎉</p>
+                <p className="text-xs text-white/40 mb-3">This revision has been approved.</p>
+                {revision.video_url && (
+                  <a
+                    href={revision.video_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    download
+                    className="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-xl bg-accent text-white text-sm font-semibold hover:bg-accent/90 active:scale-[0.98] transition-all"
+                  >
+                    <Download size={14} /> Download Video
+                  </a>
+                )}
+                {isClient && (
+                  <p className="text-[10px] text-white/25 mt-2">On iPhone? Tap &amp; hold → Save to Files</p>
+                )}
               </div>
             )}
           </div>

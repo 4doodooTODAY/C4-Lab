@@ -4,7 +4,7 @@ import {
   Loader2, FolderKanban, ArrowRight, CheckCircle2, Upload,
   Film, X, Check, CalendarDays, MapPin, Users, Clock,
   Camera, Scissors, StickyNote, ThumbsUp, ThumbsDown,
-  MessageSquare, Sparkles,
+  MessageSquare, Sparkles, Download,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
@@ -353,6 +353,7 @@ function ProjectCard({ project, revisions, clientId, userId, onRefresh }) {
 
   const sortedRevs = [...revisions].sort((a, b) => b.revision_number - a.revision_number)
   const pendingRevision = sortedRevs[0]
+  const approvedRevision = sortedRevs.find((r) => r.status === 'approved')
 
   const { text, sub, color, emoji } = getStatusInfo(project.stage, pendingRevision)
   const isPitch      = project.stage === 'pitch'
@@ -556,6 +557,51 @@ function ProjectCard({ project, revisions, clientId, userId, onRefresh }) {
           </div>
         )}
 
+        {/* ── Download approved files ── */}
+        {approvedRevision && (approvedRevision.video_url || approvedRevision.photo_urls?.length > 0) && (
+          <div className="mb-3 bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-7 h-7 rounded-full bg-accent/20 flex items-center justify-center">
+                <Download size={14} className="text-accent" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-white leading-tight">Download Your Files</p>
+                <p className="text-[11px] text-gray-400">Original quality — no compression</p>
+              </div>
+            </div>
+
+            {approvedRevision.video_url && (
+              <a
+                href={approvedRevision.video_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                download
+                className="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-xl bg-accent text-white text-sm font-semibold hover:bg-accent/90 active:scale-[0.98] transition-all mb-2"
+              >
+                <Download size={14} /> Download Video
+              </a>
+            )}
+
+            {approvedRevision.photo_urls?.length > 0 && approvedRevision.photo_urls.map((url, i) => (
+              <a
+                key={i}
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                download
+                className="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-xl bg-white/10 text-white text-sm font-medium hover:bg-white/20 active:scale-[0.98] transition-all mb-2 last:mb-0"
+              >
+                <Camera size={14} />
+                {approvedRevision.photo_urls.length === 1 ? 'Download Photos' : `Download Photo ${i + 1}`}
+              </a>
+            ))}
+
+            <p className="text-[10px] text-gray-500 text-center mt-2">
+              On iPhone? Tap &amp; hold → Save to Files
+            </p>
+          </div>
+        )}
+
         {!isPitch && !canReview && !isDelivered && !isReadyToPost && !pendingRevision && (
           <div className="w-full py-2.5 px-5 rounded-xl bg-gray-50 border border-gray-100 text-gray-400 text-sm text-center mb-3 flex items-center justify-center gap-2">
             <Clock size={13} /> Your team is on it — we'll notify you when action is needed
@@ -640,7 +686,7 @@ export default function MyProjects() {
 
     const [revRes, profilesRes] = await Promise.all([
       projectIds.length
-        ? supabase.from('project_revisions').select('id, project_id, revision_number, status').in('project_id', projectIds)
+        ? supabase.from('project_revisions').select('id, project_id, revision_number, status, video_url, photo_urls').in('project_id', projectIds)
         : Promise.resolve({ data: [] }),
       profileIds.length
         ? supabase.from('profiles').select('id, full_name').in('id', profileIds)

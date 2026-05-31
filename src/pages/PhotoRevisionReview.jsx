@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Loader2, Send, Check, X, Plus, Image, ChevronLeft, ChevronRight, MessageSquare } from 'lucide-react'
+import { ArrowLeft, Loader2, Send, Check, X, Plus, Image, ChevronLeft, ChevronRight, MessageSquare, Download } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import Avatar from '../components/ui/Avatar'
@@ -459,6 +459,27 @@ export default function PhotoRevisionReview() {
                   Pin Comment
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* Download panel — shown to client when approved */}
+          {isClient && revStatus === 'approved' && photoUrls.length > 0 && (
+            <div className="p-3 border-t border-border shrink-0 space-y-1.5">
+              <p className="text-[10px] text-text-muted text-center font-medium uppercase tracking-wide mb-2">Download Approved Photos</p>
+              {photoUrls.map((url, i) => (
+                <a
+                  key={i}
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download
+                  className="flex items-center justify-center gap-1.5 w-full py-2 px-3 rounded-lg bg-accent text-white text-xs font-semibold hover:bg-accent/90 active:scale-[0.98] transition-all"
+                >
+                  <Download size={12} />
+                  {photoUrls.length === 1 ? 'Download Photo' : `Photo ${i + 1}`}
+                </a>
+              ))}
+              <p className="text-[9px] text-text-muted text-center pt-1">Original quality · On iPhone: tap &amp; hold → Save to Files</p>
             </div>
           )}
 
