@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { notify, notifyMany, notifyAdmins } from '../lib/notify'
 import Avatar from '../components/ui/Avatar'
+import DownloadButton from '../components/ui/DownloadButton'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -751,18 +752,11 @@ export default function VideoRevisionReview() {
                 <p className="text-sm font-semibold text-green-400 mb-0.5">Approved! 🎉</p>
                 <p className="text-xs text-white/40 mb-3">This revision has been approved.</p>
                 {revision.video_url && (
-                  <a
-                    href={revision.video_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    download
-                    className="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-xl bg-accent text-white text-sm font-semibold hover:bg-accent/90 active:scale-[0.98] transition-all"
-                  >
-                    <Download size={14} /> Download Video
-                  </a>
-                )}
-                {isClient && (
-                  <p className="text-[10px] text-white/25 mt-2">On iPhone? Tap &amp; hold → Save to Files</p>
+                  <DownloadButton
+                    url={revision.video_url}
+                    label="Download Video"
+                    className="w-full py-2.5 px-4 rounded-xl bg-accent text-white text-sm hover:bg-accent/90"
+                  />
                 )}
               </div>
             )}

@@ -9,6 +9,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { uploadToR2, fmtSpeed, fmtEta } from '../../lib/r2'
+import DownloadButton from '../../components/ui/DownloadButton'
 import { notify, notifyAdmins } from '../../lib/notify'
 import { format, parseISO, isPast, isFuture, formatDistanceToNow } from 'date-fns'
 import { fmtTime } from '../../lib/time'
@@ -571,34 +572,21 @@ function ProjectCard({ project, revisions, clientId, userId, onRefresh }) {
             </div>
 
             {approvedRevision.video_url && (
-              <a
-                href={approvedRevision.video_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                download
-                className="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-xl bg-accent text-white text-sm font-semibold hover:bg-accent/90 active:scale-[0.98] transition-all mb-2"
-              >
-                <Download size={14} /> Download Video
-              </a>
+              <DownloadButton
+                url={approvedRevision.video_url}
+                label="Download Video"
+                className="w-full py-2.5 px-4 rounded-xl bg-accent text-white text-sm hover:bg-accent/90 mb-2"
+              />
             )}
 
             {approvedRevision.photo_urls?.length > 0 && approvedRevision.photo_urls.map((url, i) => (
-              <a
+              <DownloadButton
                 key={i}
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                download
-                className="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-xl bg-white/10 text-white text-sm font-medium hover:bg-white/20 active:scale-[0.98] transition-all mb-2 last:mb-0"
-              >
-                <Camera size={14} />
-                {approvedRevision.photo_urls.length === 1 ? 'Download Photos' : `Download Photo ${i + 1}`}
-              </a>
+                url={url}
+                label={approvedRevision.photo_urls.length === 1 ? 'Download Photos' : `Download Photo ${i + 1}`}
+                className="w-full py-2.5 px-4 rounded-xl bg-white/10 text-white text-sm hover:bg-white/20 mb-2 last:mb-0"
+              />
             ))}
-
-            <p className="text-[10px] text-gray-500 text-center mt-2">
-              On iPhone? Tap &amp; hold → Save to Files
-            </p>
           </div>
         )}
 
