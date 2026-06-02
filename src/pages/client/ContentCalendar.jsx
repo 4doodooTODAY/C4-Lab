@@ -1,10 +1,12 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ChevronLeft, ChevronRight, CalendarDays, Camera, Film,
   FileText, LayoutGrid, LayoutList, Loader2, Check, X,
   MapPin, Clock, ExternalLink, AlertCircle, Link as LinkIcon, Plus,
+  Upload, FileVideo,
 } from 'lucide-react'
+import { uploadToR2, fmtSpeed, fmtEta } from '../../lib/r2'
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   addDays, isSameMonth, isToday, isSameDay, addMonths, subMonths,
@@ -242,9 +244,14 @@ export default function ContentCalendar() {
   const [clientResolved, setClientResolved] = useState(false)
   const [showRequestModal, setShowRequestModal] = useState(false)
   const [requestForm, setRequestForm] = useState({
-    type: 'post', title: '', concept: '', target_date: '', reference_links: '', footage_link: '',
+    type: 'post', title: '', concept: '', reference_links: '',
   })
-  const [submitting, setSubmitting] = useState(false)
+  const [footageFile,     setFootageFile]     = useState(null)
+  const [footageProgress, setFootageProgress] = useState(0)
+  const [footageStats,    setFootageStats]    = useState(null)
+  const [footageDragOver, setFootageDragOver] = useState(false)
+  const [submitting,      setSubmitting]      = useState(false)
+  const footageInputRef = useRef(null)
 
   // Resolve the client record — clients.profile_id is the client user link
   useEffect(() => {
@@ -473,25 +480,45 @@ export default function ContentCalendar() {
     if (!clientId || !user) return
     setSubmitting(true)
     try {
+      // Upload footage file to R2 first if one was attached
+      let footageUrl = null
+      if (footageFile) {
+        setFootageProgress(1) // signal that upload started
+        const { publicUrl } = await uploadToR2({
+          file:        footageFile,
+          category:    'footage',
+          clientName:  '',
+          projectName: requestForm.title || 'content-request',
+          folderType:  'shoots',
+          shootDate:   null,
+          onProgress:  setFootageProgress,
+          onStats:     setFootageStats,
+        })
+        footageUrl = publicUrl
+      }
+
       const links = requestForm.reference_links
         .split('\n')
         .map((l) => l.trim())
         .filter(Boolean)
-      const footageLink = requestForm.footage_link.trim()
+
       const { error } = await supabase.from('content_drafts').insert({
-        client_id: clientId,
-        title: requestForm.title || null,
-        type: requestForm.type,
-        concept: requestForm.concept || null,
-        target_date: requestForm.target_date || null,
-        inspiration_links: links.length ? links : null,
-        client_footage_links: footageLink ? [footageLink] : null,
-        status: 'pending_client',
-        created_by: user.id,
+        client_id:            clientId,
+        title:                requestForm.title || null,
+        type:                 requestForm.type,
+        concept:              requestForm.concept || null,
+        inspiration_links:    links.length ? links : null,
+        client_footage_links: footageUrl ? [footageUrl] : null,
+        status:               'pending_client',
+        created_by:           user.id,
       })
       if (error) throw new Error(error.message)
+
       setShowRequestModal(false)
-      setRequestForm({ type: 'post', title: '', concept: '', target_date: '', reference_links: '', footage_link: '' })
+      setRequestForm({ type: 'post', title: '', concept: '', reference_links: '' })
+      setFootageFile(null)
+      setFootageProgress(0)
+      setFootageStats(null)
       await loadData()
     } catch (err) {
       alert(err.message)
@@ -691,12 +718,14 @@ export default function ContentCalendar() {
               </button>
             </div>
             <form onSubmit={handleRequestSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+              {/* Type */}
               <div>
                 <label className="block text-xs font-semibold text-text-secondary mb-1.5">Type</label>
                 <select
                   className="input w-full"
                   value={requestForm.type}
                   onChange={(e) => setRequestForm((f) => ({ ...f, type: e.target.value }))}
+                  disabled={submitting}
                 >
                   <option value="post">Post</option>
                   <option value="reel">Reel</option>
@@ -705,6 +734,8 @@ export default function ContentCalendar() {
                   <option value="other">Other</option>
                 </select>
               </div>
+
+              {/* Title */}
               <div>
                 <label className="block text-xs font-semibold text-text-secondary mb-1.5">Title</label>
                 <input
@@ -713,8 +744,11 @@ export default function ContentCalendar() {
                   placeholder="Give your idea a title"
                   value={requestForm.title}
                   onChange={(e) => setRequestForm((f) => ({ ...f, title: e.target.value }))}
+                  disabled={submitting}
                 />
               </div>
+
+              {/* Concept */}
               <div>
                 <label className="block text-xs font-semibold text-text-secondary mb-1.5">Description / Concept</label>
                 <textarea
@@ -722,43 +756,123 @@ export default function ContentCalendar() {
                   placeholder="Describe the concept, vibe, key message…"
                   value={requestForm.concept}
                   onChange={(e) => setRequestForm((f) => ({ ...f, concept: e.target.value }))}
+                  disabled={submitting}
                 />
               </div>
+
+              {/* Reference links */}
               <div>
-                <label className="block text-xs font-semibold text-text-secondary mb-1.5">Post Date</label>
-                <input
-                  type="date"
-                  className="input w-full"
-                  value={requestForm.target_date}
-                  onChange={(e) => setRequestForm((f) => ({ ...f, target_date: e.target.value }))}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-text-secondary mb-1.5">Reference Links <span className="font-normal text-text-muted">(one per line)</span></label>
+                <label className="block text-xs font-semibold text-text-secondary mb-1.5">
+                  Reference Links <span className="font-normal text-text-muted">(one per line, optional)</span>
+                </label>
                 <textarea
                   className="input w-full min-h-[72px] resize-none text-sm"
                   placeholder={"https://example.com/inspo\nhttps://instagram.com/..."}
                   value={requestForm.reference_links}
                   onChange={(e) => setRequestForm((f) => ({ ...f, reference_links: e.target.value }))}
+                  disabled={submitting}
                 />
               </div>
+
+              {/* Footage upload */}
               <div>
-                <label className="block text-xs font-semibold text-text-secondary mb-1.5">Footage or Files Link <span className="font-normal text-text-muted">(optional)</span></label>
+                <label className="block text-xs font-semibold text-text-secondary mb-1.5">
+                  Attach Footage <span className="font-normal text-text-muted">(optional)</span>
+                </label>
+
                 <input
-                  type="text"
-                  className="input w-full"
-                  placeholder="Google Drive, Dropbox, etc."
-                  value={requestForm.footage_link}
-                  onChange={(e) => setRequestForm((f) => ({ ...f, footage_link: e.target.value }))}
+                  ref={footageInputRef}
+                  type="file"
+                  accept="video/*,image/*,.zip,.mov,.mp4,.avi,.mkv"
+                  className="hidden"
+                  disabled={submitting}
+                  onChange={(e) => { if (e.target.files[0]) setFootageFile(e.target.files[0]) }}
                 />
+
+                {footageFile ? (
+                  <div className="flex items-center gap-3 p-3 rounded-xl border border-green-200 bg-green-50">
+                    <div className="w-9 h-9 rounded-xl bg-green-100 flex items-center justify-center shrink-0">
+                      <FileVideo size={16} className="text-green-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-text-primary truncate">{footageFile.name}</p>
+                      <p className="text-xs text-text-muted">
+                        {(footageFile.size / 1_048_576).toFixed(1)} MB
+                      </p>
+                    </div>
+                    {!submitting && (
+                      <button
+                        type="button"
+                        onClick={() => { setFootageFile(null); setFootageProgress(0); setFootageStats(null) }}
+                        className="p-1.5 rounded-lg text-text-muted hover:text-red-500 hover:bg-red-50 transition-colors"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => !submitting && footageInputRef.current?.click()}
+                    onDragOver={(e) => { e.preventDefault(); setFootageDragOver(true) }}
+                    onDragLeave={() => setFootageDragOver(false)}
+                    onDrop={(e) => {
+                      e.preventDefault(); setFootageDragOver(false)
+                      if (e.dataTransfer.files[0]) setFootageFile(e.dataTransfer.files[0])
+                    }}
+                    className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-all ${
+                      footageDragOver ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/50 hover:bg-surface-2'
+                    }`}
+                  >
+                    <Upload size={18} className="mx-auto text-text-muted mb-1.5" />
+                    <p className="text-sm text-text-secondary">
+                      <span className="text-accent font-medium">Browse</span> or drop footage here
+                    </p>
+                    <p className="text-xs text-text-muted mt-0.5">MP4, MOV, AVI, photos, ZIP</p>
+                  </div>
+                )}
+
+                {/* Upload progress (shows during submit if file attached) */}
+                {submitting && footageFile && footageProgress > 0 && (
+                  <div className="mt-2">
+                    <div className="flex justify-between text-xs text-text-muted mb-1">
+                      <span>Uploading footage…</span>
+                      <div className="flex gap-2">
+                        {footageStats && <span className="font-medium">{fmtSpeed(footageStats.speed)}</span>}
+                        {footageStats?.eta != null && <span>{fmtEta(footageStats.eta)}</span>}
+                        <span>{footageProgress}%</span>
+                      </div>
+                    </div>
+                    <div className="h-1.5 bg-surface-3 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-accent rounded-full transition-all duration-200"
+                        style={{ width: `${footageProgress}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
+
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setShowRequestModal(false)} className="btn-secondary flex-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowRequestModal(false)
+                    setFootageFile(null); setFootageProgress(0); setFootageStats(null)
+                  }}
+                  className="btn-secondary flex-1"
+                  disabled={submitting}
+                >
                   Cancel
                 </button>
-                <button type="submit" disabled={submitting} className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50">
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50"
+                >
                   {submitting ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-                  {submitting ? 'Submitting…' : 'Submit Request'}
+                  {submitting
+                    ? (footageFile && footageProgress < 100 ? 'Uploading…' : 'Submitting…')
+                    : 'Submit Request'}
                 </button>
               </div>
             </form>
