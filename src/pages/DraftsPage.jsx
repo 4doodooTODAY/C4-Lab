@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { uploadToR2, fmtSpeed, fmtEta } from '../lib/r2'
+import { uploadToR2, fmtSpeed, fmtEta, warmUp } from '../lib/r2'
 import DownloadButton from '../components/ui/DownloadButton'
 import { formatDistanceToNow } from 'date-fns'
 
@@ -493,7 +493,7 @@ export default function DraftsPage() {
             )}
             {isCreativeOrAdmin && (
               <button
-                onClick={() => setShowUpload(true)}
+                onClick={() => { warmUp(); setShowUpload(true) }}
                 className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-accent text-white hover:bg-accent/90 transition-colors"
               >
                 <Plus size={12} /> Upload Draft
@@ -583,7 +583,7 @@ export default function DraftsPage() {
             </h3>
             {isCreativeOrAdmin && (
               <button
-                onClick={() => setShowUpload(true)}
+                onClick={() => { warmUp(); setShowUpload(true) }}
                 className="flex items-center gap-1 text-xs text-accent hover:underline"
               >
                 <Upload size={11} /> Upload new draft
@@ -597,7 +597,7 @@ export default function DraftsPage() {
               <p className="text-sm font-medium text-text-muted">No drafts uploaded yet</p>
               {isCreativeOrAdmin && (
                 <button
-                  onClick={() => setShowUpload(true)}
+                  onClick={() => { warmUp(); setShowUpload(true) }}
                   className="mt-4 px-5 py-2 rounded-xl text-xs font-semibold bg-accent text-white hover:bg-accent/90 transition-colors"
                 >
                   Upload First Draft

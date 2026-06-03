@@ -195,6 +195,7 @@ export default function DraftVideoReview() {
           .order('timestamp_seconds'),
       ])
       if (vRes.error) throw vRes.error
+      if (cRes.error) console.warn('Comments fetch error:', cRes.error.message)
       setVersion(vRes.data)
       setComments(cRes.data || [])
     } catch (e) {

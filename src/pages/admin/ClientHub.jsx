@@ -702,6 +702,8 @@ function ShootsTab({ clientId, client }) {
 function ContentTab({ clientId, shoots, projects, onRefetchProjects }) {
   const { drafts, loading, refetch } = useContentDrafts(clientId)
   const navigate = useNavigate()
+  const { profile } = useAuth()
+  const isAdminUser = profile?.role === 'admin'
   const [showNew, setShowNew]   = useState(false)
   const [updating, setUpdating] = useState(null)
   const [deleteConfirm, setDeleteConfirm] = useState(null)
@@ -887,7 +889,8 @@ function ContentTab({ clientId, shoots, projects, onRefetchProjects }) {
         </button>
       </div>
 
-      {draft.status === 'pending_client' && (
+      {/* Only admins and clients can approve concepts — photographers/creatives can create but not approve */}
+      {draft.status === 'pending_client' && isAdminUser && (
         <div className="flex gap-2 mt-2">
           <button onClick={() => handleStatus(draft.id, 'approved')} disabled={!!updating}
             className="btn-secondary text-xs flex-1 flex items-center justify-center gap-1">
@@ -899,6 +902,9 @@ function ContentTab({ clientId, shoots, projects, onRefetchProjects }) {
             Decline
           </button>
         </div>
+      )}
+      {draft.status === 'pending_client' && !isAdminUser && (
+        <p className="text-[10px] text-text-muted mt-2 text-center">Awaiting admin or client approval</p>
       )}
       {draft.status === 'approved' && (() => {
         const linkedProject = projects?.find((p) => p.draft_id === draft.id)

@@ -5,14 +5,20 @@ const CHUNK_SIZE     = 16 * 1024 * 1024   // 16 MB per part — more parts = mor
 const PARALLEL_PARTS = 6                   // simultaneous part uploads
 const MULTIPART_MIN  = 8 * 1024 * 1024    // use multipart for files ≥ 8 MB
 
-// ── Auth header helper ────────────────────────────────────────────────────────
+// ── Auth header helper — cached for 50s to avoid repeated getSession() calls ──
+let _cachedHeaders = null
+let _cachedAt = 0
 async function authHeaders() {
+  const now = Date.now()
+  if (_cachedHeaders && now - _cachedAt < 50_000) return _cachedHeaders
   const { data: { session } } = await supabase.auth.getSession()
-  return {
+  _cachedHeaders = {
     'Content-Type':  'application/json',
     'Authorization': `Bearer ${session?.access_token}`,
     'apikey':        import.meta.env.VITE_SUPABASE_ANON_KEY,
   }
+  _cachedAt = now
+  return _cachedHeaders
 }
 
 const EDGE = () => `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/r2-upload`
@@ -26,6 +32,16 @@ async function callEdge(body) {
   const json = await res.json()
   if (!res.ok) throw new Error(json.error || 'Edge function error')
   return json
+}
+
+/**
+ * warmUp — call this early (e.g. when upload modal opens) to prime the
+ * Supabase edge function and reduce cold-start latency on first upload.
+ */
+export function warmUp() {
+  authHeaders().then((h) => {
+    fetch(EDGE(), { method: 'OPTIONS', headers: h }).catch(() => {})
+  }).catch(() => {})
 }
 
 // ── Upload a single part via XHR ─────────────────────────────────────────────
