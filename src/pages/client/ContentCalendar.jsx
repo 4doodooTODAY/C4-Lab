@@ -19,11 +19,12 @@ import { fmtTime } from '../../lib/time'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const ITEM_STYLES = {
-  shoot:    { bg: 'bg-purple-100', text: 'text-purple-700', dot: 'bg-purple-500', border: 'border-purple-200' },
-  draft:    { bg: 'bg-amber-50',   text: 'text-amber-700',  dot: 'bg-amber-500',  border: 'border-amber-200' },
-  approved: { bg: 'bg-green-50',   text: 'text-green-700',  dot: 'bg-green-500',  border: 'border-green-200' },
-  review:   { bg: 'bg-orange-50',  text: 'text-orange-700', dot: 'bg-orange-500', border: 'border-orange-200' },
-  event:    { bg: 'bg-blue-50',    text: 'text-blue-700',   dot: 'bg-blue-500',   border: 'border-blue-200' },
+  shoot:       { bg: 'bg-purple-100', text: 'text-purple-700', dot: 'bg-purple-500', border: 'border-purple-200' },
+  draft:       { bg: 'bg-amber-50',   text: 'text-amber-700',  dot: 'bg-amber-500',  border: 'border-amber-200' },
+  approved:    { bg: 'bg-green-50',   text: 'text-green-700',  dot: 'bg-green-500',  border: 'border-green-200' },
+  review:      { bg: 'bg-orange-50',  text: 'text-orange-700', dot: 'bg-orange-500', border: 'border-orange-200' },
+  draftReview: { bg: 'bg-accent/10', text: 'text-accent',      dot: 'bg-accent',     border: 'border-accent/30' },
+  event:       { bg: 'bg-blue-50',    text: 'text-blue-700',   dot: 'bg-blue-500',   border: 'border-blue-200' },
 }
 
 const DRAFT_TYPE_LABELS = {
@@ -117,8 +118,28 @@ function ItemDetail({ item, onApprove, onDecline, onClose, updating }) {
           </div>
         )}
 
+        {/* Draft version ready to review */}
+        {item.kind === 'draftReview' && (
+          <div className="mt-2">
+            <p className="text-xs text-text-secondary mb-2">
+              {item.isPhoto ? 'Your photos are ready' : 'Your video is ready'} — review and leave feedback or approve.
+            </p>
+          </div>
+        )}
+
         {/* Actions */}
         <div className="mt-4 flex gap-2">
+          {item.kind === 'draftReview' && (
+            <button
+              onClick={() => navigate(item.isPhoto
+                ? `/drafts/${item.draftId}/photo-review/${item.versionId}`
+                : `/drafts/${item.draftId}/video-review/${item.versionId}`
+              )}
+              className="btn-primary text-xs flex-1 flex items-center justify-center gap-1.5"
+            >
+              {item.isPhoto ? <><Camera size={11} /> Review Photos</> : <><Film size={11} /> Watch & Review</>}
+            </button>
+          )}
           {item.kind === 'draft' && (
             <>
               <button onClick={() => onApprove(item)} disabled={updating}
@@ -180,6 +201,17 @@ function ListView({ allItems, onApprove, onDecline, updating }) {
           {item.location && <p className="text-xs text-text-muted mt-1 flex items-center gap-1"><MapPin size={10} /> {item.location}</p>}
 
           <div className="flex gap-2 mt-3">
+            {item.kind === 'draftReview' && (
+              <button
+                onClick={() => navigate(item.isPhoto
+                  ? `/drafts/${item.draftId}/photo-review/${item.versionId}`
+                  : `/drafts/${item.draftId}/video-review/${item.versionId}`
+                )}
+                className="text-xs px-3 py-1.5 rounded-lg bg-accent text-white font-medium hover:bg-accent/90 transition-colors flex items-center gap-1"
+              >
+                {item.isPhoto ? <><Camera size={10} /> Review Photos</> : <><Film size={10} /> Watch & Review</>}
+              </button>
+            )}
             {item.kind === 'draft' && (
               <>
                 <button onClick={() => onApprove(item)} disabled={updating}
@@ -302,10 +334,10 @@ export default function ContentCalendar() {
             .in('project_id', projectIds)
         : Promise.resolve({ data: [] }),
 
-      // Content drafts
+      // Content drafts (with pending draft versions for review notifications)
       supabase
         .from('content_drafts')
-        .select('id, type, title, concept, target_date, inspiration_links, status, shoots(title)')
+        .select('id, type, title, concept, target_date, inspiration_links, status, shoots(title), content_draft_versions(id, version_number, video_url, photo_urls, status)')
         .eq('client_id', clientId)
         .not('status', 'in', '("scrapped","declined")'),
 
@@ -373,9 +405,30 @@ export default function ContentCalendar() {
       })
     })
 
-    // Drafts
+    // Drafts + any draft versions pending client review
     ;(draftsRes.data || []).forEach((d) => {
       const date = d.target_date ? parseISO(d.target_date) : null
+
+      // Add a "review" item for each pending draft version
+      const pendingVersions = (d.content_draft_versions || [])
+        .filter((v) => v.status === 'pending_client_review')
+      pendingVersions.forEach((v) => {
+        const isPhoto = !v.video_url && v.photo_urls?.length > 0
+        items.push({
+          id:         `dv-${v.id}`,
+          rawId:      v.id,
+          kind:       'draftReview',
+          type:       d.type,
+          title:      `${d.title || DRAFT_TYPE_LABELS[d.type] || 'Draft'} — Draft ${v.version_number} Ready`,
+          date:       date || new Date(),
+          dateLabel:  date ? format(date, 'MMM d, yyyy') : 'Review now',
+          draftId:    d.id,
+          versionId:  v.id,
+          isPhoto,
+        })
+      })
+
+      // Show the concept card itself
       items.push({
         id:          `draft-${d.id}`,
         rawId:       d.id,
@@ -536,8 +589,9 @@ export default function ContentCalendar() {
   const selectedDayItems = selected ? getDayItems(selected) : []
 
   // Pending approval count
-  const pendingCount = allItems.filter((i) => i.kind === 'draft').length
-  const reviewCount  = allItems.filter((i) => i.kind === 'review').length
+  const pendingCount      = allItems.filter((i) => i.kind === 'draft').length
+  const reviewCount       = allItems.filter((i) => i.kind === 'review').length
+  const draftReviewCount  = allItems.filter((i) => i.kind === 'draftReview').length
 
   return (
     <div className="p-6 max-w-3xl">
@@ -554,6 +608,11 @@ export default function ContentCalendar() {
             {reviewCount > 0 && (
               <span className="text-xs font-medium text-orange-700 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full flex items-center gap-1">
                 <Film size={10} /> {reviewCount} item{reviewCount !== 1 ? 's' : ''} to review
+              </span>
+            )}
+            {draftReviewCount > 0 && (
+              <span className="text-xs font-medium text-accent bg-accent/10 border border-accent/30 px-2 py-0.5 rounded-full flex items-center gap-1">
+                <Film size={10} /> {draftReviewCount} draft{draftReviewCount !== 1 ? 's' : ''} ready to review
               </span>
             )}
           </div>

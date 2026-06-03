@@ -36,6 +36,9 @@ const ClientMyProjects       = lazy(() => import('./pages/client/MyProjects'))
 const VideoRevisionReview    = lazy(() => import('./pages/VideoRevisionReview'))
 const PhotoRevisionReview    = lazy(() => import('./pages/PhotoRevisionReview'))
 const AdminFileSystem        = lazy(() => import('./pages/admin/FileSystem'))
+const DraftsPage             = lazy(() => import('./pages/DraftsPage'))
+const DraftVideoReview       = lazy(() => import('./pages/DraftVideoReview'))
+const DraftPhotoReview       = lazy(() => import('./pages/DraftPhotoReview'))
 
 function PageLoader() {
   return (
@@ -153,6 +156,17 @@ function AppRoutes() {
           } />
           <Route path="/projects/:id/photo-revision/:revisionId" element={
             <ProtectedRoute roles={['admin', 'creative', 'editor', 'client']}><PhotoRevisionReview /></ProtectedRoute>
+          } />
+
+          {/* Content draft upload hub + per-version review */}
+          <Route path="/drafts/:draftId" element={
+            <ProtectedRoute roles={['admin', 'creative', 'editor', 'client']}><DraftsPage /></ProtectedRoute>
+          } />
+          <Route path="/drafts/:draftId/video-review/:versionId" element={
+            <ProtectedRoute roles={['admin', 'creative', 'editor', 'client']}><DraftVideoReview /></ProtectedRoute>
+          } />
+          <Route path="/drafts/:draftId/photo-review/:versionId" element={
+            <ProtectedRoute roles={['admin', 'creative', 'editor', 'client']}><DraftPhotoReview /></ProtectedRoute>
           } />
 
           {/* Creative */}

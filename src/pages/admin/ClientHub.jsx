@@ -4,7 +4,7 @@ import {
   ArrowLeft, Building2, Users2, CalendarDays, FolderKanban,
   Inbox, Plus, X, Loader2, Edit2, MapPin, Clock, Check, Pencil,
   Camera, Film, ExternalLink, Trash2, ChevronRight, AlertCircle,
-  Link as LinkIcon, FileText, LayoutList, HardDrive, Image, File,
+  Link as LinkIcon, FileText, LayoutList, HardDrive, Image, File, Upload,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -877,37 +877,39 @@ function ContentTab({ clientId, shoots, projects, onRefetchProjects }) {
         </div>
       </div>
 
+      {/* Upload drafts — always available for admin/creative/editor */}
+      <div className="mt-2 pt-2 border-t border-border">
+        <button
+          onClick={() => navigate(`/drafts/${draft.id}`)}
+          className="w-full btn-primary text-xs flex items-center justify-center gap-1.5"
+        >
+          <Upload size={11} /> Upload / Manage Drafts
+        </button>
+      </div>
+
       {draft.status === 'pending_client' && (
-        <div className="flex gap-2 mt-2 pt-2 border-t border-border">
+        <div className="flex gap-2 mt-2">
           <button onClick={() => handleStatus(draft.id, 'approved')} disabled={!!updating}
-            className="btn-primary text-xs flex-1 flex items-center justify-center gap-1">
+            className="btn-secondary text-xs flex-1 flex items-center justify-center gap-1">
             {updating === draft.id ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />}
-            Approve & Create Project
+            Approve Concept
           </button>
           <button onClick={() => handleStatus(draft.id, 'scrapped')} disabled={!!updating}
-            className="btn-secondary text-xs flex-1">
+            className="btn-secondary text-xs flex-1 text-red-500 hover:border-red-200">
             Decline
           </button>
         </div>
       )}
       {draft.status === 'approved' && (() => {
         const linkedProject = projects?.find((p) => p.draft_id === draft.id)
-        return (
-          <div className="flex gap-2 mt-2 pt-2 border-t border-border">
-            {linkedProject ? (
-              <button onClick={() => navigate(`/projects/${linkedProject.id}`)}
-                className="btn-secondary text-xs flex-1 flex items-center justify-center gap-1">
-                <ChevronRight size={11} /> View Project
-              </button>
-            ) : (
-              <button onClick={() => handleCreateProject(draft)} disabled={!!updating}
-                className="btn-primary text-xs flex-1 flex items-center justify-center gap-1">
-                {updating === draft.id ? <Loader2 size={11} className="animate-spin" /> : <FolderKanban size={11} />}
-                Create Project
-              </button>
-            )}
+        return linkedProject ? (
+          <div className="mt-2">
+            <button onClick={() => navigate(`/projects/${linkedProject.id}`)}
+              className="btn-secondary text-xs w-full flex items-center justify-center gap-1">
+              <ChevronRight size={11} /> View Project
+            </button>
           </div>
-        )
+        ) : null
       })()}
     </div>
   )
