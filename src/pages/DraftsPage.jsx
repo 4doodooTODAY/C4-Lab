@@ -130,7 +130,7 @@ function UploadModal({ draftId, clientName, projectName, onClose, onUploaded }) 
             setEta(fmtEta(remaining))
           },
         })
-        videoUrl = url
+        videoUrl = url.publicUrl
       } else {
         for (let i = 0; i < files.length; i++) {
           const url = await uploadToR2({
@@ -145,7 +145,7 @@ function UploadModal({ draftId, clientName, projectName, onClose, onUploaded }) 
               setEta(fmtEta(remaining))
             },
           })
-          photoUrls.push(url)
+          photoUrls.push(url.publicUrl)
         }
       }
 
@@ -417,11 +417,11 @@ export default function DraftsPage() {
           </div>
 
           {/* Footage links from client */}
-          {Array.isArray(draft.footage_urls) && draft.footage_urls.length > 0 && (
+          {Array.isArray(draft.client_footage_links) && draft.client_footage_links.length > 0 && (
             <div className="pt-4 border-t border-border">
               <p className="text-xs font-semibold text-text-muted mb-2 uppercase tracking-wide">Client Footage</p>
               <div className="flex flex-wrap gap-2">
-                {draft.footage_urls.map((url, i) => (
+                {draft.client_footage_links.map((url, i) => (
                   <DownloadButton
                     key={i}
                     url={url}

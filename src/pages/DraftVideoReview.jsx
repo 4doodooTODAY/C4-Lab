@@ -335,10 +335,10 @@ export default function DraftVideoReview() {
         </button>
         <Film size={14} className="text-white/40" />
         <span className="text-sm font-semibold">{draft?.title || 'Draft Review'}</span>
-        {draft?.content_drafts?.clients?.name && (
+        {draft?.clients?.name && (
           <>
             <span className="text-white/30">·</span>
-            <span className="text-xs text-white/40">{draft.content_drafts.clients.name}</span>
+            <span className="text-xs text-white/40">{draft.clients.name}</span>
           </>
         )}
         <span className="text-white/30">·</span>
