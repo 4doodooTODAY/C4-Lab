@@ -46,7 +46,7 @@ export default function ClientDashboard() {
 
         const [projRes, revRes, shootsRes] = await Promise.all([
           supabase.from('projects')
-            .select('id, name, stage, status, due_date, created_at')
+            .select('id, name, stage, status, due_date, created_at, updated_at')
             .eq('client_id', client.id)
             .order('created_at', { ascending: false }),
           supabase.from('project_revisions')
@@ -63,7 +63,12 @@ export default function ClientDashboard() {
         ])
 
         if (projRes.error) console.error('Projects fetch error:', projRes.error)
-        const projData = (projRes.data || []).filter((p) => p.status !== 'archived')
+        const fourDaysAgo = new Date(Date.now() - 4 * 24 * 60 * 60 * 1000)
+        const projData = (projRes.data || []).filter((p) => {
+          if (p.status === 'archived') return false
+          if (p.stage === 'delivered' && new Date(p.updated_at) < fourDaysAgo) return false
+          return true
+        })
         setProjects(projData)
         setUpcomingShoots(shootsRes.data || [])
 

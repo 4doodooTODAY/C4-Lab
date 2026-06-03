@@ -139,13 +139,13 @@ export default function CreativeDashboard() {
       if (isAdmin) {
         projQuery = supabase
           .from('projects')
-          .select('id, name, stage, shoot_date, location, creative_id, editor_id, clients(name, contact_name), creative:profiles!creative_id(id, full_name), editor:profiles!editor_id(id, full_name)')
+          .select('id, name, stage, shoot_date, location, updated_at, creative_id, editor_id, clients(name, contact_name), creative:profiles!creative_id(id, full_name), editor:profiles!editor_id(id, full_name)')
           .neq('stage', 'archived')
           .order('shoot_date', { ascending: true, nullsFirst: false })
       } else {
         projQuery = supabase
           .from('projects')
-          .select('id, name, stage, shoot_date, location, editor_id, clients(name, contact_name), editor:profiles!editor_id(id, full_name)')
+          .select('id, name, stage, shoot_date, location, updated_at, editor_id, clients(name, contact_name), editor:profiles!editor_id(id, full_name)')
           .neq('stage', 'archived')
           .or(`creative_id.eq.${user.id},editor_id.eq.${user.id}`)
           .order('shoot_date', { ascending: true, nullsFirst: false })
@@ -179,7 +179,14 @@ export default function CreativeDashboard() {
         return (e.calendar_event_members || []).some((m) => m.profile_id === user.id)
       })
 
-      setProjects(myProjects)
+      // Hide delivered projects from dashboard after 4 days
+      const fourDaysAgo = addDays(now, -4)
+      const visibleProjects = myProjects.filter((p) => {
+        if (p.stage !== 'delivered') return true
+        return new Date(p.updated_at) > fourDaysAgo
+      })
+
+      setProjects(visibleProjects)
       setRevisions(revData || [])
       setEvents(visibleEvents)
       setLoading(false)
