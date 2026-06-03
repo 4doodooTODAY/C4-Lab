@@ -2,7 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Film, CalendarDays, Settings,
   LogOut, Users, Building2, Inbox, Home, MessageSquare, Bell, FolderKanban, HardDrive,
-  ShieldCheck, Scissors
+  ShieldCheck, Scissors, Clapperboard
 } from 'lucide-react'
 
 import { useAuth } from '../../contexts/AuthContext'
@@ -26,7 +26,7 @@ const NAV = {
     { to: '/calendar',  icon: CalendarDays,     label: 'Calendar' },
     { to: '/clients',   icon: Building2,        label: 'Clients' },
     { to: '/projects',  icon: FolderKanban,     label: 'Projects' },
-    { to: '/files',     icon: HardDrive,        label: 'Files' },
+    { to: '/files',     icon: Clapperboard,     label: 'Media' },
     { to: '/messages',  icon: MessageSquare,    label: 'Messages' },
   ],
   editor: [
@@ -34,7 +34,7 @@ const NAV = {
     { to: '/calendar',  icon: CalendarDays,     label: 'Calendar' },
     { to: '/clients',   icon: Building2,        label: 'Clients' },
     { to: '/projects',  icon: FolderKanban,     label: 'Projects' },
-    { to: '/files',     icon: HardDrive,        label: 'Files' },
+    { to: '/files',     icon: Clapperboard,     label: 'Media' },
     { to: '/messages',  icon: MessageSquare,    label: 'Messages' },
   ],
   client: [

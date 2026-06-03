@@ -428,6 +428,16 @@ export default function FileSystem() {
   // Build client tree from processedFootage
   const tree = useMemo(() => {
     const t = {}
+    // For creatives/editors, seed every assigned shoot so the page shows a full
+    // list of their shoots — even ones with no uploads yet. Skipped while a
+    // search/type filter is active so results stay scoped to matches.
+    if (isCreative && !search.trim() && typeFilter === 'All types') {
+      Object.values(shootMap).forEach(s => {
+        const cid = s.client_id || '__unlinked'
+        if (!t[cid]) t[cid] = {}
+        if (!t[cid][s.id]) t[cid][s.id] = []
+      })
+    }
     processedFootage.forEach(f => {
       const cid = f.client_id || '__unlinked'
       if (!t[cid]) t[cid] = {}
@@ -436,7 +446,7 @@ export default function FileSystem() {
       t[cid][sid].push(f)
     })
     return t
-  }, [processedFootage])
+  }, [processedFootage, isCreative, search, typeFilter, shootMap])
 
   // Stats
   const totalSize    = totalBytes(footage)
@@ -507,9 +517,9 @@ export default function FileSystem() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">File System</h1>
+          <h1 className="text-2xl font-bold text-text-primary">{isCreative ? 'Media' : 'File System'}</h1>
           <p className="text-sm text-text-muted mt-0.5">
-            {isCreative ? 'Files for your assigned clients' : 'All uploaded footage — organised by client and shoot'}
+            {isCreative ? 'Shoots for your assigned clients' : 'All uploaded footage — organised by client and shoot'}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -612,7 +622,7 @@ export default function FileSystem() {
 
           {/* ── Footage tab ── */}
           {tab === 'footage' && (
-            processedFootage.length === 0 ? (
+            Object.keys(tree).length === 0 ? (
               <div className="card p-16 text-center">
                 <HardDrive size={36} className="mx-auto text-text-muted/20 mb-4" />
                 <p className="text-sm font-semibold text-text-primary">

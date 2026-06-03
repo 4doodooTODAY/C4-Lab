@@ -3,7 +3,7 @@ import {
   X, CalendarDays, MapPin, Camera, Upload, Send,
   Loader2, MessageSquare, ExternalLink, Film, Image,
   File, HardDrive, Link2, Plus, Pencil, Check, Users,
-  AlertCircle,
+  AlertCircle, FolderKanban,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -335,7 +335,10 @@ export default function ShootDetailModal({ shoot: initialShoot, clientId, client
     location:       initialShoot?.location || '',
     creative_notes: initialShoot?.creative_notes || '',
     status:         initialShoot?.status || 'scheduled',
+    project_id:     initialShoot?.project_id || '',
   })
+  const [projects,       setProjects]       = useState([])
+  const [linkedProject,  setLinkedProject]  = useState(null)
   const [teamMembers,    setTeamMembers]    = useState([])
   const [assignedMember, setAssignedMember] = useState(initialShoot?.photographer_id || '')
   const [saving,         setSaving]         = useState(false)
@@ -356,7 +359,27 @@ export default function ShootDetailModal({ shoot: initialShoot, clientId, client
       .select('profile_id, profiles(id, full_name, role)')
       .eq('client_id', clientId)
       .then(({ data }) => setTeamMembers((data || []).map((m) => m.profiles).filter(Boolean)))
+
+    supabase
+      .from('projects')
+      .select('id, name, stage')
+      .eq('client_id', clientId)
+      .neq('stage', 'archived')
+      .order('created_at', { ascending: false })
+      .then(({ data }) => setProjects(data || []))
   }, [editMode, clientId])
+
+  // Resolve the linked project's name for the view-mode display
+  useEffect(() => {
+    const pid = shoot?.project_id
+    if (!pid) { setLinkedProject(null); return }
+    supabase
+      .from('projects')
+      .select('id, name')
+      .eq('id', pid)
+      .maybeSingle()
+      .then(({ data }) => setLinkedProject(data || null))
+  }, [shoot?.project_id])
 
   const set = (k) => (e) => setEditForm((f) => ({ ...f, [k]: e.target.value }))
 
@@ -373,6 +396,7 @@ export default function ShootDetailModal({ shoot: initialShoot, clientId, client
         creative_notes:  editForm.creative_notes || null,
         status:          editForm.status,
         photographer_id: assignedMember || null,
+        project_id:      editForm.project_id || null,
       }
       const { error } = await supabase.from('shoots').update(payload).eq('id', shoot.id)
       if (error) throw error
@@ -423,6 +447,7 @@ export default function ShootDetailModal({ shoot: initialShoot, clientId, client
       location:       shoot.location || '',
       creative_notes: shoot.creative_notes || '',
       status:         shoot.status || 'scheduled',
+      project_id:     shoot.project_id || '',
     })
     setSaveError('')
     setEditMode(false)
@@ -496,6 +521,21 @@ export default function ShootDetailModal({ shoot: initialShoot, clientId, client
                     <option value="completed">Completed</option>
                     <option value="cancelled">Cancelled</option>
                   </select>
+                </div>
+
+                {/* Linked project — optional */}
+                <div>
+                  <label className="label flex items-center gap-1.5"><FolderKanban size={11} /> Linked Project <span className="text-text-muted font-normal">(optional)</span></label>
+                  {projects.length === 0 ? (
+                    <p className="text-xs text-text-muted mt-1">No projects for this client yet.</p>
+                  ) : (
+                    <select className="input" value={editForm.project_id} onChange={set('project_id')}>
+                      <option value="">— Not linked to a project —</option>
+                      {projects.map((p) => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  )}
                 </div>
 
                 {/* Assigned shooter */}
@@ -573,6 +613,13 @@ export default function ShootDetailModal({ shoot: initialShoot, clientId, client
                   <div className="bg-surface-2/60 rounded-xl p-4">
                     <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Creative Notes</p>
                     <p className="text-sm text-text-primary leading-relaxed">{shoot.creative_notes}</p>
+                  </div>
+                )}
+
+                {canSeeCreativeNotes && linkedProject && (
+                  <div className="flex items-center gap-2 text-xs text-text-muted">
+                    <FolderKanban size={11} className="shrink-0" />
+                    <span>Linked to project <span className="font-medium text-text-primary">{linkedProject.name}</span></span>
                   </div>
                 )}
 

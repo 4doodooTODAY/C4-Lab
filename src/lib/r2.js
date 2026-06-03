@@ -1,8 +1,8 @@
 import { supabase } from './supabase'
 
 // ── Config ────────────────────────────────────────────────────────────────────
-const CHUNK_SIZE     = 16 * 1024 * 1024   // 16 MB per part — more parts = more parallelism
-const PARALLEL_PARTS = 6                   // simultaneous part uploads
+const CHUNK_SIZE     = 12 * 1024 * 1024   // 12 MB per part — smaller parts keep the worker pool saturated
+const PARALLEL_PARTS = 10                  // simultaneous part uploads (continuous worker pool)
 const MULTIPART_MIN  = 8 * 1024 * 1024    // use multipart for files ≥ 8 MB
 
 // ── Auth header helper — cached for 50s to avoid repeated getSession() calls ──
@@ -114,21 +114,27 @@ async function uploadMultipart({ file, key, publicUrl, uploadId, partUrls, onPro
   }
 
   try {
-    // 2. Upload parts in batches of PARALLEL_PARTS
-    for (let batchStart = 0; batchStart < totalParts; batchStart += PARALLEL_PARTS) {
-      const batchEnd     = Math.min(batchStart + PARALLEL_PARTS, totalParts)
-      const batchIndices = Array.from({ length: batchEnd - batchStart }, (_, i) => batchStart + i)
-
-      await Promise.all(batchIndices.map(async (partIdx) => {
-        const start  = partIdx * CHUNK_SIZE
-        const end    = Math.min(start + CHUNK_SIZE, file.size)
-        const chunk  = file.slice(start, end)
+    // 2. Upload parts via a continuous worker pool. Unlike fixed batches, a pool
+    //    never waits for a slow part before starting the next one — as soon as any
+    //    worker frees up it grabs the next index, keeping all lanes saturated.
+    let nextPart = 0
+    const worker = async () => {
+      while (true) {
+        if (signal?.aborted) throw new DOMException('Upload cancelled', 'AbortError')
+        const partIdx = nextPart++
+        if (partIdx >= totalParts) return
+        const start = partIdx * CHUNK_SIZE
+        const end   = Math.min(start + CHUNK_SIZE, file.size)
+        const chunk = file.slice(start, end)
         await uploadPart(partUrls[partIdx], chunk, (loaded) => {
           bytesLoaded[partIdx] = loaded
           reportProgress()
         }, signal)
-      }))
+      }
     }
+    await Promise.all(
+      Array.from({ length: Math.min(PARALLEL_PARTS, totalParts) }, () => worker())
+    )
 
     // 3. Complete — edge function uses ListParts to get ETags server-side
     await callEdge({ action: 'multipart-complete', key, uploadId })
