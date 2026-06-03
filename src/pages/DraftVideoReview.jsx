@@ -176,7 +176,9 @@ export default function DraftVideoReview() {
   const [actionError, setActionError] = useState('')
 
   const isClient          = profile?.role === 'client'
+  const isEditor          = profile?.role === 'editor'
   const isCreativeOrAdmin = ['admin', 'creative', 'editor'].includes(profile?.role)
+  const isAdminOnly       = profile?.role === 'admin'
 
   const fetchAll = useCallback(async () => {
     if (!versionId) return
@@ -315,7 +317,9 @@ export default function DraftVideoReview() {
   const draft       = version?.content_drafts
   const status      = version?.status
   const versionNum  = version?.version_number
-  const canAddComments = (isClient && status === 'pending_client_review') || isCreativeOrAdmin
+  // Only clients add timestamped comments (and admins for oversight).
+  // Editors can VIEW all comments but cannot add new ones — it's the client's turn to mark up.
+  const canAddComments   = (isClient && status === 'pending_client_review') || isAdminOnly
   const canActOnComments = isCreativeOrAdmin && status === 'pending_editor'
 
   const statusBadge = {
@@ -459,6 +463,13 @@ export default function DraftVideoReview() {
                 </button>
               </div>
             )}
+            {/* Editor/creative: show waiting state when client hasn't reviewed yet */}
+            {status === 'pending_client_review' && isCreativeOrAdmin && !isClient && (
+              <div className="flex items-center gap-3 text-sm text-white/50">
+                <Loader2 size={15} className="text-blue-400 animate-spin shrink-0" />
+                <span>Waiting on the client to review. You'll see their comments here once they send feedback.</span>
+              </div>
+            )}
             {status === 'pending_editor' && isCreativeOrAdmin && (
               <div className="flex items-center gap-3 text-sm text-white/50">
                 <MessageSquare size={15} className="text-amber-400 shrink-0" />
@@ -504,7 +515,11 @@ export default function DraftVideoReview() {
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
             {comments.length === 0 ? (
               <p className="text-xs text-white/30 text-center mt-10">
-                {canAddComments ? 'Click the timeline to leave a comment' : 'No comments yet'}
+                {canAddComments
+                  ? 'Click the timeline to leave a comment'
+                  : status === 'pending_client_review' && isCreativeOrAdmin
+                    ? 'Waiting for client comments…'
+                    : 'No comments yet'}
               </p>
             ) : comments.map((c) => (
               <CommentItem

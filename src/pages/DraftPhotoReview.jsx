@@ -461,6 +461,15 @@ export default function DraftPhotoReview() {
             </div>
           )}
 
+          {/* Editor/creative: waiting on client */}
+          {isCreativeOrAdmin && status === 'pending_client_review' && (
+            <div className="p-3 border-t border-border shrink-0">
+              <p className="text-xs text-text-muted flex items-start gap-2">
+                <Loader2 size={13} className="text-blue-500 shrink-0 mt-0.5 animate-spin" />
+                Waiting on the client to review. Their pin comments will appear here.
+              </p>
+            </div>
+          )}
           {/* Editor/creative sees client feedback prompt */}
           {isCreativeOrAdmin && status === 'pending_editor' && (
             <div className="p-3 border-t border-border shrink-0">

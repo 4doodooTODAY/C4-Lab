@@ -110,13 +110,13 @@ export default function DownloadButton({ url, filename, label = 'Download', clas
   let icon, text
   if (status === 'starting') {
     icon = <Loader2 size={14} className="animate-spin" />
-    text = 'Starting…'
+    text = 'Take a deep breath…'
   } else if (status === 'loading') {
     icon = <Loader2 size={14} className="animate-spin" />
-    text = progress > 0 ? `${progress}%` : 'Downloading…'
+    text = progress > 0 ? `Hold for ${Math.max(1, 4 - Math.floor(progress / 25))}… (${progress}%)` : 'Hold for 4…'
   } else if (status === 'done') {
     icon = <Check size={14} />
-    text = 'Done!'
+    text = 'Got it! ✓'
   } else {
     icon = <Download size={14} />
     text = label
