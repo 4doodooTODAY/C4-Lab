@@ -4,7 +4,7 @@ import {
   ArrowLeft, Camera, FolderKanban, HardDrive, Loader2,
   CalendarDays, MapPin, Film, ExternalLink,
   ChevronRight, Building2, FileVideo, Image, File,
-  Upload, Check,
+  Upload, Check, LayoutList,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useShoots } from '../../hooks/useShoots'
@@ -12,6 +12,7 @@ import { format, parseISO, isBefore, startOfDay } from 'date-fns'
 import { fmtTime } from '../../lib/time'
 import { forceDownload } from '../../lib/r2'
 import ShootDetailModal from '../../components/shoots/ShootDetailModal'
+import { formatDistanceToNow } from 'date-fns'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function fmtBytes(bytes) {
@@ -332,10 +333,97 @@ function FilesTab({ clientId }) {
   )
 }
 
+// ── Drafts Tab ─────────────────────────────────────────────────────────────────
+function DraftsTab({ clientId }) {
+  const navigate = useNavigate()
+  const [drafts, setDrafts]   = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!clientId) return
+    supabase
+      .from('content_drafts')
+      .select(`
+        id, title, type, status, created_at,
+        content_draft_versions(id, version_number, status)
+      `)
+      .eq('client_id', clientId)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => { setDrafts(data || []); setLoading(false) })
+  }, [clientId])
+
+  if (loading) return <div className="flex justify-center py-10"><Loader2 size={20} className="animate-spin text-text-muted" /></div>
+
+  if (!drafts.length) return (
+    <div className="card p-10 text-center">
+      <LayoutList size={32} className="mx-auto text-text-muted/30 mb-3" />
+      <p className="text-sm font-semibold text-text-primary">No content drafts yet</p>
+      <p className="text-sm text-text-muted mt-1">Drafts created in the client hub will appear here.</p>
+    </div>
+  )
+
+  const TYPE_COLORS = {
+    reel:  'bg-purple-50 text-purple-700',
+    post:  'bg-blue-50 text-blue-700',
+    photo: 'bg-amber-50 text-amber-700',
+    story: 'bg-pink-50 text-pink-700',
+  }
+
+  return (
+    <div className="space-y-3">
+      {drafts.map((d) => {
+        const versions = d.content_draft_versions || []
+        const latestVersion = versions.length > 0
+          ? versions.reduce((a, b) => a.version_number > b.version_number ? a : b)
+          : null
+        const isApproved = versions.some((v) => v.status === 'approved')
+        const isPendingClient = versions.some((v) => v.status === 'pending_client_review')
+        const isPendingEditor = versions.some((v) => v.status === 'pending_editor')
+
+        let statusLabel = 'No uploads'
+        let statusCls   = 'bg-gray-100 text-gray-500'
+        if (isApproved)      { statusLabel = '✓ Approved';       statusCls = 'bg-green-50 text-green-700' }
+        else if (isPendingClient) { statusLabel = 'Awaiting Client'; statusCls = 'bg-blue-50 text-blue-700' }
+        else if (isPendingEditor) { statusLabel = 'In Revision';     statusCls = 'bg-amber-50 text-amber-700' }
+
+        return (
+          <div
+            key={d.id}
+            onClick={() => navigate(`/drafts/${d.id}`)}
+            className="card p-4 hover:shadow-md transition-shadow cursor-pointer flex items-center gap-4"
+          >
+            <div className="w-9 h-9 rounded-xl bg-surface-2 flex items-center justify-center shrink-0">
+              {d.type === 'reel' || d.type === 'video' ? <Film size={15} className="text-text-secondary" /> : <Image size={15} className="text-text-secondary" />}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-text-primary truncate">{d.title}</p>
+              <p className="text-xs text-text-muted mt-0.5">
+                {versions.length} version{versions.length !== 1 ? 's' : ''} · {formatDistanceToNow(new Date(d.created_at), { addSuffix: true })}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {d.type && (
+                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${TYPE_COLORS[d.type] || 'bg-surface-2 text-text-muted'}`}>
+                  {d.type.charAt(0).toUpperCase() + d.type.slice(1)}
+                </span>
+              )}
+              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${statusCls}`}>
+                {statusLabel}
+              </span>
+            </div>
+            <ChevronRight size={14} className="text-text-muted shrink-0" />
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ── Main Page ──────────────────────────────────────────────────────────────────
 const TABS = [
   { id: 'shoots',   label: 'Shoots',   icon: Camera },
   { id: 'projects', label: 'Projects', icon: FolderKanban },
+  { id: 'drafts',   label: 'Drafts',   icon: LayoutList },
   { id: 'files',    label: 'Files',    icon: HardDrive },
 ]
 
@@ -386,6 +474,7 @@ export default function CreativeClientPage() {
 
       {tab === 'shoots'   && <ShootsTab   clientId={id} clientName={client?.name} />}
       {tab === 'projects' && <ProjectsTab clientId={id} />}
+      {tab === 'drafts'   && <DraftsTab   clientId={id} />}
       {tab === 'files'    && <FilesTab    clientId={id} />}
     </div>
   )

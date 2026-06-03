@@ -1,9 +1,9 @@
 import { supabase } from './supabase'
 
 // ── Config ────────────────────────────────────────────────────────────────────
-const CHUNK_SIZE     = 25 * 1024 * 1024   // 25 MB per part (R2 min is 5 MB)
-const PARALLEL_PARTS = 4                   // simultaneous part uploads
-const MULTIPART_MIN  = 10 * 1024 * 1024   // use multipart for files ≥ 10 MB
+const CHUNK_SIZE     = 16 * 1024 * 1024   // 16 MB per part — more parts = more parallelism
+const PARALLEL_PARTS = 6                   // simultaneous part uploads
+const MULTIPART_MIN  = 8 * 1024 * 1024    // use multipart for files ≥ 8 MB
 
 // ── Auth header helper ────────────────────────────────────────────────────────
 async function authHeaders() {
@@ -31,23 +31,27 @@ async function callEdge(body) {
 // ── Upload a single part via XHR ─────────────────────────────────────────────
 // We don't capture ETags here — CORS blocks that header on presigned URLs.
 // The edge function calls ListParts server-side to get real ETags at complete time.
-function uploadPart(url, chunk, onLoaded) {
+function uploadPart(url, chunk, onLoaded, signal) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     xhr.open('PUT', url)
     xhr.upload.onprogress = (e) => { if (e.lengthComputable) onLoaded(e.loaded) }
     xhr.onload  = () => xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Part upload failed: HTTP ${xhr.status}`))
     xhr.onerror = () => reject(new Error('Part upload network error'))
+    xhr.onabort = () => reject(new DOMException('Upload cancelled', 'AbortError'))
+    if (signal) signal.addEventListener('abort', () => xhr.abort(), { once: true })
     xhr.send(chunk)
   })
 }
 
 // ── Single PUT for small files ────────────────────────────────────────────────
-function uploadSingle(uploadUrl, file, onProgress, onStats) {
+function uploadSingle(uploadUrl, file, onProgress, onStats, signal) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     xhr.open('PUT', uploadUrl)
     xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream')
+    xhr.onabort = () => reject(new DOMException('Upload cancelled', 'AbortError'))
+    if (signal) signal.addEventListener('abort', () => xhr.abort(), { once: true })
 
     if (onProgress || onStats) {
       const startTime = Date.now()
@@ -78,7 +82,7 @@ function uploadSingle(uploadUrl, file, onProgress, onStats) {
 }
 
 // ── Multipart parallel upload for large files ─────────────────────────────────
-async function uploadMultipart({ file, key, publicUrl, uploadId, partUrls, onProgress, onStats }) {
+async function uploadMultipart({ file, key, publicUrl, uploadId, partUrls, onProgress, onStats, signal }) {
   const totalParts  = partUrls.length
   const startTime   = Date.now()
   const bytesLoaded = new Array(totalParts).fill(0)
@@ -106,7 +110,7 @@ async function uploadMultipart({ file, key, publicUrl, uploadId, partUrls, onPro
         await uploadPart(partUrls[partIdx], chunk, (loaded) => {
           bytesLoaded[partIdx] = loaded
           reportProgress()
-        })
+        }, signal)
       }))
     }
 
@@ -122,7 +126,7 @@ async function uploadMultipart({ file, key, publicUrl, uploadId, partUrls, onPro
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────
-export async function uploadToR2({ file, category, clientName, projectName, folderType, shootDate, onProgress, onStats }) {
+export async function uploadToR2({ file, category, clientName, projectName, folderType, shootDate, onProgress, onStats, signal }) {
   const fileInfo = {
     filename:    file.name,
     contentType: file.type || 'application/octet-stream',
@@ -141,12 +145,12 @@ export async function uploadToR2({ file, category, clientName, projectName, fold
       partCount: totalParts,
       ...fileInfo,
     })
-    return uploadMultipart({ file, key, publicUrl, uploadId, partUrls, onProgress, onStats })
+    return uploadMultipart({ file, key, publicUrl, uploadId, partUrls, onProgress, onStats, signal })
   }
 
   // Small file: single presigned PUT
   const { uploadUrl, publicUrl, key } = await callEdge({ action: 'presign', ...fileInfo })
-  await uploadSingle(uploadUrl, file, onProgress, onStats)
+  await uploadSingle(uploadUrl, file, onProgress, onStats, signal)
   return { publicUrl, key }
 }
 

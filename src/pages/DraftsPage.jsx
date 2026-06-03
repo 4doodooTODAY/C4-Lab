@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Loader2, Upload, Film, Image, Check,
-  ChevronRight, Plus, X, Clock, AlertCircle,
+  ChevronRight, Plus, X, Clock, AlertCircle, Globe, User,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -92,14 +92,31 @@ function UploadModal({ draftId, clientName, projectName, onClose, onUploaded }) 
   const [speed,      setSpeed]      = useState('')
   const [eta,        setEta]        = useState('')
   const [error,      setError]      = useState('')
+  const abortCtrlRef = useRef(null)
 
   const handleFileChange = (e) => {
     const picked = Array.from(e.target.files || [])
     setFiles(mediaType === 'video' ? picked.slice(0, 1) : picked)
   }
 
+  const handleCancel = () => {
+    if (uploading && abortCtrlRef.current) {
+      abortCtrlRef.current.abort()
+      setUploading(false)
+      setProgress(0)
+      setSpeed('')
+      setEta('')
+      setError('')
+    } else {
+      onClose()
+    }
+  }
+
   const handleUpload = async () => {
     if (!files.length) return
+    const ctrl = new AbortController()
+    abortCtrlRef.current = ctrl
+
     setUploading(true)
     setError('')
     setProgress(0)
@@ -114,56 +131,70 @@ function UploadModal({ draftId, clientName, projectName, onClose, onUploaded }) 
         .limit(1)
       const nextVersion = (existingVersions?.[0]?.version_number || 0) + 1
 
-      let videoUrl   = null
-      let photoUrls  = []
+      let videoUrl  = null
+      let photoUrls = []
 
       if (mediaType === 'video') {
-        const url = await uploadToR2({
+        const result = await uploadToR2({
           file:        files[0],
           category:    'drafts',
           clientName:  clientName || 'client',
           projectName: projectName || 'project',
           folderType:  'video',
+          signal:      ctrl.signal,
           onProgress:  (pct) => setProgress(pct),
           onStats:     ({ speed: spd, eta: remaining }) => {
             setSpeed(fmtSpeed(spd))
             setEta(fmtEta(remaining))
           },
         })
-        videoUrl = url.publicUrl
+        videoUrl = result.publicUrl
       } else {
-        for (let i = 0; i < files.length; i++) {
-          const url = await uploadToR2({
-            file:        files[i],
-            category:    'drafts',
-            clientName:  clientName || 'client',
-            projectName: projectName || 'project',
-            folderType:  'photos',
-            onProgress:  (pct) => setProgress(Math.round(((i / files.length) + pct / 100 / files.length) * 100)),
-            onStats:     ({ speed: spd, eta: remaining }) => {
-              setSpeed(fmtSpeed(spd))
-              setEta(fmtEta(remaining))
-            },
-          })
-          photoUrls.push(url.publicUrl)
-        }
+        // Upload ALL photos in parallel — much faster than sequential
+        const totalFiles = files.length
+        const perFilePct = new Array(totalFiles).fill(0)
+
+        const results = await Promise.all(
+          Array.from(files).map((file, i) =>
+            uploadToR2({
+              file,
+              category:    'drafts',
+              clientName:  clientName || 'client',
+              projectName: projectName || 'project',
+              folderType:  'photos',
+              signal:      ctrl.signal,
+              onProgress:  (pct) => {
+                perFilePct[i] = pct
+                const overall = Math.round(perFilePct.reduce((a, b) => a + b, 0) / totalFiles)
+                setProgress(overall)
+              },
+              onStats: ({ speed: spd, eta: remaining }) => {
+                setSpeed(fmtSpeed(spd))
+                setEta(fmtEta(remaining))
+              },
+            })
+          )
+        )
+        photoUrls = results.map((r) => r.publicUrl)
       }
 
       const { error: insErr } = await supabase.from('content_draft_versions').insert({
-        draft_id:     draftId,
+        draft_id:       draftId,
         version_number: nextVersion,
-        video_url:    videoUrl,
-        photo_urls:   photoUrls.length ? photoUrls : null,
-        status:       'pending_client_review',
-        created_by:   profile.id,
+        video_url:      videoUrl,
+        photo_urls:     photoUrls.length ? photoUrls : null,
+        status:         'pending_client_review',
+        created_by:     profile.id,
       })
       if (insErr) throw insErr
 
       onUploaded()
     } catch (e) {
+      if (e.name === 'AbortError') return // user cancelled — just close
       setError(e.message)
-    } finally {
       setUploading(false)
+    } finally {
+      if (!ctrl.signal.aborted) setUploading(false)
     }
   }
 
@@ -172,7 +203,7 @@ function UploadModal({ draftId, clientName, projectName, onClose, onUploaded }) 
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <h2 className="text-sm font-semibold text-text-primary">Upload New Draft</h2>
-          <button onClick={onClose} disabled={uploading} className="text-text-muted hover:text-text-primary transition-colors disabled:opacity-40">
+          <button onClick={handleCancel} className="text-text-muted hover:text-text-primary transition-colors">
             <X size={16} />
           </button>
         </div>
@@ -184,13 +215,15 @@ function UploadModal({ draftId, clientName, projectName, onClose, onUploaded }) 
             <div className="flex rounded-xl bg-surface-2 p-1 gap-1">
               <button
                 onClick={() => { setMediaType('video'); setFiles([]) }}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all ${mediaType === 'video' ? 'bg-white shadow text-text-primary' : 'text-text-muted hover:text-text-secondary'}`}
+                disabled={uploading}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all disabled:opacity-50 ${mediaType === 'video' ? 'bg-white shadow text-text-primary' : 'text-text-muted hover:text-text-secondary'}`}
               >
                 <Film size={12} /> Video
               </button>
               <button
                 onClick={() => { setMediaType('photos'); setFiles([]) }}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all ${mediaType === 'photos' ? 'bg-white shadow text-text-primary' : 'text-text-muted hover:text-text-secondary'}`}
+                disabled={uploading}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all disabled:opacity-50 ${mediaType === 'photos' ? 'bg-white shadow text-text-primary' : 'text-text-muted hover:text-text-secondary'}`}
               >
                 <Image size={12} /> Photos
               </button>
@@ -202,7 +235,7 @@ function UploadModal({ draftId, clientName, projectName, onClose, onUploaded }) 
             <p className="text-xs font-semibold text-text-muted mb-2">
               {mediaType === 'video' ? 'Select Video File' : 'Select Photos'}
             </p>
-            <label className={`flex flex-col items-center justify-center gap-2 w-full h-32 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${files.length ? 'border-accent/40 bg-accent/5' : 'border-border hover:border-accent/30 hover:bg-surface-2'}`}>
+            <label className={`flex flex-col items-center justify-center gap-2 w-full h-32 border-2 border-dashed rounded-xl transition-colors ${uploading ? 'cursor-default opacity-50' : 'cursor-pointer'} ${files.length ? 'border-accent/40 bg-accent/5' : 'border-border hover:border-accent/30 hover:bg-surface-2'}`}>
               <Upload size={20} className="text-text-muted" />
               <p className="text-xs text-text-muted">
                 {files.length
@@ -235,7 +268,7 @@ function UploadModal({ draftId, clientName, projectName, onClose, onUploaded }) 
                 <span>{progress}%</span>
                 <span className="flex items-center gap-2">
                   {speed && <span>{speed}</span>}
-                  {eta && <span>~{eta} left</span>}
+                  {eta && <span>{eta}</span>}
                 </span>
               </div>
             </div>
@@ -251,11 +284,10 @@ function UploadModal({ draftId, clientName, projectName, onClose, onUploaded }) 
 
         <div className="flex gap-3 px-6 py-4 border-t border-border">
           <button
-            onClick={onClose}
-            disabled={uploading}
-            className="flex-1 py-2.5 rounded-xl text-sm font-medium border border-border text-text-secondary hover:bg-surface-2 transition-colors disabled:opacity-40"
+            onClick={handleCancel}
+            className="flex-1 py-2.5 rounded-xl text-sm font-medium border border-border text-text-secondary hover:bg-surface-2 transition-colors"
           >
-            Cancel
+            {uploading ? 'Cancel Upload' : 'Cancel'}
           </button>
           <button
             onClick={handleUpload}
@@ -275,13 +307,18 @@ function UploadModal({ draftId, clientName, projectName, onClose, onUploaded }) 
 export default function DraftsPage() {
   const { draftId } = useParams()
   const navigate = useNavigate()
-  const { profile, isAdmin } = useAuth()
+  const { profile } = useAuth()
 
-  const [draft,       setDraft]       = useState(null)
-  const [loading,     setLoading]     = useState(true)
-  const [error,       setError]       = useState('')
-  const [showUpload,  setShowUpload]  = useState(false)
+  const [draft,          setDraft]          = useState(null)
+  const [loading,        setLoading]        = useState(true)
+  const [error,          setError]          = useState('')
+  const [showUpload,     setShowUpload]     = useState(false)
+  const [assignedEditor, setAssignedEditor] = useState(null)  // { id, full_name }
+  const [allEditors,     setAllEditors]     = useState([])    // for admin picker
+  const [publishing,     setPublishing]     = useState(false)
+  const [published,      setPublished]      = useState(false)
 
+  const isAdmin           = profile?.role === 'admin'
   const isCreativeOrAdmin = ['admin', 'creative', 'editor'].includes(profile?.role)
   const isClient          = profile?.role === 'client'
 
@@ -292,7 +329,8 @@ export default function DraftsPage() {
         .from('content_drafts')
         .select(`
           *,
-          clients(name),
+          clients(id, name),
+          assigned_editor:profiles!assigned_editor_id(id, full_name),
           content_draft_versions(
             id, version_number, video_url, photo_urls, status, created_at, notes,
             profiles!created_by(full_name)
@@ -301,17 +339,45 @@ export default function DraftsPage() {
         .eq('id', draftId)
         .single()
       if (fetchErr) throw fetchErr
-      // Sort versions ascending
       if (data?.content_draft_versions) {
         data.content_draft_versions.sort((a, b) => a.version_number - b.version_number)
       }
       setDraft(data)
+      setPublished(!!data?.published_at)
+      // Pre-fill assigned editor state
+      if (data?.assigned_editor) setAssignedEditor(data.assigned_editor)
     } catch (e) {
       setError(e.message)
     } finally {
       setLoading(false)
     }
   }, [draftId])
+
+  // Load client team for editor auto-assign
+  useEffect(() => {
+    if (!draft?.clients?.id) return
+    const clientId = draft.clients.id
+
+    // Fetch all editors/creatives assigned to this client
+    supabase
+      .from('client_creatives')
+      .select('profiles(id, full_name, role)')
+      .eq('client_id', clientId)
+      .then(({ data }) => {
+        const members = (data || []).map((d) => d.profiles).filter(Boolean)
+        setAllEditors(members)
+
+        // Auto-assign: if current user is editor/creative for this client and no editor set yet
+        if (!draft.assigned_editor_id && profile?.role !== 'admin') {
+          const me = members.find((m) => m.id === profile?.id)
+          if (me) {
+            setAssignedEditor(me)
+            // Persist auto-assignment
+            supabase.from('content_drafts').update({ assigned_editor_id: me.id }).eq('id', draftId)
+          }
+        }
+      })
+  }, [draft?.clients?.id, draft?.assigned_editor_id, draftId, profile])
 
   useEffect(() => { fetchDraft() }, [fetchDraft])
 
@@ -328,6 +394,28 @@ export default function DraftsPage() {
   const handleUploaded = () => {
     setShowUpload(false)
     fetchDraft()
+  }
+
+  const handleChangeEditor = async (editorId) => {
+    const editor = allEditors.find((e) => e.id === editorId) || null
+    setAssignedEditor(editor)
+    await supabase.from('content_drafts').update({ assigned_editor_id: editorId || null }).eq('id', draftId)
+  }
+
+  const handlePublish = async () => {
+    setPublishing(true)
+    try {
+      const { error: pubErr } = await supabase
+        .from('content_drafts')
+        .update({ published_at: new Date().toISOString() })
+        .eq('id', draftId)
+      if (pubErr) throw pubErr
+      setPublished(true)
+    } catch (e) {
+      alert('Publish failed: ' + e.message)
+    } finally {
+      setPublishing(false)
+    }
   }
 
   if (loading) return (
@@ -361,11 +449,13 @@ export default function DraftsPage() {
     return 'no_versions'
   })()
 
+  const approvedVersion = versions.find((v) => v.status === 'approved')
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-border sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-6 py-4 flex items-center gap-3">
+        <div className="max-w-4xl mx-auto px-6 py-4 flex items-center gap-3 flex-wrap">
           <button
             onClick={() => navigate(-1)}
             className="text-text-muted hover:text-text-primary transition-colors"
@@ -383,14 +473,33 @@ export default function DraftsPage() {
           <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full ${typeBadge.cls} ml-1`}>
             {typeBadge.label}
           </span>
-          {isCreativeOrAdmin && (
-            <button
-              onClick={() => setShowUpload(true)}
-              className="ml-auto flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-accent text-white hover:bg-accent/90 transition-colors"
-            >
-              <Plus size={12} /> Upload Draft
-            </button>
-          )}
+          <div className="ml-auto flex items-center gap-2">
+            {/* Publish button — admin only, after approved */}
+            {isAdmin && overallStatus === 'approved' && (
+              published ? (
+                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
+                  <Globe size={11} /> Published
+                </span>
+              ) : (
+                <button
+                  onClick={handlePublish}
+                  disabled={publishing}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-green-600 text-white hover:bg-green-700 transition-colors disabled:opacity-50"
+                >
+                  {publishing ? <Loader2 size={12} className="animate-spin" /> : <Globe size={12} />}
+                  Publish
+                </button>
+              )
+            )}
+            {isCreativeOrAdmin && (
+              <button
+                onClick={() => setShowUpload(true)}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-accent text-white hover:bg-accent/90 transition-colors"
+              >
+                <Plus size={12} /> Upload Draft
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -407,14 +516,43 @@ export default function DraftsPage() {
                 <p className="text-sm text-text-secondary mt-3 leading-relaxed">{draft.concept}</p>
               )}
             </div>
-            <div className="shrink-0">
+            <div className="shrink-0 flex flex-col items-end gap-2">
               {overallStatus !== 'no_versions' && (
                 <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${statusConfig(overallStatus).cls}`}>
                   {statusConfig(overallStatus).label}
                 </span>
               )}
+              {published && (
+                <span className="flex items-center gap-1 text-[11px] font-semibold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">
+                  <Globe size={9} /> Published
+                </span>
+              )}
             </div>
           </div>
+
+          {/* Assigned editor — shown to all team, editable by admin */}
+          {isCreativeOrAdmin && (
+            <div className="pt-4 border-t border-border flex items-center gap-3">
+              <User size={13} className="text-text-muted shrink-0" />
+              <span className="text-xs text-text-muted font-medium">Assigned Editor:</span>
+              {isAdmin ? (
+                <select
+                  value={assignedEditor?.id || ''}
+                  onChange={(e) => handleChangeEditor(e.target.value || null)}
+                  className="flex-1 text-xs border border-border rounded-lg px-2.5 py-1.5 bg-white text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/30"
+                >
+                  <option value="">— Unassigned —</option>
+                  {allEditors.map((e) => (
+                    <option key={e.id} value={e.id}>{e.full_name}</option>
+                  ))}
+                </select>
+              ) : (
+                <span className="text-xs text-text-primary font-medium">
+                  {assignedEditor?.full_name || 'Unassigned'}
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Footage links from client */}
           {Array.isArray(draft.client_footage_links) && draft.client_footage_links.length > 0 && (
@@ -475,7 +613,7 @@ export default function DraftsPage() {
           )}
         </div>
 
-        {/* Status guide for client */}
+        {/* Status callouts */}
         {isClient && overallStatus === 'pending_client_review' && (
           <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 flex items-start gap-3">
             <Clock size={16} className="text-blue-500 shrink-0 mt-0.5" />
@@ -504,10 +642,28 @@ export default function DraftsPage() {
           <div className="bg-green-50 border border-green-200 rounded-2xl p-5 flex items-start gap-3">
             <Check size={16} className="text-green-500 shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-semibold text-green-800">Draft approved!</p>
-              <p className="text-xs text-green-700 mt-1">
-                {isClient ? 'You approved this draft. Download the final file above.' : 'The client approved this draft.'}
+              <p className="text-sm font-semibold text-green-800">
+                {published ? 'Draft approved and published!' : 'Draft approved!'}
               </p>
+              <p className="text-xs text-green-700 mt-1">
+                {isClient
+                  ? 'You approved this draft. Download the final file above.'
+                  : published
+                    ? 'This draft has been approved by the client and marked as published.'
+                    : isAdmin
+                      ? 'The client approved this draft. Use the Publish button above to mark it as published.'
+                      : 'The client approved this draft.'}
+              </p>
+              {isAdmin && !published && approvedVersion && (
+                <button
+                  onClick={handlePublish}
+                  disabled={publishing}
+                  className="mt-3 flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-green-600 text-white hover:bg-green-700 transition-colors disabled:opacity-50"
+                >
+                  {publishing ? <Loader2 size={12} className="animate-spin" /> : <Globe size={12} />}
+                  Mark as Published
+                </button>
+              )}
             </div>
           </div>
         )}
