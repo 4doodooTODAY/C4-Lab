@@ -229,10 +229,13 @@ function PitchPanel({ project, clientId, userId, onApproved }) {
   const handleApprove = async () => {
     setApproving(true); setError('')
     try {
-      const { error: e } = await supabase.from('projects')
+      const { data, error: e } = await supabase.from('projects')
         .update({ stage: 'pre_production', pitch_approved_by: userId, pitch_approved_at: new Date().toISOString() })
         .eq('id', project.id)
+        .select('id')
       if (e) throw new Error(e.message)
+      // RLS no-op guard: if no row came back, the update was blocked, not applied.
+      if (!data?.length) throw new Error("You don't have permission to approve this project. Please contact your team.")
 
       // Notify admin + creative
       const targets = [project.creative_id].filter(Boolean)
@@ -262,10 +265,12 @@ function PitchPanel({ project, clientId, userId, onApproved }) {
     if (!notes.trim()) { setShowNotes(true); return }
     setDeclining(true); setError('')
     try {
-      const { error: e } = await supabase.from('projects')
+      const { data, error: e } = await supabase.from('projects')
         .update({ pitch_notes: notes.trim() })
         .eq('id', project.id)
+        .select('id')
       if (e) throw new Error(e.message)
+      if (!data?.length) throw new Error("You don't have permission to send feedback on this project. Please contact your team.")
 
       await notifyAdmins({
         actorId: userId, type: 'pitch_changes_requested',
@@ -302,6 +307,31 @@ function PitchPanel({ project, clientId, userId, onApproved }) {
           <p className="text-sm text-gray-700 leading-relaxed">{project.notes}</p>
         </div>
       )}
+
+      {/* Project details */}
+      <div className="grid grid-cols-2 gap-2 mb-4">
+        <div className="bg-white rounded-xl px-3 py-2.5 border border-accent/10">
+          <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Deliverable</p>
+          <p className="text-sm font-semibold text-gray-800 capitalize">{project.media_type === 'photo' ? 'Photo set' : 'Video'}</p>
+        </div>
+        <div className="bg-white rounded-xl px-3 py-2.5 border border-accent/10">
+          <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Revisions included</p>
+          <p className="text-sm font-semibold text-gray-800">{project.max_revisions || 3}</p>
+        </div>
+        {project.shoot_date && (
+          <div className="bg-white rounded-xl px-3 py-2.5 border border-accent/10">
+            <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Proposed shoot</p>
+            <p className="text-sm font-semibold text-gray-800">{format(parseISO(project.shoot_date), 'MMM d, yyyy')}</p>
+            {project.location && <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5"><MapPin size={9} /> {project.location}</p>}
+          </div>
+        )}
+        {project.target_date && (
+          <div className="bg-white rounded-xl px-3 py-2.5 border border-accent/10">
+            <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Target delivery</p>
+            <p className="text-sm font-semibold text-gray-800">{format(parseISO(project.target_date), 'MMM d, yyyy')}</p>
+          </div>
+        )}
+      </div>
 
       {project.pitch_notes && (
         <div className="bg-orange-50 border border-orange-100 rounded-xl px-4 py-3 mb-4">
@@ -658,7 +688,7 @@ export default function MyProjects() {
       .select(`
         id, name, stage, status, concept, notes,
         target_date, due_date, shoot_date, location,
-        creative_id, editor_id
+        creative_id, editor_id, media_type, max_revisions
       `)
       .eq('client_id', client.id)
       .order('created_at', { ascending: false })
