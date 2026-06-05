@@ -435,7 +435,7 @@ export default function ProjectDetail() {
     setLoadingExtras(true)
     Promise.all([
       supabase.from('shoot_uploads').select('*').eq('project_id', id).order('created_at'),
-      supabase.from('shoot_notes').select('*, profiles(id, full_name, avatar_url)').eq('project_id', id).order('created_at'),
+      supabase.from('shoot_notes').select('*, profiles:profile_id(id, full_name, avatar_url), author:author_id(id, full_name, avatar_url)').eq('project_id', id).order('created_at'),
       supabase.from('project_revisions').select('*, profiles(id, full_name)').eq('project_id', id).order('revision_number'),
     ]).then(([uploads, notes, revs]) => {
       setShootUploads(uploads.data || [])
@@ -568,9 +568,15 @@ export default function ProjectDetail() {
       const { data, error } = await supabase
         .from('shoot_notes')
         .insert({ project_id: id, profile_id: profile?.id, content })
-        .select('*, profiles(id, full_name, avatar_url)')
+        .select('id, content, created_at, profile_id')
       if (error) throw new Error(error.message)
-      if (data?.length) setShootNotes((prev) => [...prev, data[0]])
+      const row = data?.[0]
+      if (row) {
+        setShootNotes((prev) => [...prev, {
+          ...row,
+          profiles: { id: profile?.id, full_name: profile?.full_name, avatar_url: profile?.avatar_url },
+        }])
+      }
       setNoteInput('')
     } catch (err) {
       setActionError(err.message)
@@ -1063,16 +1069,19 @@ export default function ProjectDetail() {
               <p className="text-sm text-text-muted mb-4">No notes yet.</p>
             ) : (
               <div className="space-y-4 mb-4">
-                {shootNotes.map((n) => (
+                {shootNotes.map((n) => {
+                  const who = n.profiles || n.author
+                  return (
                   <div key={n.id} className="bg-surface-2 rounded-xl p-3">
                     <div className="flex items-center gap-2 mb-2">
-                      <Avatar name={n.profiles?.full_name} url={n.profiles?.avatar_url} size={6} />
-                      <p className="text-xs font-medium text-text-primary">{n.profiles?.full_name || 'Unknown'}</p>
+                      <Avatar name={who?.full_name} url={who?.avatar_url} size={6} />
+                      <p className="text-xs font-medium text-text-primary">{who?.full_name || 'Unknown'}</p>
                       <span className="text-xs text-text-muted">{format(new Date(n.created_at), 'MMM d, yyyy')}</span>
                     </div>
                     <p className="text-sm text-text-primary whitespace-pre-wrap">{n.content}</p>
                   </div>
-                ))}
+                  )
+                })}
               </div>
             )}
             <div className="flex items-end gap-2">
