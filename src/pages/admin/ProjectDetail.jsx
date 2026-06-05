@@ -435,7 +435,7 @@ export default function ProjectDetail() {
     setLoadingExtras(true)
     Promise.all([
       supabase.from('shoot_uploads').select('*').eq('project_id', id).order('created_at'),
-      supabase.from('shoot_notes').select('*, profiles:profile_id(id, full_name, avatar_url), author:author_id(id, full_name, avatar_url)').eq('project_id', id).order('created_at'),
+      supabase.from('shoot_notes').select('*, poster:profiles!shoot_notes_profile_id_fkey(id, full_name, avatar_url), author:profiles!shoot_notes_author_id_fkey(id, full_name, avatar_url)').eq('project_id', id).order('created_at'),
       supabase.from('project_revisions').select('*, profiles(id, full_name)').eq('project_id', id).order('revision_number'),
     ]).then(([uploads, notes, revs]) => {
       setShootUploads(uploads.data || [])
@@ -574,7 +574,7 @@ export default function ProjectDetail() {
       if (row) {
         setShootNotes((prev) => [...prev, {
           ...row,
-          profiles: { id: profile?.id, full_name: profile?.full_name, avatar_url: profile?.avatar_url },
+          poster: { id: profile?.id, full_name: profile?.full_name, avatar_url: profile?.avatar_url },
         }])
       }
       setNoteInput('')
@@ -1070,7 +1070,7 @@ export default function ProjectDetail() {
             ) : (
               <div className="space-y-4 mb-4">
                 {shootNotes.map((n) => {
-                  const who = n.profiles || n.author
+                  const who = n.poster || n.author
                   return (
                   <div key={n.id} className="bg-surface-2 rounded-xl p-3">
                     <div className="flex items-center gap-2 mb-2">
