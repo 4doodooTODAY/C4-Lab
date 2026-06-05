@@ -374,6 +374,15 @@ export default function ProjectDetail() {
   const [notesSaving, setNS]            = useState(false)
   const [notesSaved, setNSaved]         = useState(false)
 
+  // Team notes feed (shoot_notes) — visible to everyone but the client
+  const [noteInput, setNoteInput]       = useState('')
+  const [postingNote, setPostingNote]   = useState(false)
+
+  // Inspiration links (optional, team-editable)
+  const [inspoLinks, setInspoLinks]     = useState([])
+  const [inspoInput, setInspoInput]     = useState('')
+  const [savingInspo, setSavingInspo]   = useState(false)
+
   // Status
   const [status, setStatus]             = useState('')
 
@@ -417,6 +426,7 @@ export default function ProjectDetail() {
     if (project) {
       setNotes(project.notes || '')
       setStatus(project.status || 'active')
+      setInspoLinks(project.inspiration_links || [])
     }
   }, [project])
 
@@ -548,6 +558,55 @@ export default function ProjectDetail() {
     } finally {
       setNS(false)
     }
+  }
+
+  const handlePostNote = async () => {
+    const content = noteInput.trim()
+    if (!content) return
+    setPostingNote(true)
+    try {
+      const { data, error } = await supabase
+        .from('shoot_notes')
+        .insert({ project_id: id, profile_id: profile?.id, content })
+        .select('*, profiles(id, full_name, avatar_url)')
+      if (error) throw new Error(error.message)
+      if (data?.length) setShootNotes((prev) => [...prev, data[0]])
+      setNoteInput('')
+    } catch (err) {
+      setActionError(err.message)
+    } finally {
+      setPostingNote(false)
+    }
+  }
+
+  const saveInspoLinks = async (next) => {
+    setSavingInspo(true)
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .update({ inspiration_links: next })
+        .eq('id', id)
+        .select('inspiration_links')
+      if (error) throw new Error(error.message)
+      if (!data?.length) throw new Error("You don't have permission to edit inspiration links.")
+      setInspoLinks(data[0].inspiration_links || next)
+    } catch (err) {
+      setActionError(err.message)
+    } finally {
+      setSavingInspo(false)
+    }
+  }
+
+  const addInspoLink = async () => {
+    let url = inspoInput.trim()
+    if (!url) return
+    if (!/^https?:\/\//i.test(url)) url = 'https://' + url
+    setInspoInput('')
+    await saveInspoLinks([...inspoLinks, url])
+  }
+
+  const removeInspoLink = async (idx) => {
+    await saveInspoLinks(inspoLinks.filter((_, i) => i !== idx))
   }
 
   const handleArchive = async () => {
@@ -989,17 +1048,21 @@ export default function ProjectDetail() {
             )}
           </div>
 
-          {/* Shoot Notes */}
+          {/* Team Notes — visible to everyone but the client */}
           <div className="bg-white rounded-2xl border border-border p-5">
-            <h2 className="text-sm font-semibold text-text-primary mb-4 flex items-center gap-2">
-              <StickyNote size={14} className="text-text-muted" /> Shoot Notes
-            </h2>
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+                <StickyNote size={14} className="text-text-muted" /> Notes
+              </h2>
+              <span className="text-xs text-text-muted">Visible to your team · not the client</span>
+            </div>
+            <p className="text-xs text-text-muted mb-4">Shoot notes, context and reminders for everyone working on this project.</p>
             {loadingExtras ? (
               <Loader2 size={16} className="animate-spin text-text-muted" />
             ) : shootNotes.length === 0 ? (
-              <p className="text-sm text-text-muted">No shoot notes yet.</p>
+              <p className="text-sm text-text-muted mb-4">No notes yet.</p>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-4 mb-4">
                 {shootNotes.map((n) => (
                   <div key={n.id} className="bg-surface-2 rounded-xl p-3">
                     <div className="flex items-center gap-2 mb-2">
@@ -1012,6 +1075,63 @@ export default function ProjectDetail() {
                 ))}
               </div>
             )}
+            <div className="flex items-end gap-2">
+              <textarea
+                className="input flex-1 min-h-[44px] resize-y text-sm"
+                placeholder="Add a note for the team…"
+                value={noteInput}
+                onChange={(e) => setNoteInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handlePostNote() }}
+              />
+              <button
+                onClick={handlePostNote}
+                disabled={!noteInput.trim() || postingNote}
+                className="btn-primary flex items-center gap-1.5 disabled:opacity-50 shrink-0">
+                {postingNote ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />} Add
+              </button>
+            </div>
+          </div>
+
+          {/* Inspiration Links (optional) */}
+          <div className="bg-white rounded-2xl border border-border p-5">
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+                <Sparkles size={14} className="text-text-muted" /> Inspiration Links
+              </h2>
+              <span className="text-xs text-text-muted">Optional</span>
+            </div>
+            <p className="text-xs text-text-muted mb-4">References, examples or moodboards for this project.</p>
+            {inspoLinks.length === 0 ? (
+              <p className="text-sm text-text-muted mb-4">No inspiration links yet.</p>
+            ) : (
+              <div className="space-y-1.5 mb-4">
+                {inspoLinks.map((url, i) => (
+                  <div key={i} className="flex items-center gap-2 px-3 py-2 bg-surface-2/60 rounded-xl">
+                    <a href={url} target="_blank" rel="noopener noreferrer"
+                      className="text-xs text-accent hover:underline truncate flex-1">{url}</a>
+                    <button onClick={() => removeInspoLink(i)} disabled={savingInspo}
+                      className="p-1 text-text-muted hover:text-red-600 rounded-md hover:bg-red-50 disabled:opacity-40 shrink-0"
+                      title="Remove link">
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <input
+                type="url"
+                className="input flex-1 text-sm"
+                placeholder="Paste a link (e.g. youtube.com/…)"
+                value={inspoInput}
+                onChange={(e) => setInspoInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') addInspoLink() }}
+              />
+              <button onClick={addInspoLink} disabled={!inspoInput.trim() || savingInspo}
+                className="btn-secondary flex items-center gap-1.5 disabled:opacity-50 shrink-0">
+                {savingInspo ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />} Add
+              </button>
+            </div>
           </div>
 
           {/* Revisions */}

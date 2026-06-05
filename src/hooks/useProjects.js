@@ -8,6 +8,7 @@ const PROJECT_SELECT = `
   creative_id, editor_id, revision_count,
   admin_review_required,
   draft_id, shoot_id, concept, target_date, client_id,
+  inspiration_links,
   clients(id, name, contact_name),
   creative:profiles!creative_id(id, full_name, avatar_url),
   editor:profiles!editor_id(id, full_name, avatar_url)
