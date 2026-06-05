@@ -321,6 +321,8 @@ export default function DraftsPage() {
   const isAdmin           = profile?.role === 'admin'
   const isCreativeOrAdmin = ['admin', 'creative', 'editor'].includes(profile?.role)
   const isClient          = profile?.role === 'client'
+  // Admin, editors, and creatives can publish an approved draft.
+  const canPublish        = ['admin', 'editor', 'creative'].includes(profile?.role)
 
   const fetchDraft = useCallback(async () => {
     if (!draftId) return
@@ -474,8 +476,8 @@ export default function DraftsPage() {
             {typeBadge.label}
           </span>
           <div className="ml-auto flex items-center gap-2">
-            {/* Publish button — admin only, after approved */}
-            {isAdmin && overallStatus === 'approved' && (
+            {/* Publish button — admin/editor/creative, after approved */}
+            {canPublish && overallStatus === 'approved' && (
               published ? (
                 <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
                   <Globe size={11} /> Published
@@ -650,11 +652,11 @@ export default function DraftsPage() {
                   ? 'You approved this draft. Download the final file above.'
                   : published
                     ? 'This draft has been approved by the client and marked as published.'
-                    : isAdmin
+                    : canPublish
                       ? 'The client approved this draft. Use the Publish button above to mark it as published.'
                       : 'The client approved this draft.'}
               </p>
-              {isAdmin && !published && approvedVersion && (
+              {canPublish && !published && approvedVersion && (
                 <button
                   onClick={handlePublish}
                   disabled={publishing}

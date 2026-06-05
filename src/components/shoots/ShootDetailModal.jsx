@@ -172,8 +172,12 @@ function NotesThread({ shootId }) {
 
 // ── Shoot files list ──────────────────────────────────────────────────────────
 function ShootFiles({ shootId }) {
+  const { profile }           = useAuth()
   const [files, setFiles]     = useState([])
   const [loading, setLoading] = useState(true)
+  const [removingId, setRemovingId] = useState(null)
+
+  const canRemove = ['admin', 'creative', 'editor', 'team_lead'].includes(profile?.role)
 
   useEffect(() => {
     if (!shootId) return
@@ -184,6 +188,22 @@ function ShootFiles({ shootId }) {
       .order('created_at', { ascending: false })
       .then(({ data }) => { setFiles(data || []); setLoading(false) })
   }, [shootId])
+
+  const removeFile = async (f) => {
+    if (!window.confirm(`Remove "${f.file_name}" from this shoot?`)) return
+    setRemovingId(f.id)
+    const { data, error } = await supabase
+      .from('shoot_uploads')
+      .delete()
+      .eq('id', f.id)
+      .select('id')
+    setRemovingId(null)
+    if (error || !data?.length) {
+      window.alert(error?.message || "You don't have permission to remove this file.")
+      return
+    }
+    setFiles((prev) => prev.filter((x) => x.id !== f.id))
+  }
 
   if (loading) return <div className="flex justify-center py-3"><Loader2 size={14} className="animate-spin text-text-muted" /></div>
   if (!files.length) return (
@@ -216,6 +236,15 @@ function ShootFiles({ shootId }) {
                 className="p-1.5 text-text-muted hover:text-accent transition-colors rounded-lg hover:bg-accent/5"
                 title="Download file">
                 <ExternalLink size={12} />
+              </button>
+            )}
+            {canRemove && (
+              <button
+                onClick={(e) => { e.stopPropagation(); removeFile(f) }}
+                disabled={removingId === f.id}
+                className="p-1.5 text-text-muted hover:text-red-600 transition-colors rounded-lg hover:bg-red-50 disabled:opacity-40"
+                title="Remove file">
+                {removingId === f.id ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
               </button>
             )}
           </div>

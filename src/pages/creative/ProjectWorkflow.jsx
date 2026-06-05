@@ -4,7 +4,7 @@ import {
   ArrowLeft, Loader2, Upload, Check, Film, StickyNote, Send,
   Download, FileVideo, Eye,
   ChevronRight, X, MessageSquare, Users, ExternalLink,
-  AlertCircle, CheckCircle2, Clock, Zap, Camera,
+  AlertCircle, CheckCircle2, Clock, Zap, Camera, Link2,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
@@ -545,6 +545,7 @@ function ShootDeliverySection({ project, uploads, shootNotes, onRefresh }) {
   const [uploadProgress, setProgress]     = useState({})
   const [uploadStats,    setUploadStats]  = useState(null)
   const [uploadError,    setUploadError]  = useState('')
+  const [removingId,     setRemovingId]   = useState(null)
 
   // Note state
   const [noteContent, setNoteContent] = useState('')
@@ -603,6 +604,25 @@ function ShootDeliverySection({ project, uploads, shootNotes, onRefresh }) {
       setUploadError(err.message)
     } finally {
       setUploading(false)
+    }
+  }
+
+  const removeUpload = async (f) => {
+    if (!window.confirm(`Remove "${f.file_name}" from this project?`)) return
+    setRemovingId(f.id)
+    try {
+      const { data, error } = await supabase
+        .from('shoot_uploads')
+        .delete()
+        .eq('id', f.id)
+        .select('id')
+      if (error) throw new Error(error.message)
+      if (!data?.length) throw new Error("You don't have permission to remove this file.")
+      onRefresh()
+    } catch (err) {
+      setUploadError(err.message)
+    } finally {
+      setRemovingId(null)
     }
   }
 
@@ -705,10 +725,19 @@ function ShootDeliverySection({ project, uploads, shootNotes, onRefresh }) {
           {showFiles && (
             <div className="mt-3 space-y-1.5 border-t border-green-200 pt-3">
               {uploads.map((f) => (
-                <div key={f.id} className="flex items-center gap-2">
+                <div key={f.id} className="flex items-center gap-2 group">
                   <Film size={12} className="text-green-600 shrink-0" />
                   <span className="text-xs text-green-900 truncate flex-1">{f.file_name}</span>
                   <span className="text-xs text-green-600">{fmtBytes(f.file_size)}</span>
+                  {!alreadySent && (
+                    <button
+                      onClick={() => removeUpload(f)}
+                      disabled={removingId === f.id}
+                      title="Remove file"
+                      className="p-1 rounded-md text-green-500 hover:text-red-600 hover:bg-red-50 disabled:opacity-40 transition-colors shrink-0">
+                      {removingId === f.id ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -871,6 +900,94 @@ async function downloadFiles(files, setDownloading) {
     }
   }
   setDownloading(false)
+}
+
+// ── Shoot Link Card ──────────────────────────────────────────────────────────
+// Lets creatives/editors (and admins) link this project to a shoot by setting
+// projects.shoot_id. Creatives/editors can only do this before the 2nd draft;
+// admins can link at any time.
+function ShootLinkCard({ project, onRefresh }) {
+  const [shoots,    setShoots]    = useState([])
+  const [selected,  setSelected]  = useState(project.shoot_id || '')
+  const [saving,    setSaving]    = useState(false)
+  const [error,     setError]     = useState('')
+  const [done,      setDone]      = useState(false)
+
+  const clientId = project.clients?.id
+
+  useEffect(() => {
+    if (!clientId) return
+    supabase
+      .from('shoots')
+      .select('id, title, shoot_date')
+      .eq('client_id', clientId)
+      .order('shoot_date', { ascending: false, nullsFirst: false })
+      .then(({ data }) => setShoots(data || []))
+  }, [clientId])
+
+  useEffect(() => { setSelected(project.shoot_id || '') }, [project.shoot_id])
+
+  const handleSave = async () => {
+    setSaving(true); setError(''); setDone(false)
+    try {
+      const { data, error: e } = await supabase
+        .from('projects')
+        .update({ shoot_id: selected || null })
+        .eq('id', project.id)
+        .select('id')
+      if (e) throw new Error(e.message)
+      if (!data?.length) throw new Error("You don't have permission to link a shoot to this project.")
+      setDone(true)
+      onRefresh?.()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-border p-5 space-y-3">
+      <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+        <Link2 size={14} className="text-text-muted" /> Linked Shoot
+      </h2>
+      <p className="text-xs text-text-muted -mt-1">
+        Link this project to a shoot to pull its footage in. Optional.
+      </p>
+      {shoots.length === 0 ? (
+        <p className="text-xs text-text-muted italic">No shoots exist for this client yet.</p>
+      ) : (
+        <div className="flex gap-2">
+          <select
+            className="input flex-1 text-sm"
+            value={selected}
+            onChange={(e) => { setSelected(e.target.value); setDone(false) }}
+            disabled={saving}
+          >
+            <option value="">— Not linked to a shoot —</option>
+            {shoots.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.title}{s.shoot_date ? ` · ${format(parseISO(s.shoot_date), 'MMM d, yyyy')}` : ''}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={handleSave}
+            disabled={saving || selected === (project.shoot_id || '')}
+            className="btn-primary flex items-center gap-1.5 text-sm shrink-0 disabled:opacity-40"
+          >
+            {saving ? <Loader2 size={13} className="animate-spin" /> : done ? <Check size={13} /> : <Link2 size={13} />}
+            {done ? 'Linked' : 'Link'}
+          </button>
+        </div>
+      )}
+      {error && (
+        <p className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2 flex items-center gap-1.5">
+          <AlertCircle size={12} /> {error}
+        </p>
+      )}
+    </div>
+  )
 }
 
 function SourceFootageSection({ uploads, shootNotes }) {
@@ -2032,6 +2149,9 @@ export default function ProjectWorkflow() {
 
   const isCreative = profile?.role === 'creative' || project.creative_id === profile?.id || isAdmin
   const isEditor   = profile?.role === 'editor' || projectEditorIds.includes(profile?.id) || project.editor_id === profile?.id || isAdmin
+  // "Before the 2nd draft" = no revision numbered 2 or higher exists yet.
+  const maxRevNum   = revisions.reduce((m, r) => Math.max(m, r.revision_number || 0), 0)
+  const canLinkShoot = isAdmin || ((isCreative || isEditor) && maxRevNum < 2)
   return (
     <div className="p-8 max-w-4xl">
       {/* Back link */}
@@ -2124,6 +2244,11 @@ export default function ProjectWorkflow() {
               uploads={uploads.filter((u) => !u.shoot_id)}
               onRefresh={fetchAll}
             />
+          )}
+
+          {/* Link a shoot to this project — before the 2nd draft (admins anytime) */}
+          {canLinkShoot && (
+            <ShootLinkCard project={project} onRefresh={fetchAll} />
           )}
 
           {/* 3a. Source Footage — visible to any editor role (incl. creative+editor combo) */}
