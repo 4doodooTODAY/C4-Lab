@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Plus, X, Loader2, Film, Camera, Users } from 'lucide-react'
+import { Plus, X, Loader2, Film, Camera, Users, Link2 } from 'lucide-react'
+import { format, parseISO } from 'date-fns'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { createProject } from '../../hooks/useProjects'
@@ -8,6 +9,7 @@ export default function NewProjectModal({ onClose, onCreated }) {
   const { user, isAdmin } = useAuth()
   const [clients,       setClients]    = useState([])
   const [clientTeam,    setClientTeam] = useState([])
+  const [shoots,        setShoots]     = useState([])
   const [form, setForm] = useState({
     name: '',
     client_id: '',
@@ -15,6 +17,7 @@ export default function NewProjectModal({ onClose, onCreated }) {
     admin_review_required: false,
   })
   const [selectedEditor, setSelectedEditor] = useState('')
+  const [selectedShoot,  setSelectedShoot]  = useState('')
   const [saving, setSaving] = useState(false)
   const [error,  setError]  = useState('')
 
@@ -31,6 +34,17 @@ export default function NewProjectModal({ onClose, onCreated }) {
         .then(({ data }) => setClients((data || []).map((r) => r.clients).filter(Boolean)))
     }
   }, [isAdmin, user?.id])
+
+  // Load shoots for the selected client so the project can link one on creation
+  useEffect(() => {
+    if (!form.client_id) { setShoots([]); setSelectedShoot(''); return }
+    supabase
+      .from('shoots')
+      .select('id, title, shoot_date')
+      .eq('client_id', form.client_id)
+      .order('shoot_date', { ascending: false, nullsFirst: false })
+      .then(({ data }) => setShoots(data || []))
+  }, [form.client_id])
 
   useEffect(() => {
     if (!form.client_id) { setClientTeam([]); setSelectedEditor(''); return }
@@ -66,6 +80,7 @@ export default function NewProjectModal({ onClose, onCreated }) {
         created_by:            user?.id,
         admin_review_required: form.admin_review_required,
         editor_id:             selectedEditor || null,
+        shoot_id:              selectedShoot || null,
         status:                'active',
         media_type:            form.media_type,
       }
@@ -158,6 +173,24 @@ export default function NewProjectModal({ onClose, onCreated }) {
                   </select>
                 </div>
               )}
+              <div>
+                <label className="label flex items-center gap-1.5"><Link2 size={12} /> Link a Shoot (optional)</label>
+                {shoots.length === 0 ? (
+                  <p className="text-[11px] text-text-muted italic">No shoots exist for this client yet.</p>
+                ) : (
+                  <>
+                    <select className="input" value={selectedShoot} onChange={(e) => setSelectedShoot(e.target.value)}>
+                      <option value="">— Not linked to a shoot —</option>
+                      {shoots.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.title}{s.shoot_date ? ` · ${format(parseISO(s.shoot_date), 'MMM d, yyyy')}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[11px] text-text-muted mt-1">Footage from this shoot will show up inside the project.</p>
+                  </>
+                )}
+              </div>
             </div>
           )}
 

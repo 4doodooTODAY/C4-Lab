@@ -492,6 +492,16 @@ export default function VideoRevisionReview() {
       title: "Client sent feedback — it's your turn",
       sub: 'Review their timestamped comments and upload a revised cut when ready.',
     }
+    if ((revStatus === 'pending_photographer_review' || revStatus === 'pending_creative_review') && (isPhotographer || isAdmin) && !isClient) return {
+      bg: 'bg-amber-900/40 border-amber-500/30', icon: '👀', textColor: 'text-amber-200',
+      title: 'Review this cut before the client sees it',
+      sub: 'The editor sent you a new cut. Watch it through, leave timestamped notes if needed, then approve and send it to the client.',
+    }
+    if ((revStatus === 'pending_photographer_review' || revStatus === 'pending_creative_review') && isClient) return {
+      bg: 'bg-amber-900/30 border-amber-500/30', icon: '⏳', textColor: 'text-amber-200',
+      title: 'Your team is reviewing the latest cut',
+      sub: "It's being checked internally before it reaches you. We'll let you know the moment it's ready for your review.",
+    }
     if (revStatus === 'approved') return {
       bg: 'bg-green-900/40 border-green-500/30', icon: '✅', textColor: 'text-green-200',
       title: 'Video approved!',
@@ -683,17 +693,17 @@ export default function VideoRevisionReview() {
                 <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 mb-1">
                   <div className="flex items-center gap-2 mb-1">
                     <Camera size={12} className="text-amber-300" />
-                    <p className="text-xs text-amber-300 font-semibold">Your review is needed</p>
+                    <p className="text-xs text-amber-300 font-semibold">You're reviewing the editor's cut</p>
                   </div>
-                  <p className="text-xs text-white/50">Click the timeline to leave timestamped notes for the client. When done, send it to them below.</p>
+                  <p className="text-xs text-white/50">The client can't see this yet. Click the timeline to leave timestamped notes, then approve it to send to the client.</p>
                 </div>
                 <button
                   onClick={handlePhotographerDone}
                   disabled={submittingAction}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition-all disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-green-600 hover:bg-green-500 text-white text-sm font-semibold transition-all disabled:opacity-50"
                 >
                   {submittingAction ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                  Done — Send to Client
+                  Approve & Send to Client
                 </button>
               </>
             )}

@@ -92,6 +92,7 @@ export default function PhotoRevisionReview() {
   const [error,           setError]           = useState('')
   const [sending,         setSending]         = useState(false)
   const [approving,       setApproving]       = useState(false)
+  const [sendingToClient, setSendingToClient] = useState(false)
 
   const [photoIndex,  setPhotoIndex]  = useState(0)
   const [selectedPin, setSelectedPin] = useState(null)
@@ -235,6 +236,45 @@ export default function PhotoRevisionReview() {
     }
   }
 
+  // ── Photographer/creative: done reviewing — approve & send to the client ──
+  const handlePhotographerDone = async () => {
+    setSendingToClient(true)
+    try {
+      const { data, error: e } = await supabase.from('project_revisions')
+        .update({ status: 'pending_client_review' })
+        .eq('id', revisionId)
+        .select('id')
+      if (e) throw new Error(e.message)
+      if (!data?.length) throw new Error("You don't have permission to send this to the client.")
+      setRevision((r) => ({ ...r, status: 'pending_client_review' }))
+
+      const { notify, notifyAdmins } = await import('../lib/notify')
+      if (project?.client_id) {
+        const { data: clientRow } = await supabase
+          .from('clients').select('profile_id').eq('id', project.client_id).maybeSingle()
+        if (clientRow?.profile_id) {
+          await notify({
+            profileId: clientRow.profile_id, actorId: myId,
+            type: 'photographer_reviewed',
+            title: `Your photos for "${project.name}" are ready to review`,
+            body: 'The team reviewed the set and sent it over for your review.',
+            link: `/projects/${project.id}/photo-revision/${revisionId}`,
+          })
+        }
+      }
+      await notifyAdmins({
+        actorId: myId, type: 'photographer_reviewed',
+        title: `Photo review complete on "${project.name}"`,
+        body: 'The latest set is now with the client.',
+        link: `/projects/${project.id}`,
+      })
+    } catch (err) {
+      setError(err.message || 'Failed — check permissions')
+    } finally {
+      setSendingToClient(false)
+    }
+  }
+
   if (loading) return (
     <div className="flex justify-center py-24"><Loader2 size={22} className="animate-spin text-text-muted" /></div>
   )
@@ -267,6 +307,16 @@ export default function PhotoRevisionReview() {
       bg: 'bg-orange-50 border-orange-200', icon: '🔔', textColor: 'text-orange-800',
       title: "Client sent feedback — it's your turn",
       sub: 'Review their pinned comments below and upload a revised set of photos.',
+    }
+    if ((revStatus === 'pending_photographer_review' || revStatus === 'pending_creative_review') && (isPhotographer || isAdmin) && !isClient) return {
+      bg: 'bg-amber-50 border-amber-200', icon: '👀', textColor: 'text-amber-800',
+      title: 'Review this set before the client sees it',
+      sub: 'The editor sent you a new set. Review it, then approve and send it to the client.',
+    }
+    if ((revStatus === 'pending_photographer_review' || revStatus === 'pending_creative_review') && isClient) return {
+      bg: 'bg-amber-50 border-amber-200', icon: '⏳', textColor: 'text-amber-800',
+      title: 'Your team is reviewing the latest set',
+      sub: "It's being checked internally first. We'll let you know when it's ready for your review.",
     }
     if (revStatus === 'approved') return {
       bg: 'bg-green-50 border-green-200', icon: '✅', textColor: 'text-green-800',
@@ -476,6 +526,24 @@ export default function PhotoRevisionReview() {
                 />
               ))}
               <p className="text-[9px] text-text-muted text-center pt-1">Original quality — no compression</p>
+            </div>
+          )}
+
+          {/* Photographer/creative: reviewing the editor's set — approve & send to client */}
+          {(isPhotographer || isAdmin) && !isClient && (revStatus === 'pending_photographer_review' || revStatus === 'pending_creative_review') && !pendingPin && (
+            <div className="p-3 border-t border-border shrink-0 space-y-2">
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                <p className="text-xs font-semibold text-amber-800 mb-0.5">You're reviewing the editor's set</p>
+                <p className="text-[11px] text-amber-700">The client can't see this yet. Review the set, then approve it to send to the client.</p>
+              </div>
+              <button
+                onClick={handlePhotographerDone}
+                disabled={sendingToClient}
+                className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg bg-green-600 hover:bg-green-500 text-white text-xs font-semibold transition-all disabled:opacity-50"
+              >
+                {sendingToClient ? <Loader2 size={11} className="animate-spin" /> : <Send size={11} />}
+                Approve &amp; Send to Client
+              </button>
             </div>
           )}
 

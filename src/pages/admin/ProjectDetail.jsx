@@ -5,7 +5,7 @@ import {
   CalendarDays, MessageSquare, Film, StickyNote,
   AlertCircle, MapPin, Upload, FileVideo, Eye,
   Camera, Scissors, Pencil, Download, PlayCircle, User,
-  Sparkles, ThumbsUp, ThumbsDown,
+  Sparkles, ThumbsUp, ThumbsDown, Link2 as LinkIcon, CheckSquare, Square,
 } from 'lucide-react'
 import { useProject, updateProject } from '../../hooks/useProjects'
 import { useAuth } from '../../contexts/AuthContext'
@@ -383,6 +383,16 @@ export default function ProjectDetail() {
   const [inspoInput, setInspoInput]     = useState('')
   const [savingInspo, setSavingInspo]   = useState(false)
 
+  // Linked shoot
+  const [shoots, setShoots]             = useState([])
+  const [linkShoot, setLinkShoot]       = useState('')
+  const [linkingShoot, setLinkingShoot] = useState(false)
+
+  // Footage download (select + progress)
+  const [selectedFiles, setSelectedFiles] = useState(() => new Set())
+  const [downloading, setDownloading]      = useState(false)
+  const [dlProgress, setDlProgress]        = useState({ done: 0, total: 0 })
+
   // Status
   const [status, setStatus]             = useState('')
 
@@ -433,17 +443,24 @@ export default function ProjectDetail() {
   useEffect(() => {
     if (!id) return
     setLoadingExtras(true)
+    const shootId = project?.shoot_id
     Promise.all([
       supabase.from('shoot_uploads').select('*').eq('project_id', id).order('created_at'),
       supabase.from('shoot_notes').select('*, poster:profiles!shoot_notes_profile_id_fkey(id, full_name, avatar_url), author:profiles!shoot_notes_author_id_fkey(id, full_name, avatar_url)').eq('project_id', id).order('created_at'),
       supabase.from('project_revisions').select('*, profiles(id, full_name)').eq('project_id', id).order('revision_number'),
-    ]).then(([uploads, notes, revs]) => {
-      setShootUploads(uploads.data || [])
+      shootId
+        ? supabase.from('shoot_uploads').select('*').eq('shoot_id', shootId).order('created_at')
+        : Promise.resolve({ data: [] }),
+    ]).then(([uploads, notes, revs, shootFootage]) => {
+      // Merge project uploads + linked-shoot footage, de-duplicating by id
+      const merged = [...(uploads.data || []), ...(shootFootage.data || [])]
+      const seen = new Set()
+      setShootUploads(merged.filter((f) => (seen.has(f.id) ? false : seen.add(f.id))))
       setShootNotes(notes.data || [])
       setRevisions(revs.data || [])
       setLoadingExtras(false)
     })
-  }, [id])
+  }, [id, project?.shoot_id])
 
   useEffect(() => {
     if (!project) return
@@ -466,6 +483,20 @@ export default function ProjectDetail() {
     supabase.from('profiles').select('id, full_name, role').in('role', ['creative', 'editor', 'admin']).order('full_name')
       .then(({ data }) => setAssignProfiles(data || []))
   }, [isAdmin])
+
+  // Shoots for this client (for the Linked Shoot selector)
+  useEffect(() => {
+    const clientId = project?.client_id || project?.clients?.id
+    if (!clientId) { setShoots([]); return }
+    supabase
+      .from('shoots')
+      .select('id, title, shoot_date')
+      .eq('client_id', clientId)
+      .order('shoot_date', { ascending: false, nullsFirst: false })
+      .then(({ data }) => setShoots(data || []))
+  }, [project?.client_id, project?.clients?.id])
+
+  useEffect(() => { setLinkShoot(project?.shoot_id || '') }, [project?.shoot_id])
 
   const handleAssignCreative = async () => {
     if (!selectedCreative) return
@@ -613,6 +644,45 @@ export default function ProjectDetail() {
 
   const removeInspoLink = async (idx) => {
     await saveInspoLinks(inspoLinks.filter((_, i) => i !== idx))
+  }
+
+  const handleLinkShoot = async () => {
+    setLinkingShoot(true)
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .update({ shoot_id: linkShoot || null })
+        .eq('id', id)
+        .select('id')
+      if (error) throw new Error(error.message)
+      if (!data?.length) throw new Error("You don't have permission to link a shoot to this project.")
+      await refetch()
+    } catch (err) {
+      setActionError(err.message)
+    } finally {
+      setLinkingShoot(false)
+    }
+  }
+
+  const toggleFileSelected = (fileId) => {
+    setSelectedFiles((prev) => {
+      const next = new Set(prev)
+      next.has(fileId) ? next.delete(fileId) : next.add(fileId)
+      return next
+    })
+  }
+
+  const downloadList = async (files) => {
+    const list = files.filter((f) => f.file_url)
+    if (!list.length) return
+    setDownloading(true)
+    setDlProgress({ done: 0, total: list.length })
+    for (let i = 0; i < list.length; i++) {
+      await forceDownload(list[i].file_url, list[i].file_name)
+      setDlProgress({ done: i + 1, total: list.length })
+      await new Promise((r) => setTimeout(r, 350))
+    }
+    setDownloading(false)
   }
 
   const handleArchive = async () => {
@@ -952,6 +1022,34 @@ export default function ProjectDetail() {
         {/* Left (wider) */}
         <div className="lg:col-span-2 space-y-5">
 
+          {/* Linked Shoot — pulls that shoot's footage into this project */}
+          <div className="bg-white rounded-2xl border border-border p-5 space-y-2">
+            <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+              <LinkIcon size={14} className="text-text-muted" /> Linked Shoot
+            </h2>
+            <p className="text-xs text-text-muted -mt-0.5">Link a shoot to automatically pull its footage into this project. Optional.</p>
+            {shoots.length === 0 ? (
+              <p className="text-xs text-text-muted italic">No shoots exist for this client yet.</p>
+            ) : (
+              <div className="flex gap-2">
+                <select className="input flex-1 text-sm" value={linkShoot} disabled={linkingShoot}
+                  onChange={(e) => setLinkShoot(e.target.value)}>
+                  <option value="">— Not linked to a shoot —</option>
+                  {shoots.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.title}{s.shoot_date ? ` · ${format(parseISO(s.shoot_date), 'MMM d, yyyy')}` : ''}
+                    </option>
+                  ))}
+                </select>
+                <button onClick={handleLinkShoot} disabled={linkingShoot || linkShoot === (project.shoot_id || '')}
+                  className="btn-primary flex items-center gap-1.5 text-sm shrink-0 disabled:opacity-40">
+                  {linkingShoot ? <Loader2 size={13} className="animate-spin" /> : <LinkIcon size={13} />}
+                  {linkShoot === (project.shoot_id || '') && project.shoot_id ? 'Linked' : 'Link'}
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* Footage Uploads */}
           <div className="bg-white rounded-2xl border border-border p-5">
             <div className="flex items-center justify-between mb-4">
@@ -1029,27 +1127,79 @@ export default function ProjectDetail() {
             ) : shootUploads.length === 0 ? (
               <p className="text-sm text-text-muted">No footage uploaded yet.</p>
             ) : (
-              <div className="space-y-1">
-                {shootUploads.map((f) => (
-                  <div key={f.id} className="flex items-center gap-3 py-2 border-b border-border last:border-0">
-                    <div className="w-8 h-8 rounded-lg bg-surface-2 flex items-center justify-center shrink-0">
-                      <Film size={14} className="text-text-muted" />
+              <div>
+                {/* Download toolbar */}
+                <div className="flex items-center gap-2 flex-wrap mb-2">
+                  <button
+                    onClick={() => {
+                      const allIds = shootUploads.filter((f) => f.file_url).map((f) => f.id)
+                      const allSelected = allIds.every((x) => selectedFiles.has(x))
+                      setSelectedFiles(allSelected ? new Set() : new Set(allIds))
+                    }}
+                    className="text-xs flex items-center gap-1.5 text-text-secondary hover:text-text-primary">
+                    {shootUploads.filter((f) => f.file_url).every((f) => selectedFiles.has(f.id)) && shootUploads.some((f) => f.file_url)
+                      ? <CheckSquare size={14} className="text-accent" /> : <Square size={14} />}
+                    Select all
+                  </button>
+                  <div className="flex-1" />
+                  {selectedFiles.size > 0 && (
+                    <button
+                      onClick={() => downloadList(shootUploads.filter((f) => selectedFiles.has(f.id)))}
+                      disabled={downloading}
+                      className="btn-secondary text-xs flex items-center gap-1.5 disabled:opacity-50">
+                      <Download size={12} /> Download Selected ({selectedFiles.size})
+                    </button>
+                  )}
+                  <button
+                    onClick={() => downloadList(shootUploads)}
+                    disabled={downloading}
+                    className="btn-primary text-xs flex items-center gap-1.5 disabled:opacity-50">
+                    {downloading ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                    Download All
+                  </button>
+                </div>
+
+                {/* Progress bar */}
+                {downloading && (
+                  <div className="mb-3">
+                    <div className="flex items-center justify-between text-[11px] text-text-muted mb-1">
+                      <span>Downloading…</span>
+                      <span>{dlProgress.done} / {dlProgress.total}</span>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-text-primary truncate">{f.file_name}</p>
-                      <p className="text-xs text-text-muted">{fmtBytes(f.file_size)} · {new Date(f.created_at).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })} EST</p>
+                    <div className="h-1.5 bg-surface-2 rounded-full overflow-hidden">
+                      <div className="h-full bg-accent transition-all"
+                        style={{ width: `${dlProgress.total ? (dlProgress.done / dlProgress.total) * 100 : 0}%` }} />
                     </div>
-                    {f.file_url && (
-                      <button
-                        onClick={() => forceDownload(f.file_url, f.file_name)}
-                        className="text-text-muted hover:text-accent transition-colors shrink-0"
-                        title="Download"
-                      >
-                        <Download size={13} />
-                      </button>
-                    )}
                   </div>
-                ))}
+                )}
+
+                <div className="space-y-1">
+                  {shootUploads.map((f) => (
+                    <div key={f.id} className="flex items-center gap-3 py-2 border-b border-border last:border-0">
+                      {f.file_url && (
+                        <button onClick={() => toggleFileSelected(f.id)} className="shrink-0" title="Select">
+                          {selectedFiles.has(f.id) ? <CheckSquare size={16} className="text-accent" /> : <Square size={16} className="text-text-muted" />}
+                        </button>
+                      )}
+                      <div className="w-8 h-8 rounded-lg bg-surface-2 flex items-center justify-center shrink-0">
+                        <Film size={14} className="text-text-muted" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-text-primary truncate">{f.file_name}</p>
+                        <p className="text-xs text-text-muted">{fmtBytes(f.file_size)} · {new Date(f.created_at).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })} EST</p>
+                      </div>
+                      {f.file_url && (
+                        <button
+                          onClick={() => forceDownload(f.file_url, f.file_name)}
+                          className="text-text-muted hover:text-accent transition-colors shrink-0"
+                          title="Download"
+                        >
+                          <Download size={13} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
