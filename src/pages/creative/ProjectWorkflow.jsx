@@ -4,7 +4,7 @@ import {
   ArrowLeft, Loader2, Upload, Check, Film, StickyNote, Send,
   Download, FileVideo, Eye,
   ChevronRight, X, MessageSquare, Users, ExternalLink,
-  AlertCircle, CheckCircle2, Clock, Zap, Camera, Link2,
+  AlertCircle, CheckCircle2, Clock, Zap, Camera, Link2, Trash2,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
@@ -871,7 +871,7 @@ function ShootDeliverySection({ project, uploads, shootNotes, onRefresh }) {
 
 // ── Source Footage Section (Editor only) ──────────────────────────────────────
 
-function FileList({ files, accent = false }) {
+function FileList({ files, accent = false, onDelete, deletingId }) {
   return (
     <div className={`mt-2 rounded-xl divide-y ${accent ? 'border border-blue-100 divide-blue-50' : 'border border-border divide-border'}`}>
       {files.map((f) => (
@@ -881,14 +881,35 @@ function FileList({ files, accent = false }) {
           <span className={`text-xs ${accent ? 'text-blue-400' : 'text-text-muted'}`}>{fmtBytes(f.file_size)}{f.created_at && ` · ${new Date(f.created_at).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })} EST`}</span>
           {f.file_url && (
             <button onClick={() => forceDownload(f.file_url, f.file_name)}
-              className={`transition-colors shrink-0 ${accent ? 'text-blue-500 hover:text-blue-700' : 'text-accent hover:text-accent/80'}`}>
+              className={`transition-colors shrink-0 ${accent ? 'text-blue-500 hover:text-blue-700' : 'text-accent hover:text-accent/80'}`}
+              title="Download">
               <Download size={13} />
+            </button>
+          )}
+          {onDelete && (
+            <button onClick={() => onDelete(f)} disabled={deletingId === f.id}
+              className="text-text-muted hover:text-red-500 transition-colors shrink-0 disabled:opacity-40"
+              title="Delete">
+              {deletingId === f.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
             </button>
           )}
         </div>
       ))}
     </div>
   )
+}
+
+// Delete a shoot_uploads row with an RLS no-op guard. Returns an error string
+// (or null on success) so callers can surface permission problems.
+async function deleteShootUpload(f) {
+  const { data, error } = await supabase
+    .from('shoot_uploads')
+    .delete()
+    .eq('id', f.id)
+    .select('id')
+  if (error) return error.message
+  if (!data?.length) return "You don't have permission to delete this file."
+  return null
 }
 
 async function downloadFiles(files, setDownloading) {
@@ -990,14 +1011,26 @@ function ShootLinkCard({ project, onRefresh }) {
   )
 }
 
-function SourceFootageSection({ uploads, shootNotes }) {
+function SourceFootageSection({ uploads, shootNotes, onRefresh }) {
   const [showTeam,         setShowTeam]         = useState(false)
   const [showClient,       setShowClient]        = useState(false)
   const [dlTeam,           setDlTeam]           = useState(false)
   const [dlClient,         setDlClient]         = useState(false)
+  const [deletingId,       setDeletingId]       = useState(null)
+  const [deleteError,      setDeleteError]      = useState('')
 
   const teamUploads   = uploads.filter((f) => f.profiles?.role !== 'client')
   const clientUploads = uploads.filter((f) => f.profiles?.role === 'client')
+
+  const handleDelete = async (f) => {
+    if (!window.confirm(`Delete "${f.file_name}"? This can't be undone.`)) return
+    setDeletingId(f.id)
+    setDeleteError('')
+    const err = await deleteShootUpload(f)
+    setDeletingId(null)
+    if (err) { setDeleteError(err); return }
+    onRefresh?.()
+  }
 
   const teamSize   = teamUploads.reduce((acc, f) => acc + (f.file_size || 0), 0)
   const clientSize = clientUploads.reduce((acc, f) => acc + (f.file_size || 0), 0)
@@ -1007,6 +1040,8 @@ function SourceFootageSection({ uploads, shootNotes }) {
       <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
         <Film size={14} className="text-text-muted" /> Source Footage
       </h2>
+
+      {deleteError && <p className="text-xs text-red-500">{deleteError}</p>}
 
       {/* ── Client Assets ─────────────────────────────────────────────────── */}
       <div>
@@ -1042,7 +1077,7 @@ function SourceFootageSection({ uploads, shootNotes }) {
                 {dlClient ? 'Downloading…' : 'Download All'}
               </button>
             </div>
-            {showClient && <FileList files={clientUploads} accent />}
+            {showClient && <FileList files={clientUploads} accent onDelete={handleDelete} deletingId={deletingId} />}
           </div>
         )}
       </div>
@@ -1081,7 +1116,7 @@ function SourceFootageSection({ uploads, shootNotes }) {
                 {dlTeam ? 'Downloading…' : 'Download All'}
               </button>
             </div>
-            {showTeam && <FileList files={teamUploads} />}
+            {showTeam && <FileList files={teamUploads} onDelete={handleDelete} deletingId={deletingId} />}
           </div>
         )}
       </div>
@@ -1119,8 +1154,19 @@ function ProjectMediaSection({ project, uploads, onRefresh }) {
   const [error,       setError]       = useState('')
   const [showAll,     setShowAll]     = useState(false)
   const [dragging,    setDragging]    = useState(false)
+  const [deletingId,  setDeletingId]  = useState(null)
 
   const addFiles = (incoming) => setFiles((prev) => [...prev, ...Array.from(incoming)])
+
+  const removeUpload = async (f) => {
+    if (!window.confirm(`Delete "${f.file_name}"? This can't be undone.`)) return
+    setDeletingId(f.id)
+    setError('')
+    const err = await deleteShootUpload(f)
+    setDeletingId(null)
+    if (err) { setError(err); return }
+    onRefresh()
+  }
 
   const handleUpload = async () => {
     if (!files.length) return
@@ -1277,6 +1323,14 @@ function ProjectMediaSection({ project, uploads, onRefresh }) {
                     <Download size={13} />
                   </button>
                 )}
+                <button
+                  onClick={() => removeUpload(f)}
+                  disabled={deletingId === f.id}
+                  className="text-text-muted hover:text-red-500 transition-colors shrink-0 disabled:opacity-40"
+                  title="Delete"
+                >
+                  {deletingId === f.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                </button>
               </div>
             ))}
           </div>
@@ -2256,6 +2310,7 @@ export default function ProjectWorkflow() {
             <SourceFootageSection
               uploads={uploads}
               shootNotes={shootNotes}
+              onRefresh={fetchAll}
             />
           )}
 
