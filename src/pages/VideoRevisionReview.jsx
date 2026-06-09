@@ -208,29 +208,35 @@ export default function VideoRevisionReview() {
       setRevision(revRes.data)
       setProject(revRes.data.projects)
 
-      // Fetch all editors for this project
-      const { data: editors } = await supabase
-        .from('project_editors')
-        .select('profile_id, profiles(id, full_name)')
-        .eq('project_id', revRes.data.projects.id)
-      setProjectEditorIds((editors || []).map((r) => r.profile_id))
-      const firstName = editors?.[0]?.profiles?.full_name
-      if (!firstName && revRes.data.projects.editor_id) {
-        const { data: ep } = await supabase.from('profiles').select('full_name').eq('id', revRes.data.projects.editor_id).single()
-        setEditorName(ep?.full_name || '')
-      } else {
-        setEditorName(firstName || '')
-      }
-
       // Attach author_role from profiles join
       const enriched = (commRes.data || []).map((c) => ({
         ...c,
         author_role: c.profiles?.role,
       }))
       setComments(enriched)
+
+      // Video + comments are ready — render now. The editor lookup below only
+      // feeds the "who's up" banner copy, so it shouldn't block the player.
+      setLoading(false)
+
+      // Fetch all editors for this project (non-blocking)
+      const proj = revRes.data.projects
+      supabase
+        .from('project_editors')
+        .select('profile_id, profiles(id, full_name)')
+        .eq('project_id', proj.id)
+        .then(async ({ data: editors }) => {
+          setProjectEditorIds((editors || []).map((r) => r.profile_id))
+          const firstName = editors?.[0]?.profiles?.full_name
+          if (!firstName && proj.editor_id) {
+            const { data: ep } = await supabase.from('profiles').select('full_name').eq('id', proj.editor_id).single()
+            setEditorName(ep?.full_name || '')
+          } else {
+            setEditorName(firstName || '')
+          }
+        })
     } catch (err) {
       setError(err.message)
-    } finally {
       setLoading(false)
     }
   }, [revisionId])
@@ -262,37 +268,68 @@ export default function VideoRevisionReview() {
   }
 
   // ── Post comment ──────────────────────────────────────────────────────────
+  // Optimistic: the comment shows on the timeline and in the list immediately,
+  // then we reconcile with the saved row. No full page refetch — that's what
+  // made posting feel slow / look like it timed out.
   const handlePostComment = async (timestamp, text) => {
+    const tempId = `temp-${Date.now()}`
+    const optimistic = {
+      id:                tempId,
+      revision_id:       revisionId,
+      author_id:         myId,
+      timestamp_seconds: timestamp,
+      content:           text,
+      status:            'pending',
+      profiles:          { id: myId, full_name: profile?.full_name, avatar_url: profile?.avatar_url, role: myRole },
+      author_role:       myRole,
+      _pending:          true,
+    }
+    setComments((prev) => [...prev, optimistic].sort((a, b) => a.timestamp_seconds - b.timestamp_seconds))
+    setPopover(null)
+    setAddingFromPanel(false)
+
     try {
-      const { error } = await supabase.from('revision_comments').insert({
-        revision_id:       revisionId,
-        author_id:         myId,
-        timestamp_seconds: timestamp,
-        content:           text,
-      })
+      const { data, error } = await supabase
+        .from('revision_comments')
+        .insert({
+          revision_id:       revisionId,
+          author_id:         myId,
+          timestamp_seconds: timestamp,
+          content:           text,
+        })
+        .select('*, profiles(id, full_name, avatar_url, role)')
+        .single()
       if (error) throw error
-      setPopover(null)
-      setAddingFromPanel(false)
-      fetchAll()
+      // Swap the temp row for the real one
+      setComments((prev) =>
+        prev.map((c) => (c.id === tempId ? { ...data, author_role: data.profiles?.role } : c)))
     } catch (err) {
+      // Roll the optimistic comment back so nothing is silently lost
+      setComments((prev) => prev.filter((c) => c.id !== tempId))
       setActionError(err.message)
     }
   }
 
   // ── Accept / Decline comment ──────────────────────────────────────────────
-  const handleAccept = async (commentId) => {
+  // Optimistic update with rollback on failure — no refetch.
+  const setCommentStatus = async (commentId, status) => {
     setUpdatingComment(commentId)
-    await supabase.from('revision_comments').update({ status: 'accepted' }).eq('id', commentId)
+    let prevStatus
+    setComments((prev) =>
+      prev.map((c) => {
+        if (c.id === commentId) { prevStatus = c.status; return { ...c, status } }
+        return c
+      }))
+    const { error } = await supabase.from('revision_comments').update({ status }).eq('id', commentId)
+    if (error) {
+      setComments((prev) => prev.map((c) => (c.id === commentId ? { ...c, status: prevStatus } : c)))
+      setActionError(error.message)
+    }
     setUpdatingComment(null)
-    fetchAll()
   }
 
-  const handleDecline = async (commentId) => {
-    setUpdatingComment(commentId)
-    await supabase.from('revision_comments').update({ status: 'declined' }).eq('id', commentId)
-    setUpdatingComment(null)
-    fetchAll()
-  }
+  const handleAccept  = (commentId) => setCommentStatus(commentId, 'accepted')
+  const handleDecline = (commentId) => setCommentStatus(commentId, 'declined')
 
   // ── Photographer: done reviewing — hand off to client ─────────────────────
   const handlePhotographerDone = async () => {
@@ -559,6 +596,8 @@ export default function VideoRevisionReview() {
               src={revision.video_url}
               className="max-h-full max-w-full w-full"
               controls
+              preload="metadata"
+              playsInline
               onClick={() => {
                 if (videoRef.current?.paused) videoRef.current.play()
                 else videoRef.current?.pause()
