@@ -233,10 +233,12 @@ function ReviewProjectRow({ project, latest }) {
   const isPhoto = project.media_type === 'photo'
   const TypeIcon = isPhoto ? Camera : Film
 
-  // Where to send the admin: a revision awaiting their approval opens the
-  // revision review screen directly; otherwise the project workflow.
+  // Where to send the admin: if a cut has been uploaded, open the revision
+  // review screen directly. If we're still waiting on the editor's first cut
+  // (pending_editor) there's nothing to review yet — open the project workflow.
+  const hasCut = latest && latest.status !== 'pending_editor'
   const open = () => {
-    if (latest && project.stage !== 'delivered') {
+    if (hasCut && project.stage !== 'delivered') {
       navigate(isPhoto
         ? `/projects/${project.id}/photo-revision/${latest.id}`
         : `/projects/${project.id}/revision/${latest.id}`)
@@ -320,12 +322,16 @@ function AdminReviewView() {
         const latest = latestByProject[project.id]
         if (!latest) return
         switch (latest.status) {
+          // A cut has been uploaded and is not yet with the client — admin needs
+          // to check it before it goes out (includes internal creative review).
           case 'pending_admin_review':
-            admin.push({ project, latest }); break
-          case 'pending_client_review':
-            client.push({ project, latest }); break
           case 'pending_photographer_review':
           case 'pending_creative_review':
+            admin.push({ project, latest }); break
+          // Sent to the client — waiting on their comments or approval.
+          case 'pending_client_review':
+            client.push({ project, latest }); break
+          // No cut submitted yet — waiting on the assigned editor's upload.
           case 'pending_editor':
             team.push({ project, latest }); break
           default:
@@ -360,8 +366,8 @@ function AdminReviewView() {
       <ReviewSection
         icon={ShieldCheck}
         iconClass="text-orange-500"
-        title="Waiting on your approval"
-        subtitle="The first cut needs your sign-off before it reaches the client."
+        title="Needs your review before the client"
+        subtitle="A cut has been uploaded — check and approve it before it goes to the client."
         items={adminHands}
         emptyText="Nothing waiting on your approval."
       />
@@ -369,7 +375,7 @@ function AdminReviewView() {
         icon={UserCheck}
         iconClass="text-blue-500"
         title="In the client's hands"
-        subtitle="Sent to the client — waiting on their review and feedback."
+        subtitle="Sent to the client — waiting on their revision comments or approval."
         items={clientHands}
         emptyText="Nothing with clients right now."
       />
@@ -377,8 +383,8 @@ function AdminReviewView() {
         <ReviewSection
           icon={Clock}
           iconClass="text-text-muted"
-          title="Still with the team"
-          subtitle="Being edited or reviewed internally — not yet ready for the client."
+          title="Waiting on the first cut"
+          subtitle="No cut uploaded yet — waiting on the assigned editor to submit their first cut."
           items={teamHands}
           emptyText="Nothing in progress."
         />

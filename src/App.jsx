@@ -58,9 +58,14 @@ function AppLoader() {
 }
 
 function RoleSwitch({ admin, creative, client }) {
-  const { profile } = useAuth()
+  const { profile, viewMode } = useAuth()
   const role = profile?.role
-  if (role === 'admin' && admin) return admin
+  if (role === 'admin') {
+    // Admins can flip into "Creative View" — honour it so they see the same
+    // creative screens (with the assigned-vs-client split) the team sees.
+    if (viewMode === 'creative' && creative) return creative
+    if (admin) return admin
+  }
   if ((role === 'creative' || role === 'editor') && creative) return creative
   if (role === 'client' && client) return client
   return admin || creative || client || null

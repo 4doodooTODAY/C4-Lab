@@ -131,10 +131,13 @@ function EditCard({ project, revisions, myId, onClick, onMarkDone }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function CreativeProjectList() {
-  const { profile, isAdmin } = useAuth()
+  const { profile } = useAuth()
   const navigate    = useNavigate()
   const myId        = profile?.id
   const isEditor    = profile?.role === 'editor'
+  // Detect admin by role (not useAuth().isAdmin, which is false once an admin
+  // switches into Creative View) so admins still see every shoot/project here.
+  const isAdmin     = profile?.role === 'admin'
 
   const [shoots,       setShoots]       = useState([])
   const [edits,        setEdits]        = useState([])
