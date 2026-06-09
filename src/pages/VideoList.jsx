@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   Film, Plus, Trash2, Loader2, ChevronRight, X, Upload,
-  Link2, FolderOpen, FolderKanban,
+  Link2, FolderOpen, FolderKanban, ShieldCheck, UserCheck, Clock, ArrowRight, Camera,
 } from 'lucide-react'
 import { useMedia, uploadMediaFile } from '../hooks/useMedia'
 import { useAuth } from '../contexts/AuthContext'
@@ -148,114 +148,6 @@ function MediaRow({ item, onDelete }) {
   )
 }
 
-// ─── Admin stacked view — all projects + their media at once ──────────────────
-function AdminStackedView() {
-  const [groups, setGroups] = useState([])     // [{ project, media[] }]
-  const [loading, setLoading] = useState(true)
-  const [addingTo, setAddingTo] = useState(null) // project being added to
-
-  const fetchAll = async () => {
-    setLoading(true)
-    // Fetch all media with project info
-    const { data } = await supabase
-      .from('media')
-      .select('*, media_projects(id, title)')
-      .order('created_at', { ascending: false })
-
-    // Also fetch all projects that may have no media yet
-    const { data: projs } = await supabase
-      .from('media_projects')
-      .select('id, title')
-      .order('created_at', { ascending: false })
-
-    const projectMap = {}
-    ;(projs || []).forEach((p) => { projectMap[p.id] = { project: p, media: [] } })
-    ;(data || []).forEach((m) => {
-      const pid = m.media_projects?.id || m.project_id
-      if (pid && projectMap[pid]) projectMap[pid].media.push(m)
-      else if (pid) projectMap[pid] = { project: m.media_projects || { id: pid, title: 'Unknown' }, media: [m] }
-    })
-
-    setGroups(Object.values(projectMap))
-    setLoading(false)
-  }
-
-  useEffect(() => { fetchAll() }, [])
-
-  const handleDelete = async (mediaId) => {
-    await supabase.from('media').delete().eq('id', mediaId)
-    setGroups((prev) => prev.map((g) => ({ ...g, media: g.media.filter((m) => m.id !== mediaId) })))
-  }
-
-  const handleAdd = async ({ title, description, media_url }, projectId) => {
-    const { data } = await supabase
-      .from('media')
-      .insert([{ title, description, media_url, media_type: 'video', project_id: projectId }])
-      .select('*, media_projects(id, title)')
-      .single()
-    if (data) {
-      setGroups((prev) => prev.map((g) =>
-        g.project.id === projectId ? { ...g, media: [data, ...g.media] } : g
-      ))
-    }
-    setAddingTo(null)
-  }
-
-  if (loading) return <div className="flex justify-center py-24"><Loader2 size={22} className="animate-spin text-text-muted" /></div>
-
-  if (groups.length === 0) return (
-    <div className="card p-12 text-center">
-      <FolderOpen size={36} className="mx-auto text-surface-3 mb-3" />
-      <h3 className="text-sm font-semibold text-text-primary mb-1">No video review projects yet</h3>
-      <p className="text-sm text-text-muted">They'll show up here once created.</p>
-    </div>
-  )
-
-  return (
-    <div className="space-y-6">
-      {groups.map(({ project, media }) => (
-        <div key={project.id} className="bg-white rounded-2xl border border-border overflow-hidden">
-          {/* Project header */}
-          <div className="flex items-center justify-between px-5 py-3.5 border-b border-border bg-surface-2/40">
-            <div className="flex items-center gap-2">
-              <FolderKanban size={15} className="text-text-muted" />
-              <p className="text-sm font-semibold text-text-primary">{project.title}</p>
-              <span className="text-xs text-text-muted bg-surface-2 px-1.5 py-0.5 rounded-full">
-                {media.length} video{media.length !== 1 ? 's' : ''}
-              </span>
-            </div>
-            <button
-              onClick={() => setAddingTo(project.id)}
-              className="btn-primary text-xs flex items-center gap-1"
-            >
-              <Plus size={12} /> Add Video
-            </button>
-          </div>
-
-          {/* Media rows */}
-          {media.length === 0 ? (
-            <p className="text-sm text-text-muted text-center py-8 italic">No videos yet</p>
-          ) : (
-            <div className="p-3 space-y-2">
-              {media.map((item) => (
-                <MediaRow key={item.id} item={item} onDelete={handleDelete} />
-              ))}
-            </div>
-          )}
-        </div>
-      ))}
-
-      {addingTo && (
-        <AddMediaModal
-          projectId={addingTo}
-          onAdd={(data) => handleAdd(data, addingTo)}
-          onClose={() => setAddingTo(null)}
-        />
-      )}
-    </div>
-  )
-}
-
 // ─── Non-admin tabbed view ────────────────────────────────────────────────────
 function TabbedView() {
   const [projects, setProjects] = useState([])
@@ -330,6 +222,171 @@ function TabbedView() {
   )
 }
 
+// ─── Admin "Projects in Review" — split by who's holding it ───────────────────
+// A project sits in review until its latest revision is approved. We bucket by
+// the latest revision's status: waiting on admin approval vs. in the client's
+// hands. Anything still being edited internally shows in a muted third group so
+// nothing in flight disappears; approved/delivered projects drop off entirely.
+function ReviewProjectRow({ project, latest }) {
+  const navigate = useNavigate()
+  const clientName = project.clients?.contact_name || project.clients?.name || '—'
+  const isPhoto = project.media_type === 'photo'
+  const TypeIcon = isPhoto ? Camera : Film
+
+  // Where to send the admin: a revision awaiting their approval opens the
+  // revision review screen directly; otherwise the project workflow.
+  const open = () => {
+    if (latest && project.stage !== 'delivered') {
+      navigate(isPhoto
+        ? `/projects/${project.id}/photo-revision/${latest.id}`
+        : `/projects/${project.id}/revision/${latest.id}`)
+    } else {
+      navigate(`/projects/${project.id}/creative`)
+    }
+  }
+
+  const revLabel = latest
+    ? (latest.revision_number === 1 ? 'Initial cut' : `Revision ${latest.revision_number - 1}`)
+    : '—'
+
+  return (
+    <div className="flex items-center gap-4 px-4 py-3 group hover:bg-surface-2/40 transition-colors rounded-xl border border-border bg-white">
+      <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
+        <TypeIcon size={18} className="text-accent" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-text-primary truncate">{project.name}</p>
+        <p className="text-xs text-text-muted truncate">{clientName} · {revLabel}</p>
+      </div>
+      <button onClick={open} className="btn-primary flex items-center gap-1.5 text-xs shrink-0">
+        Open <ArrowRight size={13} />
+      </button>
+    </div>
+  )
+}
+
+function ReviewSection({ icon: Icon, iconClass, title, subtitle, items, emptyText }) {
+  return (
+    <section className="mb-8">
+      <div className="flex items-center gap-2 mb-1">
+        <Icon size={16} className={iconClass} />
+        <h2 className="text-base font-semibold text-text-primary">{title}</h2>
+        <span className="text-xs text-text-muted bg-surface-2 px-2 py-0.5 rounded-full">{items.length}</span>
+      </div>
+      <p className="text-xs text-text-muted mb-4">{subtitle}</p>
+      {items.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-border p-8 text-center">
+          <p className="text-sm text-text-muted">{emptyText}</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {items.map(({ project, latest }) => (
+            <ReviewProjectRow key={project.id} project={project} latest={latest} />
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function AdminReviewView() {
+  const [adminHands,  setAdminHands]  = useState([])
+  const [clientHands, setClientHands] = useState([])
+  const [teamHands,   setTeamHands]   = useState([])
+  const [loading,     setLoading]     = useState(true)
+
+  useEffect(() => {
+    const run = async () => {
+      setLoading(true)
+      const [{ data: projs }, { data: revs }] = await Promise.all([
+        supabase
+          .from('projects')
+          .select('id, name, media_type, stage, status, clients(name, contact_name)')
+          .neq('status', 'archived'),
+        supabase
+          .from('project_revisions')
+          .select('id, project_id, revision_number, status'),
+      ])
+
+      // Latest revision per project
+      const latestByProject = {}
+      ;(revs || []).forEach((r) => {
+        const cur = latestByProject[r.project_id]
+        if (!cur || r.revision_number > cur.revision_number) latestByProject[r.project_id] = r
+      })
+
+      const admin = [], client = [], team = []
+      ;(projs || []).forEach((project) => {
+        const latest = latestByProject[project.id]
+        if (!latest) return
+        switch (latest.status) {
+          case 'pending_admin_review':
+            admin.push({ project, latest }); break
+          case 'pending_client_review':
+            client.push({ project, latest }); break
+          case 'pending_photographer_review':
+          case 'pending_creative_review':
+          case 'pending_editor':
+            team.push({ project, latest }); break
+          default:
+            // approved / other → no longer in review, drop it
+            break
+        }
+      })
+
+      setAdminHands(admin)
+      setClientHands(client)
+      setTeamHands(team)
+      setLoading(false)
+    }
+    run()
+  }, [])
+
+  if (loading) return (
+    <div className="flex justify-center py-24"><Loader2 size={22} className="animate-spin text-text-muted" /></div>
+  )
+
+  const totalInReview = adminHands.length + clientHands.length + teamHands.length
+  if (totalInReview === 0) return (
+    <div className="card p-12 text-center">
+      <ShieldCheck size={36} className="mx-auto text-surface-3 mb-3" />
+      <h3 className="text-sm font-semibold text-text-primary mb-1">Nothing in review right now</h3>
+      <p className="text-sm text-text-muted">Projects waiting on approval will appear here.</p>
+    </div>
+  )
+
+  return (
+    <div>
+      <ReviewSection
+        icon={ShieldCheck}
+        iconClass="text-orange-500"
+        title="Waiting on your approval"
+        subtitle="The first cut needs your sign-off before it reaches the client."
+        items={adminHands}
+        emptyText="Nothing waiting on your approval."
+      />
+      <ReviewSection
+        icon={UserCheck}
+        iconClass="text-blue-500"
+        title="In the client's hands"
+        subtitle="Sent to the client — waiting on their review and feedback."
+        items={clientHands}
+        emptyText="Nothing with clients right now."
+      />
+      {teamHands.length > 0 && (
+        <ReviewSection
+          icon={Clock}
+          iconClass="text-text-muted"
+          title="Still with the team"
+          subtitle="Being edited or reviewed internally — not yet ready for the client."
+          items={teamHands}
+          emptyText="Nothing in progress."
+        />
+      )}
+    </div>
+  )
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function VideoList() {
   const { isAdmin } = useAuth()
@@ -338,14 +395,14 @@ export default function VideoList() {
     <div className="p-8 max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-text-primary">Video Review</h1>
+          <h1 className="text-xl font-bold text-text-primary">Review</h1>
           <p className="text-sm text-text-secondary mt-0.5">
-            {isAdmin ? 'All video review projects across your team' : 'Upload videos and leave timestamped feedback'}
+            {isAdmin ? 'Every project currently in review — grouped by who needs to act next' : 'Upload videos and leave timestamped feedback'}
           </p>
         </div>
       </div>
 
-      {isAdmin ? <AdminStackedView /> : <TabbedView />}
+      {isAdmin ? <AdminReviewView /> : <TabbedView />}
     </div>
   )
 }
