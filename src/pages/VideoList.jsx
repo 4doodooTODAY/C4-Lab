@@ -247,8 +247,9 @@ function ReviewProjectRow({ project, latest }) {
     }
   }
 
+  const isFirstCut = latest && latest.revision_number === 1
   const revLabel = latest
-    ? (latest.revision_number === 1 ? 'Initial cut' : `Revision ${latest.revision_number - 1}`)
+    ? (isFirstCut ? 'First Cut' : `Revision ${latest.revision_number - 1}`)
     : '—'
 
   return (
@@ -258,8 +259,14 @@ function ReviewProjectRow({ project, latest }) {
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-text-primary truncate">{project.name}</p>
-        <p className="text-xs text-text-muted truncate">{clientName} · {revLabel}</p>
+        <p className="text-xs text-text-muted truncate">{clientName}</p>
       </div>
+      {/* Prominent cut / revision indicator */}
+      <span className={`shrink-0 text-sm font-bold px-3 py-1.5 rounded-lg ${
+        isFirstCut ? 'bg-amber-100 text-amber-700' : 'bg-purple-100 text-purple-700'
+      }`}>
+        {revLabel}
+      </span>
       <button onClick={open} className="btn-primary flex items-center gap-1.5 text-xs shrink-0">
         Open <ArrowRight size={13} />
       </button>
@@ -331,7 +338,8 @@ function AdminReviewView() {
           // Sent to the client — waiting on their comments or approval.
           case 'pending_client_review':
             client.push({ project, latest }); break
-          // No cut submitted yet — waiting on the assigned editor's upload.
+          // In the editor's hands — waiting on an upload (first cut OR a new
+          // revision after client feedback).
           case 'pending_editor':
             team.push({ project, latest }); break
           default:
@@ -383,8 +391,8 @@ function AdminReviewView() {
         <ReviewSection
           icon={Clock}
           iconClass="text-text-muted"
-          title="Waiting on the first cut"
-          subtitle="No cut uploaded yet — waiting on the assigned editor to submit their first cut."
+          title="Waiting on the editor"
+          subtitle="In the editor's hands — waiting on a cut to be uploaded, whether it's the first cut or a new revision."
           items={teamHands}
           emptyText="Nothing in progress."
         />
