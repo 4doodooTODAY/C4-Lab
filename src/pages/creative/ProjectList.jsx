@@ -209,6 +209,10 @@ export default function CreativeProjectList() {
   const activeEdits    = edits.filter((e) => e.stage !== 'delivered')
   const completedEdits = edits.filter((e) => e.stage === 'delivered')
 
+  // Projects I'm the editor on (my job to edit) vs. other projects for my clients
+  const myAssignedEdits = activeEdits.filter((e) => e.editor_id === myId)
+  const clientEdits     = activeEdits.filter((e) => e.editor_id !== myId)
+
   const onMarkShootDone = async (id) => {
     await supabase.from('shoots').update({ status: 'completed' }).eq('id', id)
     setShoots((prev) => prev.map((sh) => sh.id === id ? { ...sh, status: 'completed' } : sh))
@@ -258,21 +262,22 @@ export default function CreativeProjectList() {
         </>
       )}
 
-      {/* My Edits — active */}
+      {/* Assigned to Me — projects where I'm the editor */}
       <section className="mb-10">
-        <div className="flex items-center gap-2 mb-4">
+        <div className="flex items-center gap-2 mb-1">
           <Scissors size={16} className="text-text-muted" />
-          <h2 className="text-base font-semibold text-text-primary">My Edits</h2>
-          <span className="text-xs text-text-muted bg-surface-2 px-2 py-0.5 rounded-full">{activeEdits.length}</span>
+          <h2 className="text-base font-semibold text-text-primary">Assigned to Me</h2>
+          <span className="text-xs text-text-muted bg-surface-2 px-2 py-0.5 rounded-full">{myAssignedEdits.length}</span>
         </div>
-        {activeEdits.length === 0 ? (
+        <p className="text-xs text-text-muted mb-4">Projects you're set as the editor on — your job to edit.</p>
+        {myAssignedEdits.length === 0 ? (
           <div className="bg-white rounded-2xl border border-border p-8 text-center">
             <Scissors size={32} className="mx-auto text-text-muted/30 mb-3" />
             <p className="text-sm text-text-muted">No active editing projects assigned to you.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {activeEdits.map((p) => (
+            {myAssignedEdits.map((p) => (
               <EditCard
                 key={p.id}
                 project={p}
@@ -288,6 +293,33 @@ export default function CreativeProjectList() {
           </div>
         )}
       </section>
+
+      {/* My Clients' Projects — everything else for my clients (not assigned to me) */}
+      {clientEdits.length > 0 && (
+        <section className="mb-10">
+          <div className="flex items-center gap-2 mb-1">
+            <Scissors size={16} className="text-text-muted/60" />
+            <h2 className="text-base font-semibold text-text-primary">My Clients' Projects</h2>
+            <span className="text-xs text-text-muted bg-surface-2 px-2 py-0.5 rounded-full">{clientEdits.length}</span>
+          </div>
+          <p className="text-xs text-text-muted mb-4">Other active projects for your clients — not assigned to you to edit.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {clientEdits.map((p) => (
+              <EditCard
+                key={p.id}
+                project={p}
+                revisions={revisions}
+                myId={myId}
+                onClick={() => navigate(`/projects/${p.id}/creative`)}
+                onMarkDone={async () => {
+                  await supabase.from('projects').update({ stage: 'delivered' }).eq('id', p.id)
+                  setEdits((prev) => prev.map((e) => e.id === p.id ? { ...e, stage: 'delivered' } : e))
+                }}
+              />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Completed section */}
       {(completedShots.length > 0 || completedEdits.length > 0) && (
