@@ -23,28 +23,12 @@ export default function DownloadButton({ url, filename, label = 'Download', clas
 
     const fname = filename || decodeURIComponent(url.split('/').pop()?.split('?')[0] || 'download')
 
-    // Desktop non-iOS: try direct anchor click first — browser handles it natively,
-    // no memory buffering needed, shows browser's own download progress bar.
-    if (!isIOS) {
-      try {
-        const a = document.createElement('a')
-        a.href = url
-        a.download = fname
-        a.target = '_blank'
-        a.rel = 'noopener noreferrer'
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-        // Brief "done" flash then reset
-        setStatus('done')
-        setTimeout(() => setStatus('idle'), 2000)
-        return
-      } catch {
-        // Fall through to blob approach
-      }
-    }
-
-    // iOS or fallback: stream fetch → blob → share/download
+    // NOTE: we deliberately do NOT use a plain <a download> anchor here.
+    // The video lives on R2 (a different origin), and browsers ignore the
+    // `download` attribute for cross-origin URLs — so the anchor just navigates
+    // (opening the file in a new tab) instead of saving it. Fetching the file
+    // into a blob and saving that blob is the only way to force a real download
+    // cross-origin. R2 CORS allows the fetch.
     setStatus('loading')
 
     try {
