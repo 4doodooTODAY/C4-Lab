@@ -117,6 +117,12 @@ function fmtBytes(bytes) {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
 }
 
+// Same convention as the rest of the app: revision_number 1 is the first cut,
+// and each later number is "Revision (n-1)" — so the client and admin agree.
+function revisionLabel(n) {
+  return n === 1 ? 'First Cut' : `Revision ${n - 1}`
+}
+
 // ── Inline Editable Field ─────────────────────────────────────────────────────
 function InlineField({ label, value, displayValue, type = 'text', onSave, icon: Icon, readOnly = false }) {
   const [editing, setEditing]   = useState(false)
@@ -1391,7 +1397,7 @@ export default function ProjectDetail() {
                       {project?.media_type === 'photo' ? <Camera size={16} className="text-text-muted" /> : <FileVideo size={16} className="text-text-muted" />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-text-primary">Revision {r.revision_number}</p>
+                      <p className="text-sm font-semibold text-text-primary">{revisionLabel(r.revision_number)}</p>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${REVISION_STATUS_COLORS[r.status] || 'bg-surface-2 text-text-muted'}`}>
                           {REVISION_STATUS_LABELS[r.status] || r.status}
@@ -1447,7 +1453,7 @@ export default function ProjectDetail() {
                   {openSlot ? (
                     <>
                       <p className="text-xs text-text-muted mt-1 mb-2">
-                        Revision {openSlot.revision_number} is open. You or the editor can upload the video — it goes straight to the client.
+                        {revisionLabel(openSlot.revision_number)} is open. You or the editor can upload the video — it goes straight to the client.
                       </p>
                       <input
                         ref={extraRevInputRef}
@@ -1483,7 +1489,7 @@ export default function ProjectDetail() {
                   ) : (
                     <>
                       <p className="text-xs text-text-muted mt-1 mb-2">
-                        The client's 3 revisions are used up. Open Revision {nextRevNum} — then you or the editor can upload the cut for the client.
+                        The client's 3 revisions are used up. Open {revisionLabel(nextRevNum)} — then you or the editor can upload the cut for the client.
                       </p>
                       <button
                         onClick={handleAddRevisionSlot}
@@ -1491,7 +1497,7 @@ export default function ProjectDetail() {
                         className="btn-secondary text-xs flex items-center gap-1.5 disabled:opacity-60"
                       >
                         {addingRevSlot ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
-                        {addingRevSlot ? 'Adding…' : `Add Revision ${nextRevNum}`}
+                        {addingRevSlot ? 'Adding…' : `Add ${revisionLabel(nextRevNum)}`}
                       </button>
                     </>
                   )}

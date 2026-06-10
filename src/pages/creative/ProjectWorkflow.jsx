@@ -1825,7 +1825,7 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
   const gateTitle = isAdminRework
     ? 'Address admin feedback and submit to client'
     : isOpenSlot
-    ? `Upload Revision ${latestRev.revision_number} for the client`
+    ? `Upload ${revisionLabel(latestRev.revision_number)} for the client`
     : nextRevNum === 1
     ? (project.admin_review_required ? 'Ready to submit your initial cut?' : 'Ready to submit your initial cut?')
     : `Ready to upload ${revisionLabel(nextRevNum)}?`
