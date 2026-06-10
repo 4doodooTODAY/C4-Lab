@@ -44,7 +44,7 @@ function getStatusInfo(stage, pendingRevision) {
   if (stage === 'review' || stage === 'revisions') {
     if (revStatus === 'pending_client_review') {
       const n = pendingRevision.revision_number
-      return { text: n === 1 ? 'Your first cut is ready!' : `Revision ${n - 1} is ready!`, sub: 'Watch and leave your feedback.', color: 'text-accent', emoji: '🎬' }
+      return { text: n === 1 ? 'Your first cut is ready!' : `Revision ${n} is ready!`, sub: 'Watch and leave your feedback.', color: 'text-accent', emoji: '🎬' }
     }
     if (revStatus === 'pending_photographer_review' || revStatus === 'pending_creative_review')
       return { text: 'Under review', sub: 'The photographer is reviewing before sending it to you.', color: 'text-purple-600', emoji: '🔍' }

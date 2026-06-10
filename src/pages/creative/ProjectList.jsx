@@ -104,7 +104,7 @@ function EditCard({ project, revisions, myId, onClick, onMarkDone }) {
 
       {latest && (
         <p className="text-xs text-text-muted mb-3 cursor-pointer" onClick={onClick}>
-          {latest.revision_number === 1 ? 'Initial Cut' : `Revision ${latest.revision_number - 1}`}
+          {latest.revision_number === 1 ? 'Initial Cut' : `Revision ${latest.revision_number}`}
           {' · '}
           <span className={hasPendingUpload ? 'text-amber-600 font-medium' : ''}>
             {hasPendingUpload ? 'Upload requested' : latest.status.replace(/_/g, ' ')}

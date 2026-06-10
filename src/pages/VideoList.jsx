@@ -249,7 +249,7 @@ function ReviewProjectRow({ project, latest }) {
 
   const isFirstCut = latest && latest.revision_number === 1
   const revLabel = latest
-    ? (isFirstCut ? 'First Cut' : `Revision ${latest.revision_number - 1}`)
+    ? (isFirstCut ? 'First Cut' : `Revision ${latest.revision_number}`)
     : '—'
 
   return (

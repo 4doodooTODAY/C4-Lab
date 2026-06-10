@@ -17,7 +17,7 @@ import { format, parseISO } from 'date-fns'
 
 // "Initial Cut" for the first upload; "Revision N" for subsequent client-driven rounds
 function revisionLabel(n) {
-  return n === 1 ? 'Initial Cut' : `Revision ${n - 1}`
+  return n === 1 ? 'Initial Cut' : `Revision ${n}`
 }
 
 function fmtBytes(bytes) {
@@ -1548,7 +1548,7 @@ function UploadPhotoRevisionSection({ project, revisions, onRefresh }) {
       await updateProject(project.id, { stage: 'review', revision_count: nextRevNum })
 
       const { notifyAdmins: notifyAdminsFn, notify: notifyFn } = await import('../../lib/notify')
-      const revLabel = nextRevNum === 1 ? 'Initial Photos' : `Revision ${nextRevNum - 1}`
+      const revLabel = nextRevNum === 1 ? 'Initial Photos' : `Revision ${nextRevNum}`
 
       await notifyAdminsFn({
         actorId: profile.id,
@@ -1600,11 +1600,11 @@ function UploadPhotoRevisionSection({ project, revisions, onRefresh }) {
           <Camera size={22} className="text-accent" />
         </div>
         <h2 className="text-sm font-bold text-text-primary mb-1">
-          {nextRevNum === 1 ? 'Ready to submit your photos?' : `Ready to upload Revision ${nextRevNum - 1}?`}
+          {nextRevNum === 1 ? 'Ready to submit your photos?' : `Ready to upload Revision ${nextRevNum}?`}
         </h2>
         <p className="text-xs text-text-muted mb-4">Upload your edited photos — clients can leave pinpoint comments on each one.</p>
         <button onClick={() => setOpen(true)} className="btn-primary">
-          {nextRevNum === 1 ? 'Upload Initial Photos' : `Upload Revision ${nextRevNum - 1}`}
+          {nextRevNum === 1 ? 'Upload Initial Photos' : `Upload Revision ${nextRevNum}`}
         </button>
       </div>
     )
@@ -1614,7 +1614,7 @@ function UploadPhotoRevisionSection({ project, revisions, onRefresh }) {
     <div className="bg-white rounded-2xl border border-border p-5 space-y-4">
       <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
         <Camera size={14} className="text-text-muted" />
-        Upload Photos — {nextRevNum === 1 ? 'Initial Set' : `Revision ${nextRevNum - 1}`}
+        Upload Photos — {nextRevNum === 1 ? 'Initial Set' : `Revision ${nextRevNum}`}
       </h2>
 
       {/* File picker — hidden while uploading */}
@@ -1779,7 +1779,7 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
         await updateProject(project.id, { stage: 'review', revision_count: nextRevNum })
 
         // Notify photographer and admins
-        const revLabel = nextRevNum === 1 ? 'Initial Cut' : `Revision ${nextRevNum - 1}`
+        const revLabel = nextRevNum === 1 ? 'Initial Cut' : `Revision ${nextRevNum}`
         const { notify: notifyFn, notifyAdmins: notifyAdminsFn } = await import('../../lib/notify')
         if (project.creative_id) {
           await notifyFn({

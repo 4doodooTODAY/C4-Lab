@@ -120,7 +120,7 @@ function fmtBytes(bytes) {
 // Same convention as the rest of the app: revision_number 1 is the first cut,
 // and each later number is "Revision (n-1)" — so the client and admin agree.
 function revisionLabel(n) {
-  return n === 1 ? 'First Cut' : `Revision ${n - 1}`
+  return n === 1 ? 'First Cut' : `Revision ${n}`
 }
 
 // ── Inline Editable Field ─────────────────────────────────────────────────────

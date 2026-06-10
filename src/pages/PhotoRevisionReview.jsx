@@ -363,7 +363,7 @@ export default function PhotoRevisionReview() {
           <span className="text-sm font-semibold text-text-primary">{project?.name}</span>
           <span className="text-text-muted">·</span>
           <span className="text-xs text-text-muted">
-            {revision?.revision_number === 1 ? 'Initial Photos' : `Revision ${revision?.revision_number - 1}`}
+            {revision?.revision_number === 1 ? 'Initial Photos' : `Revision ${revision?.revision_number}`}
           </span>
         </div>
         <div className="ml-auto flex items-center gap-2">

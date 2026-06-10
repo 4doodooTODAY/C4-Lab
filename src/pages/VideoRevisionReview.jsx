@@ -14,7 +14,7 @@ import DownloadButton from '../components/ui/DownloadButton'
 
 // "Initial Cut" for first upload; "Revision N" for subsequent client-driven rounds
 function revisionLabel(n) {
-  return n === 1 ? 'Initial Cut' : `Revision ${n - 1}`
+  return n === 1 ? 'Initial Cut' : `Revision ${n}`
 }
 
 // Snap a raw float timestamp to the nearest 0.25s increment
