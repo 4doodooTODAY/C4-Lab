@@ -170,6 +170,20 @@ export default function PhotoRevisionReview() {
 
   const handleSavePin = async () => {
     if (!pendingPin || !newComment.trim()) return
+    const tempId = `temp-${Date.now()}`
+    const x_pct = parseFloat(pendingPin.x_pct.toFixed(2))
+    const y_pct = parseFloat(pendingPin.y_pct.toFixed(2))
+    const body  = newComment.trim()
+    // Optimistic: show the pin immediately, reconcile/rollback after insert.
+    const optimistic = {
+      id: tempId, revision_id: revisionId, photo_index: photoIndex,
+      x_pct, y_pct, body, profile_id: myId, status: 'pending',
+      _pending: true,
+      profiles: { id: myId, full_name: profile?.full_name, avatar_url: profile?.avatar_url },
+    }
+    setComments((prev) => [...prev, optimistic])
+    setPendingPin(null)
+    setNewComment('')
     setSaving(true)
     try {
       const { data, error: insErr } = await supabase
@@ -177,26 +191,37 @@ export default function PhotoRevisionReview() {
         .insert({
           revision_id:  revisionId,
           photo_index:  photoIndex,
-          x_pct:        parseFloat(pendingPin.x_pct.toFixed(2)),
-          y_pct:        parseFloat(pendingPin.y_pct.toFixed(2)),
-          body:         newComment.trim(),
+          x_pct, y_pct,
+          body,
           profile_id:   myId,
           status:       'pending',
         })
         .select('*, profiles(id, full_name, avatar_url)')
         .single()
-      if (insErr) { setError(insErr.message); return }
-      if (data) setComments((prev) => [...prev, data])
-      setPendingPin(null)
-      setNewComment('')
+      if (insErr) {
+        // Roll back the optimistic pin
+        setComments((prev) => prev.filter((c) => c.id !== tempId))
+        setError(insErr.message)
+        return
+      }
+      if (data) setComments((prev) => prev.map((c) => c.id === tempId ? data : c))
     } finally {
       setSaving(false)
     }
   }
 
   const handleStatusChange = async (commentId, status) => {
-    await supabase.from('photo_revision_comments').update({ status }).eq('id', commentId)
-    setComments((prev) => prev.map((c) => c.id === commentId ? { ...c, status } : c))
+    // Optimistic: flip status immediately, roll back on error.
+    let prevStatus
+    setComments((prev) => prev.map((c) => {
+      if (c.id === commentId) { prevStatus = c.status; return { ...c, status } }
+      return c
+    }))
+    const { error: updErr } = await supabase
+      .from('photo_revision_comments').update({ status }).eq('id', commentId)
+    if (updErr) {
+      setComments((prev) => prev.map((c) => c.id === commentId ? { ...c, status: prevStatus } : c))
+    }
   }
 
   const handleApproveAll = async () => {

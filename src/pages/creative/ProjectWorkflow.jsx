@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
-import { uploadToR2, fmtSpeed, fmtEta, forceDownload } from '../../lib/r2'
+import { uploadToR2, fmtSpeed, fmtEta, forceDownload, downloadAll } from '../../lib/r2'
 import { updateProject } from '../../hooks/useProjects'
 import Avatar from '../../components/ui/Avatar'
 import { format, parseISO } from 'date-fns'
@@ -914,12 +914,9 @@ async function deleteShootUpload(f) {
 
 async function downloadFiles(files, setDownloading) {
   setDownloading(true)
-  for (const f of files) {
-    if (f.file_url) {
-      await forceDownload(f.file_url, f.file_name)
-      await new Promise((r) => setTimeout(r, 400))
-    }
-  }
+  // Concurrent pool — keeps several transfers in flight for max throughput
+  // instead of one-at-a-time with sleep gaps between files.
+  await downloadAll(files, { concurrency: 4 })
   setDownloading(false)
 }
 

@@ -14,7 +14,7 @@ import { notify, notifyAdmins } from '../../lib/notify'
 import Avatar from '../../components/ui/Avatar'
 import { format, parseISO } from 'date-fns'
 import { fmtTime } from '../../lib/time'
-import { forceDownload, uploadToR2 } from '../../lib/r2'
+import { forceDownload, downloadAll, uploadToR2 } from '../../lib/r2'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const DISPLAY_STAGES = [
@@ -677,11 +677,11 @@ export default function ProjectDetail() {
     if (!list.length) return
     setDownloading(true)
     setDlProgress({ done: 0, total: list.length })
-    for (let i = 0; i < list.length; i++) {
-      await forceDownload(list[i].file_url, list[i].file_name)
-      setDlProgress({ done: i + 1, total: list.length })
-      await new Promise((r) => setTimeout(r, 350))
-    }
+    // Concurrent pool instead of one-at-a-time with sleep gaps — much faster.
+    await downloadAll(list, {
+      concurrency: 4,
+      onProgress: (done, total) => setDlProgress({ done, total }),
+    })
     setDownloading(false)
   }
 

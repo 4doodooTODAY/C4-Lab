@@ -200,8 +200,36 @@ export async function forceDownload(url, filename) {
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
-    URL.revokeObjectURL(a.href)
+    // Revoke after a tick so the click has consumed the URL
+    setTimeout(() => URL.revokeObjectURL(a.href), 0)
   } catch {
     window.open(url, '_blank')
   }
+}
+
+/**
+ * downloadAll — download many files at once instead of one-at-a-time.
+ *
+ * Sequential downloads (with sleep gaps between them) leave the network
+ * mostly idle and make "Download All" feel slow. A bounded worker pool keeps
+ * several transfers in flight simultaneously, maximising aggregate MB/s while
+ * staying under the browser's rapid-download throttle. onProgress(done, total)
+ * fires after each file so callers can show a progress bar.
+ */
+export async function downloadAll(files, { concurrency = 4, onProgress } = {}) {
+  const list = (files || []).filter((f) => f.file_url)
+  if (!list.length) return
+  let idx = 0
+  let done = 0
+  const worker = async () => {
+    while (idx < list.length) {
+      const f = list[idx++]
+      await forceDownload(f.file_url, f.file_name)
+      done++
+      onProgress?.(done, list.length)
+    }
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, list.length) }, () => worker())
+  )
 }
