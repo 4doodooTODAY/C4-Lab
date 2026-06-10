@@ -418,6 +418,12 @@ export default function ProjectDetail() {
   const [mediaUploadError, setMediaUploadError] = useState('')
   const [mediaDragOver, setMediaDragOver]     = useState(false)
 
+  // Admin-only extra revision upload (used when the 3 client revisions run out)
+  const extraRevInputRef = useRef(null)
+  const [extraRevFile, setExtraRevFile]         = useState(null)
+  const [uploadingExtraRev, setUploadingExtraRev] = useState(false)
+  const [extraRevError, setExtraRevError]       = useState('')
+
   // Assigned creative/editor profiles
   const [creativeProfile, setCreativeProfile] = useState(null)
   const [editorProfiles, setEditorProfiles]   = useState([])   // multiple editors
@@ -445,11 +451,11 @@ export default function ProjectDetail() {
     setLoadingExtras(true)
     const shootId = project?.shoot_id
     Promise.all([
-      supabase.from('shoot_uploads').select('*').eq('project_id', id).order('created_at'),
+      supabase.from('shoot_uploads').select('*, uploader:profiles!shoot_uploads_uploaded_by_fkey(id, full_name)').eq('project_id', id).order('created_at'),
       supabase.from('shoot_notes').select('*, poster:profiles!shoot_notes_profile_id_fkey(id, full_name, avatar_url), author:profiles!shoot_notes_author_id_fkey(id, full_name, avatar_url)').eq('project_id', id).order('created_at'),
       supabase.from('project_revisions').select('*, profiles(id, full_name)').eq('project_id', id).order('revision_number'),
       shootId
-        ? supabase.from('shoot_uploads').select('*').eq('shoot_id', shootId).order('created_at')
+        ? supabase.from('shoot_uploads').select('*, uploader:profiles!shoot_uploads_uploaded_by_fkey(id, full_name)').eq('shoot_id', shootId).order('created_at')
         : Promise.resolve({ data: [] }),
     ]).then(([uploads, notes, revs, shootFootage]) => {
       // Merge project uploads + linked-shoot footage, de-duplicating by id
@@ -737,13 +743,55 @@ export default function ProjectDetail() {
         if (dbErr) throw new Error(dbErr.message)
       }
       // Refresh uploads list
-      const { data } = await supabase.from('shoot_uploads').select('*').eq('project_id', id).order('created_at')
+      const { data } = await supabase.from('shoot_uploads').select('*, uploader:profiles!shoot_uploads_uploaded_by_fkey(id, full_name)').eq('project_id', id).order('created_at')
       setShootUploads(data || [])
       setMediaFiles([])
     } catch (err) {
       setMediaUploadError(err.message)
     } finally {
       setUploadingMedia(false)
+    }
+  }
+
+  // Admin adds an extra revision the client can review — for when the 3
+  // standard revisions are used up but another cut still needs to go out.
+  const handleExtraRevUpload = async () => {
+    if (!extraRevFile) return
+    setUploadingExtraRev(true)
+    setExtraRevError('')
+    try {
+      const latestRev = [...revisions].sort((a, b) => b.revision_number - a.revision_number)[0]
+      const nextRevNum = latestRev ? latestRev.revision_number + 1 : 1
+      const { publicUrl } = await uploadToR2({
+        file:        extraRevFile,
+        category:    'revisions',
+        clientName:  project.clients?.name || project.clients?.contact_name || 'client',
+        projectName: project.name,
+        folderType:  'projects',
+      })
+      const { error: insErr } = await supabase.from('project_revisions').insert({
+        project_id:      id,
+        revision_number: nextRevNum,
+        video_url:       publicUrl,
+        status:          'pending_client_review',
+        uploaded_by:     profile.id,
+      })
+      if (insErr) throw new Error(insErr.message)
+      // Move the project back into review so the client sees the new cut
+      await updateProject(id, { stage: 'review' })
+      // Refresh revisions list
+      const { data } = await supabase
+        .from('project_revisions')
+        .select('*, profiles(id, full_name)')
+        .eq('project_id', id)
+        .order('revision_number')
+      setRevisions(data || [])
+      setExtraRevFile(null)
+      refetch()
+    } catch (err) {
+      setExtraRevError(err.message)
+    } finally {
+      setUploadingExtraRev(false)
     }
   }
 
@@ -1187,6 +1235,9 @@ export default function ProjectDetail() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-text-primary truncate">{f.file_name}</p>
                         <p className="text-xs text-text-muted">{fmtBytes(f.file_size)} · {new Date(f.created_at).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })} EST</p>
+                        {f.uploader?.full_name && (
+                          <p className="text-xs text-text-muted truncate">Uploaded by {f.uploader.full_name}</p>
+                        )}
                       </div>
                       {f.file_url && (
                         <button
@@ -1320,6 +1371,9 @@ export default function ProjectDetail() {
                         </span>
                         <span className="text-xs text-text-muted">{format(new Date(r.created_at), 'MMM d, yyyy')}</span>
                       </div>
+                      {r.profiles?.full_name && (
+                        <p className="text-xs text-text-muted mt-0.5">Uploaded by {r.profiles.full_name}</p>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       {r.video_url && (
@@ -1343,6 +1397,59 @@ export default function ProjectDetail() {
                 ))}
               </div>
             )}
+
+            {/* Admin-only: add an extra revision once the 3 client revisions are used up */}
+            {(() => {
+              const latestRev = [...revisions].sort((a, b) => b.revision_number - a.revision_number)[0]
+              const revisionsComplete = latestRev && (
+                latestRev.status === 'approved' ||
+                latestRev.revision_number >= 3 ||
+                ['ready_to_post', 'delivered'].includes(project.stage)
+              )
+              if (!revisionsComplete) return null
+              const nextRevNum = latestRev.revision_number + 1
+              return (
+                <div className="mt-4 pt-4 border-t border-border">
+                  <p className="text-xs font-semibold text-text-primary flex items-center gap-1.5">
+                    <Plus size={12} /> Add an extra revision <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700">Admin only</span>
+                  </p>
+                  <p className="text-xs text-text-muted mt-1 mb-2">
+                    The client's 3 revisions are used up. Upload another cut for them to review (becomes Revision {nextRevNum}).
+                  </p>
+                  <input
+                    ref={extraRevInputRef}
+                    type="file"
+                    accept={project?.media_type === 'photo' ? 'image/*' : 'video/*'}
+                    className="hidden"
+                    onChange={(e) => setExtraRevFile(e.target.files?.[0] || null)}
+                  />
+                  {extraRevFile ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-text-primary truncate flex-1">{extraRevFile.name}</span>
+                      <button
+                        onClick={handleExtraRevUpload}
+                        disabled={uploadingExtraRev}
+                        className="btn-primary text-xs flex items-center gap-1.5 disabled:opacity-60"
+                      >
+                        {uploadingExtraRev ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+                        {uploadingExtraRev ? 'Uploading…' : 'Upload for client'}
+                      </button>
+                      {!uploadingExtraRev && (
+                        <button onClick={() => setExtraRevFile(null)} className="text-xs text-text-muted hover:text-text-primary">Cancel</button>
+                      )}
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => extraRevInputRef.current?.click()}
+                      className="btn-secondary text-xs flex items-center gap-1.5"
+                    >
+                      <Plus size={12} /> Choose {project?.media_type === 'photo' ? 'photo' : 'video'}
+                    </button>
+                  )}
+                  {extraRevError && <p className="text-xs text-red-500 mt-2">{extraRevError}</p>}
+                </div>
+              )
+            })()}
           </div>
 
         </div>

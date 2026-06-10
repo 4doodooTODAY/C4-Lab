@@ -877,8 +877,13 @@ function FileList({ files, accent = false, onDelete, deletingId }) {
       {files.map((f) => (
         <div key={f.id} className="flex items-center gap-3 px-3 py-2.5">
           <Film size={13} className={accent ? 'text-blue-300 shrink-0' : 'text-text-muted shrink-0'} />
-          <span className={`text-sm truncate flex-1 ${accent ? 'text-blue-900' : 'text-text-primary'}`}>{f.file_name}</span>
-          <span className={`text-xs ${accent ? 'text-blue-400' : 'text-text-muted'}`}>{fmtBytes(f.file_size)}{f.created_at && ` · ${new Date(f.created_at).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })} EST`}</span>
+          <div className="flex-1 min-w-0">
+            <span className={`text-sm truncate block ${accent ? 'text-blue-900' : 'text-text-primary'}`}>{f.file_name}</span>
+            {f.profiles?.full_name && (
+              <span className={`text-xs ${accent ? 'text-blue-400' : 'text-text-muted'}`}>Uploaded by {f.profiles.full_name}</span>
+            )}
+          </div>
+          <span className={`text-xs shrink-0 ${accent ? 'text-blue-400' : 'text-text-muted'}`}>{fmtBytes(f.file_size)}{f.created_at && ` · ${new Date(f.created_at).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })} EST`}</span>
           {f.file_url && (
             <button onClick={() => forceDownload(f.file_url, f.file_name)}
               className={`transition-colors shrink-0 ${accent ? 'text-blue-500 hover:text-blue-700' : 'text-accent hover:text-accent/80'}`}
@@ -1309,7 +1314,12 @@ function ProjectMediaSection({ project, uploads, onRefresh }) {
             {visible.map((f) => (
               <div key={f.id} className="flex items-center gap-3 px-3 py-2.5">
                 <Film size={13} className="text-text-muted shrink-0" />
-                <span className="text-sm truncate flex-1 text-text-primary">{f.file_name}</span>
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm truncate block text-text-primary">{f.file_name}</span>
+                  {f.profiles?.full_name && (
+                    <span className="text-xs text-text-muted">Uploaded by {f.profiles.full_name}</span>
+                  )}
+                </div>
                 <span className="text-xs text-text-muted shrink-0">{fmtBytes(f.file_size)}</span>
                 {f.file_url && (
                   <button
@@ -1963,7 +1973,7 @@ function RevisionsCard({ project, revisions, commentCounts, navigate }) {
                     {REVISION_STATUS_LABELS[r.status] || r.status}
                   </span>
                 </div>
-                <div className="flex items-center gap-3 text-xs text-text-muted mb-3">
+                <div className="flex items-center gap-3 text-xs text-text-muted mb-1 flex-wrap">
                   {r.created_at && (
                     <span className="flex items-center gap-1">
                       <Clock size={10} />
@@ -1975,6 +1985,9 @@ function RevisionsCard({ project, revisions, commentCounts, navigate }) {
                     {count} comment{count !== 1 ? 's' : ''}
                   </span>
                 </div>
+                {r.uploader?.full_name && (
+                  <p className="text-xs text-text-muted mb-3">Uploaded by {r.uploader.full_name}</p>
+                )}
                 <div className="flex gap-2">
                   <button
                     onClick={() => navigate(project.media_type === 'photo' ? `/projects/${project.id}/photo-revision/${r.id}` : `/projects/${project.id}/revision/${r.id}`)}
@@ -2113,7 +2126,7 @@ export default function ProjectWorkflow() {
           ? supabase.from('shoot_uploads').select('*, profiles(id, full_name, role)').eq('shoot_id', projData.shoot_id).order('created_at')
           : Promise.resolve({ data: [] }),
         supabase.from('shoot_notes').select('*').eq('project_id', id).order('created_at'),
-        supabase.from('project_revisions').select('*').eq('project_id', id).order('revision_number'),
+        supabase.from('project_revisions').select('*, uploader:profiles!project_revisions_uploaded_by_fkey(id, full_name)').eq('project_id', id).order('revision_number'),
         supabase.from('project_editors').select('profile_id').eq('project_id', id),
       ])
       setProjectEditorIds((editorsRes.data || []).map((r) => r.profile_id))
