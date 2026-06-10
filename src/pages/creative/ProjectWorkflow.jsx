@@ -1727,8 +1727,11 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
 
   // "Rework" = admin rejected and editor is fixing it — update same revision, skip to client
   const isAdminRework = latestRev?.status === 'pending_editor' && latestRev?.admin_reviewed === true
-  const nextRevNum    = isAdminRework
-    ? latestRev.revision_number  // same number — not a new client revision
+  // "Open slot" = admin added an extra revision but no video yet — fill it in place
+  // and send straight to the client (it's an admin-requested extra round).
+  const isOpenSlot    = latestRev?.status === 'pending_editor' && !latestRev?.video_url && !isAdminRework
+  const nextRevNum    = (isAdminRework || isOpenSlot)
+    ? latestRev.revision_number  // same number — fill the existing revision
     : (latestRev ? latestRev.revision_number + 1 : 1)
 
   const canUpload = ['production', 'post_production'].includes(stage) || (latestRev && latestRev.status === 'pending_editor')
@@ -1754,12 +1757,14 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
         onStats:     setUploadStats,
       })
 
-      if (isAdminRework) {
-        // Admin already reviewed — send straight to client
+      if (isAdminRework || isOpenSlot) {
+        // Admin already reviewed (rework) or admin opened this extra revision —
+        // fill the existing slot and send straight to the client.
         const { error: e } = await supabase.from('project_revisions')
-          .update({ video_url: publicUrl, status: 'pending_client_review' })
+          .update({ video_url: publicUrl, status: 'pending_client_review', uploaded_by: profile.id })
           .eq('id', latestRev.id)
         if (e) throw new Error(e.message)
+        await updateProject(project.id, { stage: 'review' })
       } else {
         // New revision → goes to photographer first for review, then client
         const { error: e } = await supabase.from('project_revisions').insert({
@@ -1819,12 +1824,16 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
   // Contextual copy based on situation
   const gateTitle = isAdminRework
     ? 'Address admin feedback and submit to client'
+    : isOpenSlot
+    ? `Upload Revision ${latestRev.revision_number} for the client`
     : nextRevNum === 1
     ? (project.admin_review_required ? 'Ready to submit your initial cut?' : 'Ready to submit your initial cut?')
     : `Ready to upload ${revisionLabel(nextRevNum)}?`
 
   const gateBody = isAdminRework
     ? 'Admin requested changes. Fix them and upload — it will go straight to the client (no extra revision count).'
+    : isOpenSlot
+    ? 'Admin opened an extra revision. Upload the cut and it goes straight to the client.'
     : nextRevNum > 1
     ? `Address the client's feedback on the initial cut and upload your revised cut.`
     : project.admin_review_required

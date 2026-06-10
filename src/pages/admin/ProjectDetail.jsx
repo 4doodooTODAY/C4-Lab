@@ -422,6 +422,7 @@ export default function ProjectDetail() {
   const extraRevInputRef = useRef(null)
   const [extraRevFile, setExtraRevFile]         = useState(null)
   const [uploadingExtraRev, setUploadingExtraRev] = useState(false)
+  const [addingRevSlot, setAddingRevSlot]       = useState(false)
   const [extraRevError, setExtraRevError]       = useState('')
 
   // Assigned creative/editor profiles
@@ -755,13 +756,49 @@ export default function ProjectDetail() {
 
   // Admin adds an extra revision the client can review — for when the 3
   // standard revisions are used up but another cut still needs to go out.
-  const handleExtraRevUpload = async () => {
-    if (!extraRevFile) return
-    setUploadingExtraRev(true)
+  const reloadRevisions = async () => {
+    const { data } = await supabase
+      .from('project_revisions')
+      .select('*, profiles(id, full_name)')
+      .eq('project_id', id)
+      .order('revision_number')
+    setRevisions(data || [])
+  }
+
+  // Step 1: admin opens a new empty revision slot. No video yet — the editor
+  // (or admin) fills it in through the normal upload flow. It just becomes the
+  // next revision number.
+  const handleAddRevisionSlot = async () => {
+    setAddingRevSlot(true)
     setExtraRevError('')
     try {
       const latestRev = [...revisions].sort((a, b) => b.revision_number - a.revision_number)[0]
       const nextRevNum = latestRev ? latestRev.revision_number + 1 : 1
+      const { error: insErr } = await supabase.from('project_revisions').insert({
+        project_id:      id,
+        revision_number: nextRevNum,
+        status:          'pending_editor',
+        uploaded_by:     profile.id,
+      })
+      if (insErr) throw new Error(insErr.message)
+      // Put the project back into review so the editor's upload flow opens up
+      await updateProject(id, { stage: 'review' })
+      await reloadRevisions()
+      refetch()
+    } catch (err) {
+      setExtraRevError(err.message)
+    } finally {
+      setAddingRevSlot(false)
+    }
+  }
+
+  // Step 2 (admin can also do this instead of the editor): upload the video
+  // into the open slot. It then goes to the client like any other revision.
+  const handleFillRevisionSlot = async (slot) => {
+    if (!extraRevFile) return
+    setUploadingExtraRev(true)
+    setExtraRevError('')
+    try {
       const { publicUrl } = await uploadToR2({
         file:        extraRevFile,
         category:    'revisions',
@@ -769,23 +806,13 @@ export default function ProjectDetail() {
         projectName: project.name,
         folderType:  'projects',
       })
-      const { error: insErr } = await supabase.from('project_revisions').insert({
-        project_id:      id,
-        revision_number: nextRevNum,
-        video_url:       publicUrl,
-        status:          'pending_client_review',
-        uploaded_by:     profile.id,
-      })
-      if (insErr) throw new Error(insErr.message)
-      // Move the project back into review so the client sees the new cut
+      const { error: updErr } = await supabase.from('project_revisions')
+        .update({ video_url: publicUrl, status: 'pending_client_review', uploaded_by: profile.id })
+        .eq('id', slot.id)
+        .select('id')
+      if (updErr) throw new Error(updErr.message)
       await updateProject(id, { stage: 'review' })
-      // Refresh revisions list
-      const { data } = await supabase
-        .from('project_revisions')
-        .select('*, profiles(id, full_name)')
-        .eq('project_id', id)
-        .order('revision_number')
-      setRevisions(data || [])
+      await reloadRevisions()
       setExtraRevFile(null)
       refetch()
     } catch (err) {
@@ -1401,50 +1428,72 @@ export default function ProjectDetail() {
             {/* Admin-only: add an extra revision once the 3 client revisions are used up */}
             {(() => {
               const latestRev = [...revisions].sort((a, b) => b.revision_number - a.revision_number)[0]
+              // An open slot = a revision the admin created that still needs a video.
+              const openSlot = latestRev && latestRev.status === 'pending_editor' && !latestRev.video_url
+                ? latestRev : null
               const revisionsComplete = latestRev && (
                 latestRev.status === 'approved' ||
                 latestRev.revision_number >= 3 ||
                 ['ready_to_post', 'delivered'].includes(project.stage)
               )
-              if (!revisionsComplete) return null
+              if (!openSlot && !revisionsComplete) return null
               const nextRevNum = latestRev.revision_number + 1
               return (
                 <div className="mt-4 pt-4 border-t border-border">
                   <p className="text-xs font-semibold text-text-primary flex items-center gap-1.5">
-                    <Plus size={12} /> Add an extra revision <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700">Admin only</span>
+                    <Plus size={12} /> Extra revision <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700">Admin only</span>
                   </p>
-                  <p className="text-xs text-text-muted mt-1 mb-2">
-                    The client's 3 revisions are used up. Upload another cut for them to review (becomes Revision {nextRevNum}).
-                  </p>
-                  <input
-                    ref={extraRevInputRef}
-                    type="file"
-                    accept={project?.media_type === 'photo' ? 'image/*' : 'video/*'}
-                    className="hidden"
-                    onChange={(e) => setExtraRevFile(e.target.files?.[0] || null)}
-                  />
-                  {extraRevFile ? (
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-text-primary truncate flex-1">{extraRevFile.name}</span>
-                      <button
-                        onClick={handleExtraRevUpload}
-                        disabled={uploadingExtraRev}
-                        className="btn-primary text-xs flex items-center gap-1.5 disabled:opacity-60"
-                      >
-                        {uploadingExtraRev ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
-                        {uploadingExtraRev ? 'Uploading…' : 'Upload for client'}
-                      </button>
-                      {!uploadingExtraRev && (
-                        <button onClick={() => setExtraRevFile(null)} className="text-xs text-text-muted hover:text-text-primary">Cancel</button>
+
+                  {openSlot ? (
+                    <>
+                      <p className="text-xs text-text-muted mt-1 mb-2">
+                        Revision {openSlot.revision_number} is open. You or the editor can upload the video — it goes straight to the client.
+                      </p>
+                      <input
+                        ref={extraRevInputRef}
+                        type="file"
+                        accept={project?.media_type === 'photo' ? 'image/*' : 'video/*'}
+                        className="hidden"
+                        onChange={(e) => setExtraRevFile(e.target.files?.[0] || null)}
+                      />
+                      {extraRevFile ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-text-primary truncate flex-1">{extraRevFile.name}</span>
+                          <button
+                            onClick={() => handleFillRevisionSlot(openSlot)}
+                            disabled={uploadingExtraRev}
+                            className="btn-primary text-xs flex items-center gap-1.5 disabled:opacity-60"
+                          >
+                            {uploadingExtraRev ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+                            {uploadingExtraRev ? 'Uploading…' : 'Upload for client'}
+                          </button>
+                          {!uploadingExtraRev && (
+                            <button onClick={() => setExtraRevFile(null)} className="text-xs text-text-muted hover:text-text-primary">Cancel</button>
+                          )}
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => extraRevInputRef.current?.click()}
+                          className="btn-secondary text-xs flex items-center gap-1.5"
+                        >
+                          <Upload size={12} /> Upload {project?.media_type === 'photo' ? 'photo' : 'video'}
+                        </button>
                       )}
-                    </div>
+                    </>
                   ) : (
-                    <button
-                      onClick={() => extraRevInputRef.current?.click()}
-                      className="btn-secondary text-xs flex items-center gap-1.5"
-                    >
-                      <Plus size={12} /> Choose {project?.media_type === 'photo' ? 'photo' : 'video'}
-                    </button>
+                    <>
+                      <p className="text-xs text-text-muted mt-1 mb-2">
+                        The client's 3 revisions are used up. Open Revision {nextRevNum} — then you or the editor can upload the cut for the client.
+                      </p>
+                      <button
+                        onClick={handleAddRevisionSlot}
+                        disabled={addingRevSlot}
+                        className="btn-secondary text-xs flex items-center gap-1.5 disabled:opacity-60"
+                      >
+                        {addingRevSlot ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+                        {addingRevSlot ? 'Adding…' : `Add Revision ${nextRevNum}`}
+                      </button>
+                    </>
                   )}
                   {extraRevError && <p className="text-xs text-red-500 mt-2">{extraRevError}</p>}
                 </div>
