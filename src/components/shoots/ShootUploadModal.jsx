@@ -132,6 +132,7 @@ export default function ShootUploadModal({ shoot, clientId, clientName, onClose,
     if (!pending.length) return
     setRunning(true)
 
+    let errorCount = 0
     for (const item of pending) {
       updateItem(item.id, { status: 'uploading', progress: 0 })
       try {
@@ -160,16 +161,16 @@ export default function ShootUploadModal({ shoot, clientId, clientName, onClose,
 
         updateItem(item.id, { status: 'done', progress: 100 })
       } catch (err) {
+        errorCount++
         updateItem(item.id, { status: 'error', error: err.message })
       }
     }
 
     setRunning(false)
-    const hasErrors = items.some((i) => i.status === 'error')
-    if (!hasErrors) {
-      setAllDone(true)
-      onUploaded?.()
-    }
+    // Refresh the parent list as soon as at least one file landed, so uploaded
+    // clips show up immediately without a page refresh.
+    if (errorCount < pending.length) onUploaded?.()
+    if (errorCount === 0) setAllDone(true)
   }
 
   const pendingCount   = items.filter((i) => i.status === 'pending').length

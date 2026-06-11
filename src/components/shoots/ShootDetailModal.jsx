@@ -171,7 +171,7 @@ function NotesThread({ shootId }) {
 }
 
 // ── Shoot files list ──────────────────────────────────────────────────────────
-function ShootFiles({ shootId }) {
+function ShootFiles({ shootId, refreshKey = 0 }) {
   const { profile }           = useAuth()
   const [files, setFiles]     = useState([])
   const [loading, setLoading] = useState(true)
@@ -189,7 +189,7 @@ function ShootFiles({ shootId }) {
       .eq('shoot_id', shootId)
       .order('created_at', { ascending: false })
       .then(({ data }) => { setFiles(data || []); setLoading(false) })
-  }, [shootId])
+  }, [shootId, refreshKey])
 
   const toggleSelected = (id) => setSelectedIds((prev) => {
     const next = new Set(prev)
@@ -411,6 +411,7 @@ function InspirationLinks({ shoot, canEdit }) {
 export default function ShootDetailModal({ shoot: initialShoot, clientId, clientName, onClose, onUpdated }) {
   const { profile } = useAuth()
   const [showUpload,    setShowUpload]    = useState(false)
+  const [filesRefreshKey, setFilesRefreshKey] = useState(0)
   const [activeSection, setSection]      = useState('files')
   const [editMode,      setEditMode]     = useState(false)
   const [localShoot,    setLocalShoot]   = useState(initialShoot)
@@ -750,7 +751,7 @@ export default function ShootDetailModal({ shoot: initialShoot, clientId, client
                   ))}
                 </div>
 
-                {activeSection === 'files' && <ShootFiles shootId={shoot.id} />}
+                {activeSection === 'files' && <ShootFiles shootId={shoot.id} refreshKey={filesRefreshKey} />}
                 {!isClient && activeSection === 'inspiration' && (
                   <InspirationLinks shoot={shoot} canEdit={canSeeCreativeNotes} />
                 )}
@@ -767,7 +768,7 @@ export default function ShootDetailModal({ shoot: initialShoot, clientId, client
           clientId={clientId}
           clientName={clientName}
           onClose={() => setShowUpload(false)}
-          onUploaded={() => setShowUpload(false)}
+          onUploaded={() => setFilesRefreshKey((k) => k + 1)}
         />
       )}
     </>
