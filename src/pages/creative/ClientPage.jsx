@@ -4,7 +4,7 @@ import {
   ArrowLeft, Camera, FolderKanban, HardDrive, Loader2,
   CalendarDays, MapPin, Film, ExternalLink,
   ChevronRight, Building2, FileVideo, Image, File,
-  Upload, Check, LayoutList,
+  Upload, Check, LayoutList, Palette,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useShoots } from '../../hooks/useShoots'
@@ -12,6 +12,7 @@ import { format, parseISO, isBefore, startOfDay } from 'date-fns'
 import { fmtTime } from '../../lib/time'
 import { forceDownload } from '../../lib/r2'
 import ShootDetailModal from '../../components/shoots/ShootDetailModal'
+import BrandPackage from '../../components/brand/BrandPackage'
 import { formatDistanceToNow } from 'date-fns'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -425,6 +426,7 @@ const TABS = [
   { id: 'projects', label: 'Projects', icon: FolderKanban },
   { id: 'drafts',   label: 'Drafts',   icon: LayoutList },
   { id: 'files',    label: 'Files',    icon: HardDrive },
+  { id: 'brand',    label: 'Brand Package', icon: Palette },
 ]
 
 export default function CreativeClientPage() {
@@ -476,6 +478,7 @@ export default function CreativeClientPage() {
       {tab === 'projects' && <ProjectsTab clientId={id} />}
       {tab === 'drafts'   && <DraftsTab   clientId={id} />}
       {tab === 'files'    && <FilesTab    clientId={id} />}
+      {tab === 'brand'    && <BrandPackage clientId={id} clientName={client?.name} />}
     </div>
   )
 }

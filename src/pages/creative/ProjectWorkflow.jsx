@@ -1271,7 +1271,6 @@ function ProjectMediaSection({ project, uploads, onRefresh }) {
           ref={fileInputRef}
           type="file"
           multiple
-          accept="video/*,image/*,.mov,.mp4,.avi,.mkv,.raw,.cr2,.arw,.zip"
           className="hidden"
           onChange={(e) => addFiles(e.target.files)}
         />

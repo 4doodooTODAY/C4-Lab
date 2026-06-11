@@ -4,11 +4,12 @@ import {
   ArrowLeft, Building2, Users2, CalendarDays, FolderKanban,
   Inbox, Plus, X, Loader2, Edit2, MapPin, Clock, Check, Pencil,
   Camera, Film, ExternalLink, Trash2, ChevronRight, AlertCircle,
-  Link as LinkIcon, FileText, LayoutList, HardDrive, Image, File, Upload,
+  Link as LinkIcon, FileText, LayoutList, HardDrive, Image, File, Upload, Palette,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import Avatar from '../../components/ui/Avatar'
+import BrandPackage from '../../components/brand/BrandPackage'
 import { format, parseISO, isBefore, startOfDay } from 'date-fns'
 import { useClientCreatives, assignCreative, removeCreativeAssignment } from '../../hooks/useClientCreatives'
 import { createProject } from '../../hooks/useProjects'
@@ -1467,6 +1468,7 @@ const TABS = [
   { id: 'shoots',   label: 'Shoots',    icon: Camera },
   { id: 'projects', label: 'Projects',  icon: FolderKanban },
   { id: 'files',    label: 'Files',     icon: HardDrive },
+  { id: 'brand',    label: 'Brand Package', icon: Palette },
   { id: 'requests', label: 'Requests',  icon: Inbox },
 ]
 
@@ -1562,6 +1564,7 @@ export default function ClientHub() {
       {tab === 'shoots'   && <ShootsTab   clientId={id} client={client} />}
 {tab === 'projects' && <ProjectsTab clientId={id} projects={projects} onRefetch={refetchProjects} />}
       {tab === 'files'    && <FilesTab    clientId={id} />}
+      {tab === 'brand'    && <BrandPackage clientId={id} clientName={client?.name} />}
       {tab === 'requests' && <RequestsTab requests={requests} />}
     </div>
   )

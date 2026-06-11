@@ -1201,7 +1201,6 @@ export default function ProjectDetail() {
                 ref={mediaInputRef}
                 type="file"
                 multiple
-                accept="video/*,image/*,.mov,.mp4,.avi,.mkv,.raw,.cr2,.arw,.zip"
                 className="hidden"
                 onChange={(e) => setMediaFiles((prev) => [...prev, ...Array.from(e.target.files)])}
               />

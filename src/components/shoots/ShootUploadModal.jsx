@@ -228,7 +228,6 @@ export default function ShootUploadModal({ shoot, clientId, clientName, onClose,
                   ref={fileInputRef}
                   type="file"
                   multiple
-                  accept="video/*,image/*,.zip,.mov,.mp4,.avi,.mkv,.raw,.cr2,.arw"
                   className="hidden"
                   onChange={(e) => addFiles(e.target.files)}
                 />
