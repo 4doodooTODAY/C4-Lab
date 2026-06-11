@@ -3,7 +3,7 @@ import {
   X, CalendarDays, MapPin, Camera, Upload, Send,
   Loader2, MessageSquare, ExternalLink, Film, Image,
   File, HardDrive, Link2, Plus, Pencil, Check, Users,
-  AlertCircle, FolderKanban,
+  AlertCircle, FolderKanban, CheckSquare, Square,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -176,6 +176,8 @@ function ShootFiles({ shootId }) {
   const [files, setFiles]     = useState([])
   const [loading, setLoading] = useState(true)
   const [removingId, setRemovingId] = useState(null)
+  const [selectedIds, setSelectedIds] = useState(() => new Set())
+  const [bulkRemoving, setBulkRemoving] = useState(false)
 
   const canRemove = ['admin', 'creative', 'editor', 'team_lead'].includes(profile?.role)
 
@@ -189,8 +191,14 @@ function ShootFiles({ shootId }) {
       .then(({ data }) => { setFiles(data || []); setLoading(false) })
   }, [shootId])
 
+  const toggleSelected = (id) => setSelectedIds((prev) => {
+    const next = new Set(prev)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
+
   const removeFile = async (f) => {
-    if (!window.confirm(`Remove "${f.file_name}" from this shoot?`)) return
+    if (!window.confirm(`Are you sure you want to remove "${f.file_name}"? This can't be undone.`)) return
     setRemovingId(f.id)
     const { data, error } = await supabase
       .from('shoot_uploads')
@@ -205,6 +213,26 @@ function ShootFiles({ shootId }) {
     setFiles((prev) => prev.filter((x) => x.id !== f.id))
   }
 
+  const removeSelected = async () => {
+    const list = files.filter((f) => selectedIds.has(f.id))
+    if (!list.length) return
+    if (!window.confirm(`Are you sure you want to remove ${list.length} file${list.length !== 1 ? 's' : ''}? This can't be undone.`)) return
+    setBulkRemoving(true)
+    const { data, error } = await supabase
+      .from('shoot_uploads')
+      .delete()
+      .in('id', list.map((f) => f.id))
+      .select('id')
+    setBulkRemoving(false)
+    if (error || !data?.length) {
+      window.alert(error?.message || "You don't have permission to remove these files.")
+      return
+    }
+    const removed = new Set(data.map((d) => d.id))
+    setFiles((prev) => prev.filter((x) => !removed.has(x.id)))
+    setSelectedIds(new Set())
+  }
+
   if (loading) return <div className="flex justify-center py-3"><Loader2 size={14} className="animate-spin text-text-muted" /></div>
   if (!files.length) return (
     <div className="text-center py-4 text-xs text-text-muted bg-surface-2/40 rounded-xl">
@@ -214,12 +242,41 @@ function ShootFiles({ shootId }) {
 
   return (
     <div className="space-y-1.5">
+      {canRemove && files.length > 0 && (
+        <div className="flex items-center gap-3 px-1 pb-1">
+          <button
+            onClick={() => {
+              const allSel = files.every((f) => selectedIds.has(f.id))
+              setSelectedIds(allSel ? new Set() : new Set(files.map((f) => f.id)))
+            }}
+            className="text-[11px] flex items-center gap-1.5 text-text-secondary hover:text-text-primary">
+            {files.length > 0 && files.every((f) => selectedIds.has(f.id))
+              ? <CheckSquare size={13} className="text-accent" /> : <Square size={13} />}
+            Select all
+          </button>
+          <div className="flex-1" />
+          {selectedIds.size > 0 && (
+            <button
+              onClick={removeSelected}
+              disabled={bulkRemoving}
+              className="text-[11px] flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50">
+              {bulkRemoving ? <Loader2 size={11} className="animate-spin" /> : <X size={11} />}
+              Remove Selected ({selectedIds.size})
+            </button>
+          )}
+        </div>
+      )}
       {files.map((f) => {
         const ext = f.file_name?.split('.').pop()?.toLowerCase()
         const isVideo = ['mp4','mov','avi','mkv','webm','m4v'].includes(ext)
         const isImage = ['jpg','jpeg','png','gif','webp','heic','raw','cr2','arw'].includes(ext)
         return (
           <div key={f.id} className="flex items-center gap-3 px-3 py-2.5 bg-surface-2/40 rounded-xl hover:bg-surface-2 transition-colors">
+            {canRemove && (
+              <button onClick={(e) => { e.stopPropagation(); toggleSelected(f.id) }} className="shrink-0" title="Select">
+                {selectedIds.has(f.id) ? <CheckSquare size={15} className="text-accent" /> : <Square size={15} className="text-text-muted" />}
+              </button>
+            )}
             <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${isVideo ? 'bg-blue-50' : isImage ? 'bg-purple-50' : 'bg-surface-3'}`}>
               {isVideo ? <Film size={12} className="text-blue-500" /> : isImage ? <Image size={12} className="text-purple-500" /> : <File size={12} className="text-text-muted" />}
             </div>

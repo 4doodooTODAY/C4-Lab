@@ -398,6 +398,7 @@ export default function ProjectDetail() {
   const [selectedFiles, setSelectedFiles] = useState(() => new Set())
   const [downloading, setDownloading]      = useState(false)
   const [dlProgress, setDlProgress]        = useState({ done: 0, total: 0 })
+  const [removingUploads, setRemovingUploads] = useState(false)
 
   // Status
   const [status, setStatus]             = useState('')
@@ -696,6 +697,39 @@ export default function ProjectDetail() {
       onProgress: (done, total) => setDlProgress({ done, total }),
     })
     setDownloading(false)
+  }
+
+  // Admin/creative/editor/team_lead can remove uploaded footage at any time.
+  const canRemoveUploads = ['admin', 'creative', 'editor', 'team_lead'].includes(profile?.role)
+
+  const removeUploads = async (files) => {
+    const list = (files || []).filter(Boolean)
+    if (!list.length) return
+    const names = list.length === 1 ? `"${list[0].file_name}"` : `${list.length} files`
+    if (!window.confirm(`Are you sure you want to remove ${names}? This can't be undone.`)) return
+    const ids = list.map((f) => f.id)
+    setRemovingUploads(true)
+    const { data, error } = await supabase
+      .from('shoot_uploads')
+      .delete()
+      .in('id', ids)
+      .select('id')
+    setRemovingUploads(false)
+    if (error) {
+      window.alert(error.message || "Couldn't remove the file(s).")
+      return
+    }
+    const removed = new Set((data || []).map((d) => d.id))
+    if (!removed.size) {
+      window.alert("You don't have permission to remove these files.")
+      return
+    }
+    setShootUploads((prev) => prev.filter((f) => !removed.has(f.id)))
+    setSelectedFiles((prev) => {
+      const next = new Set(prev)
+      removed.forEach((rid) => next.delete(rid))
+      return next
+    })
   }
 
   const handleArchive = async () => {
@@ -1231,6 +1265,15 @@ export default function ProjectDetail() {
                       <Download size={12} /> Download Selected ({selectedFiles.size})
                     </button>
                   )}
+                  {canRemoveUploads && selectedFiles.size > 0 && (
+                    <button
+                      onClick={() => removeUploads(shootUploads.filter((f) => selectedFiles.has(f.id)))}
+                      disabled={removingUploads}
+                      className="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50">
+                      {removingUploads ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
+                      Remove Selected ({selectedFiles.size})
+                    </button>
+                  )}
                   <button
                     onClick={() => downloadList(shootUploads)}
                     disabled={downloading}
@@ -1279,6 +1322,16 @@ export default function ProjectDetail() {
                           title="Download"
                         >
                           <Download size={13} />
+                        </button>
+                      )}
+                      {canRemoveUploads && (
+                        <button
+                          onClick={() => removeUploads([f])}
+                          disabled={removingUploads}
+                          className="text-text-muted hover:text-red-600 transition-colors shrink-0 disabled:opacity-40"
+                          title="Remove file"
+                        >
+                          <X size={14} />
                         </button>
                       )}
                     </div>

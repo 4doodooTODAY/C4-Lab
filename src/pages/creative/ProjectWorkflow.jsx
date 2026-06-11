@@ -5,6 +5,7 @@ import {
   Download, FileVideo, Eye,
   ChevronRight, X, MessageSquare, Users, ExternalLink,
   AlertCircle, CheckCircle2, Clock, Zap, Camera, Link2, Trash2,
+  CheckSquare, Square,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
@@ -1157,16 +1158,42 @@ function ProjectMediaSection({ project, uploads, onRefresh }) {
   const [showAll,     setShowAll]     = useState(false)
   const [dragging,    setDragging]    = useState(false)
   const [deletingId,  setDeletingId]  = useState(null)
+  const [selectedIds, setSelectedIds] = useState(() => new Set())
+  const [bulkRemoving, setBulkRemoving] = useState(false)
 
   const addFiles = (incoming) => setFiles((prev) => [...prev, ...Array.from(incoming)])
 
+  const toggleSelected = (id) => setSelectedIds((prev) => {
+    const next = new Set(prev)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
+
   const removeUpload = async (f) => {
-    if (!window.confirm(`Delete "${f.file_name}"? This can't be undone.`)) return
+    if (!window.confirm(`Are you sure you want to remove "${f.file_name}"? This can't be undone.`)) return
     setDeletingId(f.id)
     setError('')
     const err = await deleteShootUpload(f)
     setDeletingId(null)
     if (err) { setError(err); return }
+    onRefresh()
+  }
+
+  const removeSelected = async () => {
+    const list = uploads.filter((f) => selectedIds.has(f.id))
+    if (!list.length) return
+    if (!window.confirm(`Are you sure you want to remove ${list.length} file${list.length !== 1 ? 's' : ''}? This can't be undone.`)) return
+    setBulkRemoving(true)
+    setError('')
+    const { data, error: err } = await supabase
+      .from('shoot_uploads')
+      .delete()
+      .in('id', list.map((f) => f.id))
+      .select('id')
+    setBulkRemoving(false)
+    if (err) { setError(err.message); return }
+    if (!data?.length) { setError("You don't have permission to remove these files."); return }
+    setSelectedIds(new Set())
     onRefresh()
   }
 
@@ -1302,17 +1329,42 @@ function ProjectMediaSection({ project, uploads, onRefresh }) {
       )}
       {uploads.length > 0 && (
         <div>
-          {uploads.length > 3 && (
+          <div className="flex items-center gap-3 mb-2">
+            {uploads.length > 3 && (
+              <button
+                onClick={() => setShowAll((v) => !v)}
+                className="text-xs text-accent hover:text-accent/80 font-medium transition-colors"
+              >
+                {showAll ? 'Show less' : `Show all ${uploads.length} files`}
+              </button>
+            )}
             <button
-              onClick={() => setShowAll((v) => !v)}
-              className="text-xs text-accent hover:text-accent/80 font-medium transition-colors mb-2"
-            >
-              {showAll ? 'Show less' : `Show all ${uploads.length} files`}
+              onClick={() => {
+                const allSel = uploads.every((f) => selectedIds.has(f.id))
+                setSelectedIds(allSel ? new Set() : new Set(uploads.map((f) => f.id)))
+              }}
+              className="text-xs flex items-center gap-1.5 text-text-secondary hover:text-text-primary">
+              {uploads.length > 0 && uploads.every((f) => selectedIds.has(f.id))
+                ? <CheckSquare size={14} className="text-accent" /> : <Square size={14} />}
+              Select all
             </button>
-          )}
+            <div className="flex-1" />
+            {selectedIds.size > 0 && (
+              <button
+                onClick={removeSelected}
+                disabled={bulkRemoving}
+                className="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50">
+                {bulkRemoving ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
+                Remove Selected ({selectedIds.size})
+              </button>
+            )}
+          </div>
           <div className="rounded-xl border border-border divide-y divide-border">
             {visible.map((f) => (
               <div key={f.id} className="flex items-center gap-3 px-3 py-2.5">
+                <button onClick={() => toggleSelected(f.id)} className="shrink-0" title="Select">
+                  {selectedIds.has(f.id) ? <CheckSquare size={15} className="text-accent" /> : <Square size={15} className="text-text-muted" />}
+                </button>
                 <Film size={13} className="text-text-muted shrink-0" />
                 <div className="flex-1 min-w-0">
                   <span className="text-sm truncate block text-text-primary">{f.file_name}</span>
