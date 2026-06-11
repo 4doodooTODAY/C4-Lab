@@ -167,6 +167,42 @@ function ClientCard({ client, onClick, onDelete }) {
     assignedRole: a.role,
   })).filter((a) => a.id)
   const isPending  = !client.profile_id || client._profile?.must_change_password
+  const [resending, setResending] = useState(false)
+  const [resent, setResent]       = useState(false)
+  const [resendErr, setResendErr] = useState('')
+
+  const handleResend = async (e) => {
+    e.stopPropagation()
+    const email = client.email || client.contact_email
+    if (!email) { setResendErr('No email on file'); return }
+    setResending(true)
+    setResendErr('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-user`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
+          action:    'resend_invite',
+          email,
+          full_name: client.contact_name || client.name,
+          role:      'client',
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Request failed')
+      setResent(true)
+      setTimeout(() => setResent(false), 4000)
+    } catch (err) {
+      setResendErr(err.message)
+    } finally {
+      setResending(false)
+    }
+  }
 
   return (
     <div
@@ -214,6 +250,20 @@ function ClientCard({ client, onClick, onDelete }) {
         )}
         {!client.contact_email && !client.email && !client.contact_phone && !client.phone && (
           <p className="text-xs text-text-muted/50 italic">No contact info</p>
+        )}
+        {isPending && (
+          <div className="pt-1">
+            <button
+              onClick={handleResend}
+              disabled={resending || resent}
+              className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:underline disabled:opacity-60 disabled:no-underline"
+              title="Resend the invitation email"
+            >
+              {resending ? <Loader2 size={11} className="animate-spin" /> : resent ? <Check size={11} /> : <Mail size={11} />}
+              {resent ? 'Invite re-sent' : resending ? 'Sending…' : 'Resend invite'}
+            </button>
+            {resendErr && <p className="text-[10px] text-red-500 mt-1">{resendErr}</p>}
+          </div>
         )}
       </div>
 
