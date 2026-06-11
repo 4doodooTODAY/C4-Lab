@@ -1,44 +1,69 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { Loader2 } from 'lucide-react'
 
+// Lazy-load wrapper that survives deploys. When a new version ships, the old
+// tab's chunk filenames (content-hashed) no longer exist, so import() throws
+// "Failed to fetch dynamically imported module" and the page renders blank.
+// On that failure we force a one-time full reload to pull the fresh manifest.
+function lazyWithRetry(importer) {
+  return lazy(async () => {
+    const KEY = 'c4lab_chunk_reload_ts'
+    try {
+      const mod = await importer()
+      sessionStorage.removeItem(KEY) // healthy load — re-arm for the next deploy
+      return mod
+    } catch (err) {
+      const last = Number(sessionStorage.getItem(KEY) || 0)
+      // Only auto-reload once per 10s window so a genuinely-broken chunk can't
+      // trap the user in an infinite reload loop.
+      if (Date.now() - last > 10000) {
+        sessionStorage.setItem(KEY, String(Date.now()))
+        window.location.reload()
+        return new Promise(() => {}) // hold render until the reload happens
+      }
+      throw err
+    }
+  })
+}
+
 // Lazy load all pages — only load what's needed for the current route
-const AppShell        = lazy(() => import('./components/layout/AppShell'))
-const Login           = lazy(() => import('./pages/Login'))
-const ChangePassword  = lazy(() => import('./pages/ChangePassword'))
-const AdminDashboard  = lazy(() => import('./pages/admin/Dashboard'))
-const UserManagement  = lazy(() => import('./pages/admin/UserManagement'))
-const UserDetail      = lazy(() => import('./pages/admin/UserDetail'))
-const AdminClients    = lazy(() => import('./pages/admin/Clients'))
-const ClientDetail    = lazy(() => import('./pages/admin/ClientDetail'))
-const ClientHub       = lazy(() => import('./pages/admin/ClientHub'))
-const AdminProjects   = lazy(() => import('./pages/admin/Projects'))
-const ProjectDetail   = lazy(() => import('./pages/admin/ProjectDetail'))
-const AdminInbox      = lazy(() => import('./pages/admin/Inbox'))
-const CreativeDashboard = lazy(() => import('./pages/creative/Dashboard'))
-const CreativeClients   = lazy(() => import('./pages/creative/Clients'))
-const CreativeClientPage = lazy(() => import('./pages/creative/ClientPage'))
-const ClientDashboard   = lazy(() => import('./pages/client/Dashboard'))
-const ContentCalendar   = lazy(() => import('./pages/client/ContentCalendar'))
-const ClientCalendarView = lazy(() => import('./pages/client/CalendarView'))
-const RequestPost     = lazy(() => import('./pages/client/RequestPost'))
-const UploadFootage   = lazy(() => import('./pages/client/UploadFootage'))
-const VideoList              = lazy(() => import('./pages/VideoList'))
-const VideoReview            = lazy(() => import('./pages/VideoReview'))
-const CalendarPage           = lazy(() => import('./pages/CalendarPage'))
-const Settings               = lazy(() => import('./pages/Settings'))
-const Messages               = lazy(() => import('./pages/Messages'))
-const CreativeProjectList    = lazy(() => import('./pages/creative/ProjectList'))
-const CreativeProjectWorkflow = lazy(() => import('./pages/creative/ProjectWorkflow'))
-const ClientMyProjects       = lazy(() => import('./pages/client/MyProjects'))
+const AppShell        = lazyWithRetry(() => import('./components/layout/AppShell'))
+const Login           = lazyWithRetry(() => import('./pages/Login'))
+const ChangePassword  = lazyWithRetry(() => import('./pages/ChangePassword'))
+const AdminDashboard  = lazyWithRetry(() => import('./pages/admin/Dashboard'))
+const UserManagement  = lazyWithRetry(() => import('./pages/admin/UserManagement'))
+const UserDetail      = lazyWithRetry(() => import('./pages/admin/UserDetail'))
+const AdminClients    = lazyWithRetry(() => import('./pages/admin/Clients'))
+const ClientDetail    = lazyWithRetry(() => import('./pages/admin/ClientDetail'))
+const ClientHub       = lazyWithRetry(() => import('./pages/admin/ClientHub'))
+const AdminProjects   = lazyWithRetry(() => import('./pages/admin/Projects'))
+const ProjectDetail   = lazyWithRetry(() => import('./pages/admin/ProjectDetail'))
+const AdminInbox      = lazyWithRetry(() => import('./pages/admin/Inbox'))
+const CreativeDashboard = lazyWithRetry(() => import('./pages/creative/Dashboard'))
+const CreativeClients   = lazyWithRetry(() => import('./pages/creative/Clients'))
+const CreativeClientPage = lazyWithRetry(() => import('./pages/creative/ClientPage'))
+const ClientDashboard   = lazyWithRetry(() => import('./pages/client/Dashboard'))
+const ContentCalendar   = lazyWithRetry(() => import('./pages/client/ContentCalendar'))
+const ClientCalendarView = lazyWithRetry(() => import('./pages/client/CalendarView'))
+const RequestPost     = lazyWithRetry(() => import('./pages/client/RequestPost'))
+const UploadFootage   = lazyWithRetry(() => import('./pages/client/UploadFootage'))
+const VideoList              = lazyWithRetry(() => import('./pages/VideoList'))
+const VideoReview            = lazyWithRetry(() => import('./pages/VideoReview'))
+const CalendarPage           = lazyWithRetry(() => import('./pages/CalendarPage'))
+const Settings               = lazyWithRetry(() => import('./pages/Settings'))
+const Messages               = lazyWithRetry(() => import('./pages/Messages'))
+const CreativeProjectList    = lazyWithRetry(() => import('./pages/creative/ProjectList'))
+const CreativeProjectWorkflow = lazyWithRetry(() => import('./pages/creative/ProjectWorkflow'))
+const ClientMyProjects       = lazyWithRetry(() => import('./pages/client/MyProjects'))
 // ClientMyConcepts removed — concepts no longer exist in the system
-const VideoRevisionReview    = lazy(() => import('./pages/VideoRevisionReview'))
-const PhotoRevisionReview    = lazy(() => import('./pages/PhotoRevisionReview'))
-const AdminFileSystem        = lazy(() => import('./pages/admin/FileSystem'))
-const DraftsPage             = lazy(() => import('./pages/DraftsPage'))
-const DraftVideoReview       = lazy(() => import('./pages/DraftVideoReview'))
-const DraftPhotoReview       = lazy(() => import('./pages/DraftPhotoReview'))
+const VideoRevisionReview    = lazyWithRetry(() => import('./pages/VideoRevisionReview'))
+const PhotoRevisionReview    = lazyWithRetry(() => import('./pages/PhotoRevisionReview'))
+const AdminFileSystem        = lazyWithRetry(() => import('./pages/admin/FileSystem'))
+const DraftsPage             = lazyWithRetry(() => import('./pages/DraftsPage'))
+const DraftVideoReview       = lazyWithRetry(() => import('./pages/DraftVideoReview'))
+const DraftPhotoReview       = lazyWithRetry(() => import('./pages/DraftPhotoReview'))
 
 function PageLoader() {
   return (
@@ -99,7 +124,38 @@ function ProtectedRoute({ children, roles }) {
   return children
 }
 
+// Warm the route chunks in the background once the app is idle, so navigating
+// between pages is near-instant instead of waiting on a fresh network fetch.
+function usePrefetchRoutes() {
+  useEffect(() => {
+    const importers = [
+      () => import('./pages/admin/ClientHub'),
+      () => import('./pages/admin/ProjectDetail'),
+      () => import('./pages/creative/ProjectWorkflow'),
+      () => import('./pages/DraftsPage'),
+      () => import('./pages/DraftVideoReview'),
+      () => import('./pages/DraftPhotoReview'),
+      () => import('./pages/VideoRevisionReview'),
+      () => import('./pages/PhotoRevisionReview'),
+      () => import('./pages/CalendarPage'),
+      () => import('./pages/Messages'),
+      () => import('./pages/client/ContentCalendar'),
+      () => import('./pages/client/MyProjects'),
+    ]
+    let i = 0
+    const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, 300))
+    const pump = () => {
+      if (i >= importers.length) return
+      importers[i++]().catch(() => {}) // ignore prefetch failures
+      idle(pump)
+    }
+    const handle = idle(pump)
+    return () => (window.cancelIdleCallback || clearTimeout)(handle)
+  }, [])
+}
+
 function AppRoutes() {
+  usePrefetchRoutes()
   return (
     <Suspense fallback={<PageLoader />}>
       <Routes>
