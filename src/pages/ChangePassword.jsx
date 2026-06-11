@@ -266,7 +266,6 @@ export default function ChangePassword() {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*"
                   className="hidden"
                   onChange={handleFileChange}
                 />

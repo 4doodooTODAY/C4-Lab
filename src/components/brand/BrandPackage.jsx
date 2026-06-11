@@ -147,7 +147,6 @@ export default function BrandPackage({ clientId, clientName }) {
             ref={fileInputRef}
             type="file"
             multiple
-            accept="image/*"
             className="hidden"
             onChange={(e) => addLogos(e.target.files)}
           />

@@ -1688,7 +1688,6 @@ function UploadPhotoRevisionSection({ project, revisions, onRefresh }) {
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*"
             multiple
             className="hidden"
             onChange={(e) => setPhotos(Array.from(e.target.files || []))}

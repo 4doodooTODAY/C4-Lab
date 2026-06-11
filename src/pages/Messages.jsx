@@ -898,7 +898,7 @@ export default function Messages() {
                   className="w-9 h-9 rounded-full flex items-center justify-center text-text-muted hover:text-accent hover:bg-accent/10 transition-colors disabled:opacity-50">
                   {imageUploading ? <Loader2 size={18} className="animate-spin" /> : <Image size={18} />}
                 </button>
-                <input ref={imageInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImageSelect} />
+                <input ref={imageInputRef} type="file" multiple className="hidden" onChange={handleImageSelect} />
               </div>
 
               {/* Text input */}

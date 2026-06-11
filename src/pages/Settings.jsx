@@ -118,7 +118,6 @@ export default function Settings() {
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
               className="hidden"
               onChange={handleAvatarChange}
             />
