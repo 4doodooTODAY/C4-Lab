@@ -842,7 +842,6 @@ export default function ContentCalendar() {
                 <input
                   ref={footageInputRef}
                   type="file"
-                  accept="video/*,image/*,.zip,.mov,.mp4,.avi,.mkv"
                   className="hidden"
                   disabled={submitting}
                   onChange={(e) => { if (e.target.files[0]) setFootageFile(e.target.files[0]) }}

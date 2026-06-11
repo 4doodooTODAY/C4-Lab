@@ -1944,7 +1944,6 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
         <input
           ref={fileInputRef}
           type="file"
-          accept="video/*"
           className="hidden"
           onChange={(e) => setRevisionFile(e.target.files?.[0] || null)}
         />

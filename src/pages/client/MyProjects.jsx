@@ -191,7 +191,7 @@ function FootageUploader({ project, clientName, onDone }) {
           {!files.length && <p className="text-xs text-gray-300 mt-0.5">Video, photo, ZIP</p>}
         </div>
       )}
-      <input ref={fileInputRef} type="file" multiple accept="video/*,image/*,.zip,.mov,.mp4,.avi,.mkv" className="hidden" onChange={(e) => addFiles(e.target.files)} />
+      <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(e) => addFiles(e.target.files)} />
       {uploading && (
         <div>
           <div className="flex justify-between text-xs text-gray-400 mb-1">

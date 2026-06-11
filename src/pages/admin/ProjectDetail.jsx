@@ -1510,7 +1510,6 @@ export default function ProjectDetail() {
                       <input
                         ref={extraRevInputRef}
                         type="file"
-                        accept={project?.media_type === 'photo' ? 'image/*' : 'video/*'}
                         className="hidden"
                         onChange={(e) => setExtraRevFile(e.target.files?.[0] || null)}
                       />

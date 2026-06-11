@@ -9,7 +9,6 @@ import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { formatDistanceToNow } from 'date-fns'
 
-const ACCEPTED = 'video/mp4,video/webm,video/quicktime,video/x-msvideo,video/x-matroska'
 
 // ─── Add Media Modal ──────────────────────────────────────────────────────────
 function AddMediaModal({ projectId, onAdd, onClose }) {
@@ -76,7 +75,7 @@ function AddMediaModal({ projectId, onAdd, onClose }) {
               onDrop={(e) => { e.preventDefault(); setDragging(false); handleFile(e.dataTransfer.files[0]) }}
               className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${dragging ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/50'}`}
             >
-              <input id="vl-file" type="file" accept={ACCEPTED} className="hidden" onChange={(e) => handleFile(e.target.files[0])} />
+              <input id="vl-file" type="file" className="hidden" onChange={(e) => handleFile(e.target.files[0])} />
               {file ? <p className="text-sm font-medium text-text-primary">{file.name}</p> : (
                 <><Upload size={20} className="mx-auto text-text-muted mb-2" /><p className="text-sm text-text-muted">Drop a video or click to browse</p></>
               )}

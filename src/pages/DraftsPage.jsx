@@ -247,7 +247,6 @@ function UploadModal({ draftId, clientName, projectName, onClose, onUploaded }) 
               <input
                 type="file"
                 className="sr-only"
-                accept={mediaType === 'video' ? 'video/*' : 'image/*'}
                 multiple={mediaType === 'photos'}
                 onChange={handleFileChange}
                 disabled={uploading}

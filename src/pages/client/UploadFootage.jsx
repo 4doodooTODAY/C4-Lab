@@ -149,7 +149,6 @@ export default function UploadFootage() {
           <input
             ref={fileInputRef}
             type="file"
-            accept="video/*,image/*,.zip,.mov,.mp4,.avi,.mkv"
             className="hidden"
             onChange={handleFile}
           />
