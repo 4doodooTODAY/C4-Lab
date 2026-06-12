@@ -148,7 +148,17 @@ async function uploadMultipart({ file, key, publicUrl, uploadId, partUrls, onPro
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────
-export async function uploadToR2({ file, category, clientName, projectName, folderType, shootDate, onProgress, onStats, signal }) {
+export async function uploadToR2({ file, category, clientName, projectName, folderType, shootDate, onProgress, onStats, signal, normalizeVideo, onConvert }) {
+  // For client-reviewed videos, guarantee a web-playable codec (HEVC → H.264)
+  // before upload so clients never get a black screen with audio.
+  if (normalizeVideo) {
+    const { ensureWebPlayableVideo } = await import('./videoConvert')
+    file = await ensureWebPlayableVideo(file, {
+      onStage: (stage) => onConvert?.({ stage }),
+      onProgress: (pct) => onConvert?.({ stage: 'converting', pct }),
+    })
+  }
+
   const fileInfo = {
     filename:    file.name,
     contentType: file.type || 'application/octet-stream',

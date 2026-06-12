@@ -431,6 +431,7 @@ export default function ProjectDetail() {
   const [uploadingExtraRev, setUploadingExtraRev] = useState(false)
   const [addingRevSlot, setAddingRevSlot]       = useState(false)
   const [extraRevError, setExtraRevError]       = useState('')
+  const [extraRevConvert, setExtraRevConvert]   = useState(null) // HEVC→H.264 transcode state
 
   // Assigned creative/editor profiles
   const [creativeProfile, setCreativeProfile] = useState(null)
@@ -845,7 +846,10 @@ export default function ProjectDetail() {
         clientName:  project.clients?.name || project.clients?.contact_name || 'client',
         projectName: project.name,
         folderType:  'projects',
+        normalizeVideo: true,
+        onConvert:   (c) => setExtraRevConvert(c.stage && c.stage !== 'done' ? c : null),
       })
+      setExtraRevConvert(null)
       const { error: updErr } = await supabase.from('project_revisions')
         .update({ video_url: publicUrl, status: 'pending_client_review', uploaded_by: profile.id })
         .eq('id', slot.id)
@@ -1522,7 +1526,7 @@ export default function ProjectDetail() {
                             className="btn-primary text-xs flex items-center gap-1.5 disabled:opacity-60"
                           >
                             {uploadingExtraRev ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
-                            {uploadingExtraRev ? 'Uploading…' : 'Upload for client'}
+                            {uploadingExtraRev ? (extraRevConvert ? 'Optimizing video…' : 'Uploading…') : 'Upload for client'}
                           </button>
                           {!uploadingExtraRev && (
                             <button onClick={() => setExtraRevFile(null)} className="text-xs text-text-muted hover:text-text-primary">Cancel</button>

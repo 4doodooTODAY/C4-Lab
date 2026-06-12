@@ -89,6 +89,7 @@ function UploadModal({ draftId, clientName, projectName, onClose, onUploaded }) 
   const [files,      setFiles]      = useState([])
   const [uploading,  setUploading]  = useState(false)
   const [progress,   setProgress]   = useState(0)
+  const [converting, setConverting] = useState(null) // { stage, pct } while transcoding HEVC
   const [speed,      setSpeed]      = useState('')
   const [eta,        setEta]        = useState('')
   const [error,      setError]      = useState('')
@@ -142,6 +143,8 @@ function UploadModal({ draftId, clientName, projectName, onClose, onUploaded }) 
           projectName: projectName || 'project',
           folderType:  'video',
           signal:      ctrl.signal,
+          normalizeVideo: true,
+          onConvert:   (c) => setConverting(c.stage && c.stage !== 'done' ? c : null),
           onProgress:  (pct) => setProgress(pct),
           onStats:     ({ speed: spd, eta: remaining }) => {
             setSpeed(fmtSpeed(spd))
@@ -254,8 +257,23 @@ function UploadModal({ draftId, clientName, projectName, onClose, onUploaded }) 
             </label>
           </div>
 
+          {/* HEVC → H.264 conversion (so clients never get a black video) */}
+          {uploading && converting && (
+            <div className="space-y-1.5 mb-2">
+              <div className="flex justify-between text-[11px] text-text-muted">
+                <span>Optimizing video for web playback…</span>
+                <span>{converting.stage === 'converting' && converting.pct != null ? `${converting.pct}%` : ''}</span>
+              </div>
+              <div className="h-2 bg-surface-2 rounded-full overflow-hidden">
+                <div className="h-full bg-amber-500 rounded-full transition-all duration-300"
+                  style={{ width: `${converting.stage === 'converting' && converting.pct != null ? converting.pct : 8}%` }} />
+              </div>
+              <p className="text-[10px] text-text-muted">This video is in a format clients can't play, so we're converting it first.</p>
+            </div>
+          )}
+
           {/* Progress */}
-          {uploading && (
+          {uploading && !converting && (
             <div className="space-y-2">
               <div className="h-2 bg-surface-2 rounded-full overflow-hidden">
                 <div

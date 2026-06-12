@@ -1771,6 +1771,7 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
   const [uploadPct,    setUploadPct]   = useState(0)
   const [editorNote,   setEditorNote]  = useState('')
   const [uploadError,  setUploadError] = useState('')
+  const [convertState, setConvertState] = useState(null) // { stage, pct } while transcoding HEVC
 
   const stage      = STAGE_KEY_MAP[project.stage] || project.stage
   const latestRev  = [...revisions].sort((a, b) => b.revision_number - a.revision_number)[0]
@@ -1803,9 +1804,12 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
         projectName: project.name,
         folderType:  'shoots',
         shootDate:   project.shoot_date || null,
+        normalizeVideo: true,
+        onConvert:   (c) => setConvertState(c),
         onProgress:  setUploadPct,
         onStats:     setUploadStats,
       })
+      setConvertState(null)
 
       if (isAdminRework || isOpenSlot) {
         // Admin already reviewed (rework) or admin opened this extra revision —
@@ -1948,8 +1952,22 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
         />
       </div>
 
+      {/* HEVC → H.264 conversion progress (keeps clients from getting a black video) */}
+      {uploading && convertState && convertState.stage !== 'done' && (
+        <div className="mb-2">
+          <div className="flex items-center justify-between mb-1 text-xs text-text-muted">
+            <span>Optimizing video for web playback…</span>
+            <span>{convertState.stage === 'converting' && convertState.pct != null ? `${convertState.pct}%` : ''}</span>
+          </div>
+          <div className="h-1.5 bg-surface-3 rounded-full overflow-hidden">
+            <div className="h-full bg-amber-500 rounded-full transition-all duration-200" style={{ width: `${convertState.stage === 'converting' && convertState.pct != null ? convertState.pct : 8}%` }} />
+          </div>
+          <p className="text-[10px] text-text-muted mt-1">This video is in a format clients can't play, so we're converting it. One-time, only for this file.</p>
+        </div>
+      )}
+
       {/* Upload progress */}
-      {uploading && (
+      {uploading && (!convertState || convertState.stage === 'done') && (
         <div>
           <div className="flex items-center justify-between mb-1 text-xs text-text-muted">
             <span>Uploading…</span>
