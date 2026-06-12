@@ -35,7 +35,7 @@ export default function ChangePassword() {
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef(null)
 
-  const { profile, user } = useAuth()
+  const { profile, user, patchProfile } = useAuth()
   const navigate = useNavigate()
 
   // ── Step 1: Set password ───────────────────────────────────────────────────
@@ -63,8 +63,15 @@ export default function ChangePassword() {
         return
       }
 
-      // Mark password changed (fire-and-forget)
-      supabase.from('profiles').update({ must_change_password: false }).eq('id', user.id).then(() => {})
+      // Clear the must_change_password flag — and WAIT for it. If this is only
+      // fire-and-forget, the cached profile still says the password needs
+      // changing, so ProtectedRoute bounces the user straight back here and
+      // they get stuck in a loop. Update the DB, then update the in-memory
+      // profile + cache so the guard lets them through.
+      const { error: flagErr } = await supabase
+        .from('profiles').update({ must_change_password: false }).eq('id', user.id)
+      if (flagErr) console.error('Failed to clear must_change_password:', flagErr)
+      patchProfile({ must_change_password: false })
 
       setStep(2)
       setLoading(false)

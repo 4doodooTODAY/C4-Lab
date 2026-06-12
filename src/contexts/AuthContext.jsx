@@ -109,11 +109,21 @@ export function AuthProvider({ children }) {
     return data
   }
 
+  // Merge a partial update into the in-memory profile AND its sessionStorage
+  // cache so guards like ProtectedRoute react immediately (no stale redirect).
+  const patchProfile = (patch) => {
+    setProfile((prev) => {
+      const next = { ...(prev || {}), ...patch }
+      setCachedProfile(next)
+      return next
+    })
+  }
+
   // isAdmin is false when an admin has switched to creative view — they get full creative permissions only
   const isAdmin = profile?.role === 'admin' && viewMode !== 'creative'
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signIn, signOut, createUser, viewMode, setViewMode, isAdmin }}>
+    <AuthContext.Provider value={{ user, profile, loading, signIn, signOut, createUser, patchProfile, viewMode, setViewMode, isAdmin }}>
       {children}
     </AuthContext.Provider>
   )
