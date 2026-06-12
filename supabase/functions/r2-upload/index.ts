@@ -6,6 +6,7 @@ import {
   CompleteMultipartUploadCommand,
   AbortMultipartUploadCommand,
   ListPartsCommand,
+  PutBucketCorsCommand,
 } from 'npm:@aws-sdk/client-s3'
 import { getSignedUrl } from 'npm:@aws-sdk/s3-request-presigner'
 
@@ -69,6 +70,28 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json()
     const { action } = body
+
+    // ── One-time: write the bucket CORS policy so browser PUTs are allowed ────
+    // Browser uploads send a preflight (OPTIONS) before the presigned PUT;
+    // without an allowing CORS rule R2 rejects it and the upload fails with a
+    // generic network error. This sets a permissive-but-scoped policy.
+    if (action === 'set-cors') {
+      await s3.send(new PutBucketCorsCommand({
+        Bucket: R2_BUCKET,
+        CORSConfiguration: {
+          CORSRules: [{
+            AllowedOrigins: ['*'],
+            AllowedMethods: ['GET', 'PUT', 'POST', 'HEAD', 'DELETE'],
+            AllowedHeaders: ['*'],
+            ExposeHeaders:  ['ETag'],
+            MaxAgeSeconds:  3600,
+          }],
+        },
+      }))
+      return new Response(JSON.stringify({ success: true, bucket: R2_BUCKET }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
 
     // ── Simple presigned PUT (small files, backward-compat) ──────────────────
     if (!action || action === 'presign') {

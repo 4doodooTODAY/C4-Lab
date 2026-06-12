@@ -1,7 +1,43 @@
-import { lazy, Suspense, useEffect } from 'react'
+import { lazy, Suspense, useEffect, Component } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { Loader2 } from 'lucide-react'
+
+// Catches render/chunk-load failures so a broken page never shows an endless
+// spinner. A stale-deploy chunk error auto-reloads once; anything else shows a
+// friendly retry screen instead of a hung loader.
+class ErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { failed: false, msg: '' } }
+  static getDerivedStateFromError(error) {
+    const msg = String(error?.message || error || '')
+    const isChunk = /dynamically imported module|Importing a module script failed|error loading dynamically|ChunkLoadError/i.test(msg)
+    if (isChunk) {
+      const KEY = 'c4lab_boundary_reload_ts'
+      const last = Number(sessionStorage.getItem(KEY) || 0)
+      if (Date.now() - last > 10000) {
+        sessionStorage.setItem(KEY, String(Date.now()))
+        window.location.reload()
+      }
+    }
+    return { failed: true, msg }
+  }
+  componentDidCatch(error) { console.error('App error boundary:', error) }
+  render() {
+    if (!this.state.failed) return this.props.children
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-white p-6 text-center">
+        <p className="text-base font-semibold text-text-primary">This page didn't load correctly</p>
+        <p className="text-sm text-text-muted max-w-sm">A new version may have just been released. Reloading usually fixes it.</p>
+        <button
+          onClick={() => { sessionStorage.removeItem('c4lab_boundary_reload_ts'); window.location.reload() }}
+          className="px-4 py-2 rounded-xl bg-accent text-white text-sm font-semibold hover:bg-accent/90"
+        >
+          Reload
+        </button>
+      </div>
+    )
+  }
+}
 
 // Lazy-load wrapper that survives deploys. When a new version ships, the old
 // tab's chunk filenames (content-hashed) no longer exist, so import() throws
@@ -285,7 +321,9 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppRoutes />
+        <ErrorBoundary>
+          <AppRoutes />
+        </ErrorBoundary>
       </AuthProvider>
     </BrowserRouter>
   )

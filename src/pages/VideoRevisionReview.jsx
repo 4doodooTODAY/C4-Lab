@@ -190,7 +190,7 @@ export default function VideoRevisionReview() {
   const [actionError, setActionError] = useState('')
 
   const fetchAll = useCallback(async () => {
-    if (!revisionId) return
+    if (!revisionId) { setError('Revision not found.'); setLoading(false); return }
     try {
       const [revRes, commRes] = await Promise.all([
         supabase
@@ -242,6 +242,16 @@ export default function VideoRevisionReview() {
   }, [revisionId])
 
   useEffect(() => { fetchAll() }, [fetchAll])
+
+  // Safety net: never spin forever. If the data hasn't arrived in 25s, surface
+  // a retry instead of an endless loader.
+  useEffect(() => {
+    if (!loading) return
+    const t = setTimeout(() => {
+      setLoading((l) => { if (l) setError('This is taking longer than expected. Check your connection and reload.'); return false })
+    }, 25000)
+    return () => clearTimeout(t)
+  }, [loading])
 
   const myRole         = profile?.role
   const myId           = profile?.id

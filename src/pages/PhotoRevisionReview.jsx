@@ -145,6 +145,15 @@ export default function PhotoRevisionReview() {
 
   useEffect(() => { fetchAll() }, [fetchAll])
 
+  // Safety net: never spin forever — surface a retry after 25s of loading.
+  useEffect(() => {
+    if (!loading) return
+    const t = setTimeout(() => {
+      setLoading((l) => { if (l) setError('This is taking longer than expected. Check your connection and reload.'); return false })
+    }, 25000)
+    return () => clearTimeout(t)
+  }, [loading])
+
   const photoUrls = revision?.photo_urls || []
   const currentUrl = photoUrls[photoIndex]
 
