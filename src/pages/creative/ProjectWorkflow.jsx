@@ -496,6 +496,29 @@ function ProjectOverviewCard({ project, creativeProfile, editorProfile }) {
           </div>
         )}
 
+        {/* Inspiration links — visible to the whole team (creative/editor/admin) */}
+        {project.inspiration_links?.length > 0 && (
+          <div>
+            <p className="text-xs text-text-muted mb-1.5 flex items-center gap-1">
+              <Link2 size={11} /> Inspiration
+            </p>
+            <div className="space-y-1.5">
+              {project.inspiration_links.map((link, i) => (
+                <a
+                  key={i}
+                  href={link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-sm text-accent hover:underline bg-surface-2 rounded-xl px-3 py-2 break-all"
+                >
+                  <ExternalLink size={12} className="shrink-0" />
+                  <span className="truncate">{link}</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Team */}
         {(creativeProfile || editorProfile) && (
           <div>
@@ -2190,7 +2213,7 @@ export default function ProjectWorkflow() {
       // 1. Fetch project base data
       const { data: projData, error: projErr } = await supabase
         .from('projects')
-        .select('id, name, stage, media_type, shoot_date, shoot_id, location, creative_id, editor_id, revision_count, notes, clients(id, name, contact_name)')
+        .select('id, name, stage, media_type, shoot_date, shoot_id, location, creative_id, editor_id, revision_count, notes, inspiration_links, clients(id, name, contact_name)')
         .eq('id', id)
         .single()
       if (projErr) throw projErr
