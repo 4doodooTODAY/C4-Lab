@@ -201,19 +201,34 @@ export function fmtEta(seconds) {
 }
 
 export async function forceDownload(url, filename) {
+  // Cross-origin R2 files can't be force-downloaded with a blob fetch unless the
+  // bucket has GET CORS, and <a download> is ignored cross-origin. So ask the
+  // edge function for a presigned URL that carries Content-Disposition:
+  // attachment — clicking it downloads reliably, no bucket CORS required.
   try {
-    const res  = await fetch(url)
-    const blob = await res.blob()
-    const a    = document.createElement('a')
-    a.href     = URL.createObjectURL(blob)
+    const { url: dl } = await callEdge({ action: 'presign-download', url, filename })
+    const a = document.createElement('a')
+    a.href = dl
     a.download = filename || url.split('/').pop() || 'download'
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
-    // Revoke after a tick so the click has consumed the URL
-    setTimeout(() => URL.revokeObjectURL(a.href), 0)
+    return
   } catch {
-    window.open(url, '_blank')
+    // Fall back to the blob method (works if GET CORS is set), then a new tab.
+    try {
+      const res  = await fetch(url)
+      const blob = await res.blob()
+      const a    = document.createElement('a')
+      a.href     = URL.createObjectURL(blob)
+      a.download = filename || url.split('/').pop() || 'download'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      setTimeout(() => URL.revokeObjectURL(a.href), 0)
+    } catch {
+      window.open(url, '_blank')
+    }
   }
 }
 

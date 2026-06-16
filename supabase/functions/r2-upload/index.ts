@@ -7,6 +7,7 @@ import {
   AbortMultipartUploadCommand,
   ListPartsCommand,
   PutBucketCorsCommand,
+  GetObjectCommand,
 } from 'npm:@aws-sdk/client-s3'
 import { getSignedUrl } from 'npm:@aws-sdk/s3-request-presigner'
 
@@ -89,6 +90,29 @@ Deno.serve(async (req) => {
         },
       }))
       return new Response(JSON.stringify({ success: true, bucket: R2_BUCKET }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // ── Presigned GET that forces a download (no bucket CORS needed) ──────────
+    // Browsers ignore the <a download> attribute for cross-origin files, and a
+    // blob fetch needs GET CORS. A presigned URL with ResponseContentDisposition
+    // makes the file download on a plain anchor click regardless of CORS.
+    if (action === 'presign-download') {
+      let key = body.key
+      if (!key && body.url) {
+        // Derive the object key from a public URL: {PUBLIC_URL}/{key}
+        try { key = decodeURIComponent(new URL(body.url).pathname.replace(/^\/+/, '')) } catch { /* ignore */ }
+      }
+      if (!key) throw new Error('Missing key/url for download')
+      const filename = body.filename || key.split('/').pop() || 'download'
+      const command = new GetObjectCommand({
+        Bucket: R2_BUCKET,
+        Key: key,
+        ResponseContentDisposition: `attachment; filename="${filename.replace(/"/g, '')}"`,
+      })
+      const url = await getSignedUrl(s3, command, { expiresIn: 3600 })
+      return new Response(JSON.stringify({ url }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
