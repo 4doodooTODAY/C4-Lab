@@ -86,8 +86,14 @@ export async function ensureWebPlayableVideo(file, { onProgress, onStage } = {})
     await ff.writeFile(inName, await fetchFile(file))
     await ff.exec([
       '-i', inName,
-      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p',
-      '-c:a', 'aac', '-b:a', '192k',
+      '-c:v', 'libx264',
+      '-preset', 'ultrafast',   // fastest single-thread encode (ffmpeg.wasm has no MT)
+      '-crf', '24',
+      '-pix_fmt', 'yuv420p',
+      // Cap the long edge at 1920 (1080p) — standard for social delivery and a
+      // huge speed/size win when the source is 4K. Smaller sources are untouched.
+      '-vf', "scale='if(gt(iw,ih),min(1920,iw),-2)':'if(gt(iw,ih),-2,min(1920,ih))'",
+      '-c:a', 'aac', '-b:a', '160k',
       '-movflags', '+faststart',
       outName,
     ])

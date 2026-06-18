@@ -1795,6 +1795,7 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
   const [editorNote,   setEditorNote]  = useState('')
   const [uploadError,  setUploadError] = useState('')
   const [convertState, setConvertState] = useState(null) // { stage, pct } while transcoding HEVC
+  const [dragOver,     setDragOver]     = useState(false)
 
   const stage      = STAGE_KEY_MAP[project.stage] || project.stage
   const latestRev  = [...revisions].sort((a, b) => b.revision_number - a.revision_number)[0]
@@ -1948,12 +1949,21 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
         <RevisionCommentsList revisionId={latestRev.id} />
       )}
 
-      {/* File picker */}
+      {/* File picker + drag-and-drop */}
       <div
         className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${
+          dragOver ? 'border-accent bg-accent/10' :
           revisionFile ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/50'
         }`}
         onClick={() => !uploading && fileInputRef.current?.click()}
+        onDragOver={(e) => { e.preventDefault(); if (!uploading) setDragOver(true) }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault(); setDragOver(false)
+          if (uploading) return
+          const f = e.dataTransfer.files?.[0]
+          if (f) setRevisionFile(f)
+        }}
       >
         <FileVideo size={22} className="mx-auto text-text-muted mb-2" />
         {revisionFile ? (
@@ -1963,8 +1973,8 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
           </>
         ) : (
           <>
-            <p className="text-sm font-medium text-text-primary">Select revision video</p>
-            <p className="text-xs text-text-muted mt-1">MP4, MOV, or any video file</p>
+            <p className="text-sm font-medium text-text-primary">Drag a video here, or click to choose</p>
+            <p className="text-xs text-text-muted mt-1">Tip: drag straight from Photos or Finder to skip the slow file picker</p>
           </>
         )}
         <input
