@@ -846,10 +846,7 @@ export default function ProjectDetail() {
         clientName:  project.clients?.name || project.clients?.contact_name || 'client',
         projectName: project.name,
         folderType:  'projects',
-        normalizeVideo: true,
-        onConvert:   (c) => setExtraRevConvert(c.stage && c.stage !== 'done' ? c : null),
       })
-      setExtraRevConvert(null)
       const { error: updErr } = await supabase.from('project_revisions')
         .update({ video_url: publicUrl, status: 'pending_client_review', uploaded_by: profile.id })
         .eq('id', slot.id)

@@ -1828,12 +1828,9 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
         projectName: project.name,
         folderType:  'shoots',
         shootDate:   project.shoot_date || null,
-        normalizeVideo: true,
-        onConvert:   (c) => setConvertState(c),
         onProgress:  setUploadPct,
         onStats:     setUploadStats,
       })
-      setConvertState(null)
 
       if (isAdminRework || isOpenSlot) {
         // Admin already reviewed (rework) or admin opened this extra revision —

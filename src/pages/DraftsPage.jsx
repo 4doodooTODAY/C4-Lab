@@ -143,8 +143,6 @@ function UploadModal({ draftId, clientName, projectName, onClose, onUploaded }) 
           projectName: projectName || 'project',
           folderType:  'video',
           signal:      ctrl.signal,
-          normalizeVideo: true,
-          onConvert:   (c) => setConverting(c.stage && c.stage !== 'done' ? c : null),
           onProgress:  (pct) => setProgress(pct),
           onStats:     ({ speed: spd, eta: remaining }) => {
             setSpeed(fmtSpeed(spd))
