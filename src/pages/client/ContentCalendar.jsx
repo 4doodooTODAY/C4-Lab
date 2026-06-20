@@ -478,6 +478,14 @@ export default function ContentCalendar() {
 
     setAllItems(items)
     setLoading(false)
+
+    // Auto-navigate to the month of the next upcoming shoot/item so clients
+    // don't land on an empty month and think nothing is scheduled.
+    const today = startOfDay(new Date())
+    const next = items
+      .filter((i) => i.date && i.date >= today)
+      .sort((a, b) => a.date - b.date)[0]
+    if (next) setMonth(startOfMonth(next.date))
   }, [clientId])
 
   useEffect(() => {
