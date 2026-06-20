@@ -2,10 +2,12 @@ import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import { NotificationProvider } from '../../contexts/NotificationContext'
 import NotificationPanel from '../ui/NotificationPanel'
+import UploadProgressBar from '../UploadProgressBar'
 
 export default function AppShell() {
   return (
     <NotificationProvider>
+      <UploadProgressBar />
       <div className="flex h-screen overflow-hidden bg-surface-2">
         <Sidebar />
         <NotificationPanel />

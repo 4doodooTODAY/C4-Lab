@@ -1,9 +1,39 @@
 import { supabase } from './supabase'
+import { uploadStore } from './uploadStore'
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const CHUNK_SIZE     = 12 * 1024 * 1024   // 12 MB per part — smaller parts keep the worker pool saturated
 const PARALLEL_PARTS = 10                  // simultaneous part uploads (continuous worker pool)
 const MULTIPART_MIN  = 8 * 1024 * 1024    // use multipart for files ≥ 8 MB
+
+// ── Sliding-window speed estimator ───────────────────────────────────────────
+// Keeps a ring of (timestamp, cumulative-bytes) samples over the last WINDOW_MS.
+// Speed = Δbytes / Δtime over the window, which adapts quickly to real network
+// conditions without the jitter of instant speed or lag of a global average.
+const WINDOW_MS = 6000
+
+class SpeedEstimator {
+  constructor() { this._samples = [] }
+
+  record(loaded) {
+    const now = Date.now()
+    this._samples.push({ t: now, loaded })
+    const cutoff = now - WINDOW_MS
+    // Keep one sample just before the cutoff so the window always has a left edge
+    let dropTo = 0
+    while (dropTo + 1 < this._samples.length && this._samples[dropTo + 1].t < cutoff) dropTo++
+    if (dropTo > 0) this._samples = this._samples.slice(dropTo)
+  }
+
+  speed() {
+    if (this._samples.length < 2) return 0
+    const oldest = this._samples[0]
+    const newest = this._samples[this._samples.length - 1]
+    const dt = (newest.t - oldest.t) / 1000
+    const db = newest.loaded - oldest.loaded
+    return dt > 0.1 ? db / dt : 0
+  }
+}
 
 // ── Auth header helper — cached for 50s to avoid repeated getSession() calls ──
 let _cachedHeaders = null
@@ -61,7 +91,7 @@ function uploadPart(url, chunk, onLoaded, signal) {
 }
 
 // ── Single PUT for small files ────────────────────────────────────────────────
-function uploadSingle(uploadUrl, file, onProgress, onStats, signal) {
+function uploadSingle(uploadUrl, file, onProgress, onStats, signal, storeId) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     xhr.open('PUT', uploadUrl)
@@ -69,26 +99,17 @@ function uploadSingle(uploadUrl, file, onProgress, onStats, signal) {
     xhr.onabort = () => reject(new DOMException('Upload cancelled', 'AbortError'))
     if (signal) signal.addEventListener('abort', () => xhr.abort(), { once: true })
 
-    if (onProgress || onStats) {
-      const startTime = Date.now()
-      let lastLoaded = 0
-      let lastTime   = startTime
+    const est = new SpeedEstimator()
 
-      xhr.upload.onprogress = (e) => {
-        if (!e.lengthComputable) return
-        const now        = Date.now()
-        const pct        = Math.round((e.loaded / e.total) * 100)
-        const chunkSecs  = (now - lastTime) / 1000
-        const totalSecs  = (now - startTime) / 1000
-        const instantSpd = chunkSecs > 0 ? (e.loaded - lastLoaded) / chunkSecs : 0
-        const avgSpd     = totalSecs > 0 ? e.loaded / totalSecs : 0
-        const speed      = avgSpd * 0.6 + instantSpd * 0.4
-        const eta        = speed > 0 ? (e.total - e.loaded) / speed : null
-        if (onProgress) onProgress(pct)
-        if (onStats)    onStats({ speed, eta, loaded: e.loaded, total: e.total })
-        lastLoaded = e.loaded
-        lastTime   = now
-      }
+    xhr.upload.onprogress = (e) => {
+      if (!e.lengthComputable) return
+      est.record(e.loaded)
+      const pct   = Math.round((e.loaded / e.total) * 100)
+      const speed = est.speed()
+      const eta   = speed > 0 ? (e.total - e.loaded) / speed : null
+      if (onProgress) onProgress(pct)
+      if (onStats)    onStats({ speed, eta, loaded: e.loaded, total: e.total })
+      if (storeId != null) uploadStore.update(storeId, { loaded: e.loaded, speed, eta })
     }
 
     xhr.onload  = () => xhr.status < 300 ? resolve() : reject(new Error(`Upload failed: ${xhr.status}`))
@@ -98,19 +119,20 @@ function uploadSingle(uploadUrl, file, onProgress, onStats, signal) {
 }
 
 // ── Multipart parallel upload for large files ─────────────────────────────────
-async function uploadMultipart({ file, key, publicUrl, uploadId, partUrls, onProgress, onStats, signal }) {
+async function uploadMultipart({ file, key, publicUrl, uploadId, partUrls, onProgress, onStats, signal, storeId }) {
   const totalParts  = partUrls.length
-  const startTime   = Date.now()
   const bytesLoaded = new Array(totalParts).fill(0)
+  const est         = new SpeedEstimator()
 
   const reportProgress = () => {
-    const loaded  = bytesLoaded.reduce((a, b) => a + b, 0)
-    const pct     = Math.round((loaded / file.size) * 100)
-    const elapsed = (Date.now() - startTime) / 1000
-    const speed   = elapsed > 0 ? loaded / elapsed : 0
-    const eta     = speed > 0 ? (file.size - loaded) / speed : null
+    const loaded = bytesLoaded.reduce((a, b) => a + b, 0)
+    est.record(loaded)
+    const pct   = Math.round((loaded / file.size) * 100)
+    const speed = est.speed()
+    const eta   = speed > 0 ? (file.size - loaded) / speed : null
     if (onProgress) onProgress(pct)
     if (onStats)    onStats({ speed, eta, loaded, total: file.size })
+    if (storeId != null) uploadStore.update(storeId, { loaded, speed, eta })
   }
 
   try {
@@ -139,6 +161,7 @@ async function uploadMultipart({ file, key, publicUrl, uploadId, partUrls, onPro
     // 3. Complete — edge function uses ListParts to get ETags server-side
     await callEdge({ action: 'multipart-complete', key, uploadId })
     if (onProgress) onProgress(100)
+    if (storeId != null) uploadStore.update(storeId, { loaded: file.size, speed: 0, eta: 0 })
     return { publicUrl, key }
   } catch (err) {
     // Best-effort abort to clean up the incomplete upload in R2
@@ -159,6 +182,9 @@ export async function uploadToR2({ file, category, clientName, projectName, fold
     })
   }
 
+  // Register with global upload store so the app-wide progress bar tracks this file
+  const storeId = uploadStore.register(file.name, file.size)
+
   const fileInfo = {
     filename:    file.name,
     contentType: file.type || 'application/octet-stream',
@@ -169,21 +195,27 @@ export async function uploadToR2({ file, category, clientName, projectName, fold
     shootDate:   shootDate   || null,
   }
 
-  if (file.size >= MULTIPART_MIN) {
-    // Large file: multipart-init builds the key + creates the upload in one call
-    const totalParts = Math.ceil(file.size / CHUNK_SIZE)
-    const { uploadId, partUrls, key, publicUrl } = await callEdge({
-      action: 'multipart-init',
-      partCount: totalParts,
-      ...fileInfo,
-    })
-    return uploadMultipart({ file, key, publicUrl, uploadId, partUrls, onProgress, onStats, signal })
+  try {
+    let result
+    if (file.size >= MULTIPART_MIN) {
+      const totalParts = Math.ceil(file.size / CHUNK_SIZE)
+      const { uploadId, partUrls, key, publicUrl } = await callEdge({
+        action: 'multipart-init',
+        partCount: totalParts,
+        ...fileInfo,
+      })
+      result = await uploadMultipart({ file, key, publicUrl, uploadId, partUrls, onProgress, onStats, signal, storeId })
+    } else {
+      const { uploadUrl, publicUrl, key } = await callEdge({ action: 'presign', ...fileInfo })
+      await uploadSingle(uploadUrl, file, onProgress, onStats, signal, storeId)
+      result = { publicUrl, key }
+    }
+    uploadStore.complete(storeId)
+    return result
+  } catch (err) {
+    uploadStore.complete(storeId)   // remove from bar even on failure
+    throw err
   }
-
-  // Small file: single presigned PUT
-  const { uploadUrl, publicUrl, key } = await callEdge({ action: 'presign', ...fileInfo })
-  await uploadSingle(uploadUrl, file, onProgress, onStats, signal)
-  return { publicUrl, key }
 }
 
 // ── Format helpers ────────────────────────────────────────────────────────────
