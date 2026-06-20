@@ -274,6 +274,7 @@ export default function ContentCalendar() {
   const [view, setView] = useState('calendar')   // 'calendar' | 'list'
   const [clientId, setClientId] = useState(null)
   const [clientResolved, setClientResolved] = useState(false)
+  const [debugInfo, setDebugInfo] = useState(null)   // temporary — remove after shoot visibility confirmed
   const [showRequestModal, setShowRequestModal] = useState(false)
   const [requestForm, setRequestForm] = useState({
     type: 'post', title: '', concept: '', reference_links: '',
@@ -285,31 +286,76 @@ export default function ContentCalendar() {
   const [submitting,      setSubmitting]      = useState(false)
   const footageInputRef = useRef(null)
 
-  // Resolve the client record — clients.profile_id is the client user link
+  // Resolve the client record then immediately fetch shoots so there is no
+  // two-effect timing gap where clientId is set but loadData hasn't fired yet.
   useEffect(() => {
     if (!user) return
-    supabase
-      .from('clients')
-      .select('id')
-      .eq('profile_id', user.id)
-      .maybeSingle()
-      .then(async ({ data }) => {
-        if (data?.id) {
-          setClientId(data.id)
-          setClientResolved(true)
-        } else {
-          // Fallback: find via client_creatives
-          const { data: ccRows } = await supabase
-            .from('client_creatives').select('client_id').eq('profile_id', user.id).limit(1)
-          if (ccRows?.length) setClientId(ccRows[0].client_id)
-          setClientResolved(true)
-        }
+    let cancelled = false
+
+    async function bootstrap() {
+      // ── 1. Find the clients row for this user ──────────────────────────────
+      const { data: clientRow, error: clientErr } = await supabase
+        .from('clients')
+        .select('id')
+        .eq('profile_id', user.id)
+        .maybeSingle()
+
+      if (cancelled) return
+
+      if (clientErr) {
+        setDebugInfo({ step: 'clients lookup', error: clientErr.message, clientId: null, shootCount: null })
+        setLoading(false)
+        return
+      }
+
+      const cid = clientRow?.id || null
+
+      if (!cid) {
+        setDebugInfo({ step: 'clients lookup', error: 'No clients row found for this profile_id', clientId: null, shootCount: null })
+        setClientResolved(true)
+        setLoading(false)
+        return
+      }
+
+      setClientId(cid)
+      setClientResolved(true)
+
+      // ── 2. Fetch shoots directly — separate from loadData so it can't be
+      //       silently swallowed by an unrelated query failure ─────────────────
+      const { data: shootRows, error: shootErr } = await supabase
+        .from('shoots')
+        .select('id, title, shoot_date, shoot_time, location, status')
+        .eq('client_id', cid)
+
+      if (cancelled) return
+
+      setDebugInfo({
+        step:       'shoots query',
+        error:      shootErr ? shootErr.message : null,
+        clientId:   cid,
+        shootCount: shootRows?.length ?? 0,
+        shoots:     (shootRows || []).map(s => `${s.title} (${s.shoot_date})`),
       })
+
+      // ── 3. Now run the full loadData (drafts, reviews, project shoots) ──────
+      // If it throws, shoots already visible from step 2 debug panel.
+      // We don't await here — let loadData manage loading state.
+    }
+
+    bootstrap().catch((err) => {
+      if (!cancelled) {
+        setDebugInfo({ step: 'bootstrap', error: err.message, clientId: null, shootCount: null })
+        setLoading(false)
+      }
+    })
+
+    return () => { cancelled = true }
   }, [user])
 
   const loadData = useCallback(async () => {
     if (!clientId) return
     setLoading(true)
+    try {
 
     // First get all project IDs for this client
     const { data: clientProjects } = await supabase
@@ -476,16 +522,20 @@ export default function ContentCalendar() {
       })
     })
 
-    setAllItems(items)
-    setLoading(false)
+      setAllItems(items)
 
-    // Auto-navigate to the month of the next upcoming shoot/item so clients
-    // don't land on an empty month and think nothing is scheduled.
-    const today = startOfDay(new Date())
-    const next = items
-      .filter((i) => i.date && i.date >= today)
-      .sort((a, b) => a.date - b.date)[0]
-    if (next) setMonth(startOfMonth(next.date))
+      // Auto-navigate to the month of the next upcoming shoot/item
+      const today = startOfDay(new Date())
+      const next = items
+        .filter((i) => i.date && i.date >= today)
+        .sort((a, b) => a.date - b.date)[0]
+      if (next) setMonth(startOfMonth(next.date))
+    } catch (err) {
+      console.error('[Calendar] loadData error:', err)
+      setDebugInfo((prev) => ({ ...(prev || {}), loadDataError: err.message }))
+    } finally {
+      setLoading(false)
+    }
   }, [clientId])
 
   useEffect(() => {
@@ -598,6 +648,19 @@ export default function ContentCalendar() {
 
   return (
     <div className="p-6 w-full">
+      {/* ── TEMPORARY DEBUG PANEL — remove once shoots confirmed visible ── */}
+      {debugInfo && (
+        <div className="mb-4 p-3 rounded-xl border text-xs font-mono bg-yellow-50 border-yellow-300 text-yellow-900 space-y-1">
+          <p><strong>Debug — Calendar data fetch</strong></p>
+          <p>Step: {debugInfo.step}</p>
+          <p>Client ID: {debugInfo.clientId || '❌ NOT FOUND'}</p>
+          <p>Shoots found: {debugInfo.shootCount ?? '?'}</p>
+          {debugInfo.shoots?.length > 0 && <p>Shoots: {debugInfo.shoots.join(', ')}</p>}
+          {debugInfo.error && <p className="text-red-700">Error: {debugInfo.error}</p>}
+          {debugInfo.loadDataError && <p className="text-red-700">loadData error: {debugInfo.loadDataError}</p>}
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div>
