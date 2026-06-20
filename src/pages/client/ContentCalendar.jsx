@@ -485,18 +485,13 @@ export default function ContentCalendar() {
     else if (clientResolved) setLoading(false)
   }, [clientId, clientResolved, loadData])
 
-  // Real-time: reload when any project_shoot changes (INSERT / UPDATE / DELETE)
-  // The RLS policy on project_shoots ensures we only ever receive rows belonging
-  // to this client's projects, so no additional client-side filtering is needed.
+  // Real-time: reload when shoots or project_shoots change
   useEffect(() => {
     if (!clientId) return
     const channel = supabase
-      .channel(`project-shoots-client-${clientId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'project_shoots' },
-        () => loadData()
-      )
+      .channel(`shoots-client-${clientId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'shoots' }, () => loadData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'project_shoots' }, () => loadData())
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [clientId, loadData])
@@ -594,7 +589,7 @@ export default function ContentCalendar() {
   const draftReviewCount  = allItems.filter((i) => i.kind === 'draftReview').length
 
   return (
-    <div className="p-6 max-w-3xl">
+    <div className="p-6 w-full">
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div>
@@ -690,7 +685,7 @@ export default function ContentCalendar() {
                       setSelected(newSel)
                       setDetailItem(null)
                     }}
-                    className={`min-h-[76px] p-1.5 cursor-pointer transition-colors ${
+                    className={`min-h-[110px] p-2 cursor-pointer transition-colors ${
                       isSel ? 'bg-accent/5' : inMonth ? 'hover:bg-surface-2/50' : 'bg-surface-2/30'
                     }`}
                   >
@@ -707,7 +702,7 @@ export default function ContentCalendar() {
                           <div key={item.id} className={`flex items-center gap-1 px-1 py-0.5 rounded ${style.bg}`}
                             onClick={(e) => { e.stopPropagation(); setDetailItem(item); setSelected(day) }}>
                             <div className={`w-1 h-1 rounded-full shrink-0 ${style.dot}`} />
-                            <p className={`text-[9px] font-medium truncate ${style.text}`}>{item.title}</p>
+                            <p className={`text-[10px] font-medium truncate ${style.text}`}>{item.title}</p>
                           </div>
                         )
                       })}
