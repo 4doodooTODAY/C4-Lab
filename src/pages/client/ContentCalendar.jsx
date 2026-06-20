@@ -286,14 +286,15 @@ export default function ContentCalendar() {
   const [submitting,      setSubmitting]      = useState(false)
   const footageInputRef = useRef(null)
 
-  // Resolve the client record then immediately fetch shoots so there is no
-  // two-effect timing gap where clientId is set but loadData hasn't fired yet.
+  // Resolve client record, fetch shoots directly (reliable path), then
+  // trigger loadData for drafts/reviews. Shoots are handled here so a
+  // bug in any other query can't prevent them from appearing.
   useEffect(() => {
     if (!user) return
     let cancelled = false
 
     async function bootstrap() {
-      // ── 1. Find the clients row for this user ──────────────────────────────
+      // ── 1. Find the clients row ────────────────────────────────────────────
       const { data: clientRow, error: clientErr } = await supabase
         .from('clients')
         .select('id')
@@ -317,11 +318,7 @@ export default function ContentCalendar() {
         return
       }
 
-      setClientId(cid)
-      setClientResolved(true)
-
-      // ── 2. Fetch shoots directly — separate from loadData so it can't be
-      //       silently swallowed by an unrelated query failure ─────────────────
+      // ── 2. Fetch shoots directly and put them straight into allItems ───────
       const { data: shootRows, error: shootErr } = await supabase
         .from('shoots')
         .select('id, title, shoot_date, shoot_time, location, status')
@@ -337,9 +334,38 @@ export default function ContentCalendar() {
         shoots:     (shootRows || []).map(s => `${s.title} (${s.shoot_date})`),
       })
 
-      // ── 3. Now run the full loadData (drafts, reviews, project shoots) ──────
-      // If it throws, shoots already visible from step 2 debug panel.
-      // We don't await here — let loadData manage loading state.
+      // Build shoot calendar items and put them directly in state — don't
+      // wait for loadData, which may have other queries that fail or return stale data.
+      const shootCalItems = (shootRows || [])
+        .filter(s => s.shoot_date)
+        .map(s => ({
+          id:        `shoot-${s.id}`,
+          kind:      'shoot',
+          title:     s.title,
+          date:      parseISO(s.shoot_date),
+          dateLabel: format(parseISO(s.shoot_date), 'EEE, MMM d yyyy') + (s.shoot_time ? ` at ${fmtTime(s.shoot_time)}` : ''),
+          location:  s.location,
+          time:      s.shoot_time ? fmtTime(s.shoot_time) : null,
+        }))
+
+      // Auto-navigate to the month of the next upcoming shoot
+      if (shootCalItems.length > 0) {
+        const today = startOfDay(new Date())
+        const next = shootCalItems
+          .filter(i => i.date >= today)
+          .sort((a, b) => a.date - b.date)[0]
+        if (next) setMonth(startOfMonth(next.date))
+      }
+
+      // Merge into allItems — keep any non-shoot items already there
+      setAllItems(prev => {
+        const nonShoots = prev.filter(i => !i.id.startsWith('shoot-'))
+        return [...nonShoots, ...shootCalItems]
+      })
+
+      // ── 3. Kick off loadData for drafts / reviews / project shoots ─────────
+      setClientId(cid)
+      setClientResolved(true)
     }
 
     bootstrap().catch((err) => {
@@ -522,7 +548,19 @@ export default function ContentCalendar() {
       })
     })
 
-      setAllItems(items)
+      // Merge: use shoots from bootstrap (guaranteed correct via direct query)
+      // and overlay non-shoot items from this run. If loadData also found shoots
+      // (shootsRes.data non-empty), those replace bootstrap's — otherwise bootstrap wins.
+      const loadDataShootIds = new Set(items.filter(i => i.id.startsWith('shoot-')).map(i => i.id))
+      const hasLoadDataShoots = loadDataShootIds.size > 0
+      setAllItems(prev => {
+        const prevBootstrapShoots = prev.filter(i => i.id.startsWith('shoot-'))
+        const nonShoots = items.filter(i => !i.id.startsWith('shoot-'))
+        const shoots = hasLoadDataShoots
+          ? items.filter(i => i.id.startsWith('shoot-'))
+          : prevBootstrapShoots
+        return [...shoots, ...nonShoots]
+      })
 
       // Auto-navigate to the month of the next upcoming shoot/item
       const today = startOfDay(new Date())
@@ -656,6 +694,7 @@ export default function ContentCalendar() {
           <p>Client ID: {debugInfo.clientId || '❌ NOT FOUND'}</p>
           <p>Shoots found: {debugInfo.shootCount ?? '?'}</p>
           {debugInfo.shoots?.length > 0 && <p>Shoots: {debugInfo.shoots.join(', ')}</p>}
+          <p>Shoot items in calendar: {allItems.filter(i => i.id?.startsWith('shoot-')).length}</p>
           {debugInfo.error && <p className="text-red-700">Error: {debugInfo.error}</p>}
           {debugInfo.loadDataError && <p className="text-red-700">loadData error: {debugInfo.loadDataError}</p>}
         </div>
