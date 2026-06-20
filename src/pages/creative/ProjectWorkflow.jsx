@@ -9,7 +9,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
-import { uploadToR2, fmtSpeed, fmtEta, forceDownload, downloadAll } from '../../lib/r2'
+import { uploadToR2, fmtBytes, fmtSpeed, fmtEta, forceDownload, downloadAll } from '../../lib/r2'
 import { updateProject } from '../../hooks/useProjects'
 import Avatar from '../../components/ui/Avatar'
 import { format, parseISO } from 'date-fns'
@@ -19,12 +19,6 @@ import { format, parseISO } from 'date-fns'
 // "Initial Cut" for the first upload; "Revision N" for subsequent client-driven rounds
 function revisionLabel(n) {
   return n === 1 ? 'Initial Cut' : `Revision ${n}`
-}
-
-function fmtBytes(bytes) {
-  if (!bytes) return '—'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
 }
 
 const STAGES = [
@@ -567,7 +561,7 @@ function ShootDeliverySection({ project, uploads, shootNotes, onRefresh }) {
   const [files,          setFiles]        = useState([])
   const [uploading,      setUploading]    = useState(false)
   const [uploadProgress, setProgress]     = useState({})
-  const [uploadStats,    setUploadStats]  = useState(null)
+  const [uploadStats,    setUploadStats]  = useState(null)  // { speed, eta, loaded, total, filesDone, filesTotal }
   const [uploadError,    setUploadError]  = useState('')
   const [removingId,     setRemovingId]   = useState(null)
 
@@ -593,9 +587,17 @@ function ShootDeliverySection({ project, uploads, shootNotes, onRefresh }) {
     files.forEach((f) => { progressMap[f.name] = 0 })
     setProgress({ ...progressMap })
 
+    const totalBytes = files.reduce((s, f) => s + f.size, 0)
+    const loadedPer  = new Array(files.length).fill(0)
+    let   filesDone  = 0
+
+    const report = (speed, eta) => {
+      const loaded = loadedPer.reduce((a, b) => a + b, 0)
+      setUploadStats({ speed, eta, loaded, total: totalBytes, filesDone, filesTotal: files.length })
+    }
+
     try {
-      // Upload all files in parallel for maximum speed
-      await Promise.all(files.map(async (file) => {
+      await Promise.all(files.map(async (file, i) => {
         const { publicUrl } = await uploadToR2({
           file,
           category:    'footage',
@@ -604,14 +606,8 @@ function ShootDeliverySection({ project, uploads, shootNotes, onRefresh }) {
           folderType:  'shoots',
           shootDate:   project.shoot_date || null,
           onProgress: (pct) => setProgress((p) => ({ ...p, [file.name]: pct })),
-          onStats:    (s)   => setUploadStats(s),
+          onStats:    (s) => { loadedPer[i] = s.loaded || 0; report(s.speed, s.eta) },
         })
-        // Run in Supabase SQL Editor if creative uploads fail:
-        // create policy "creatives can insert shoot_uploads" on shoot_uploads
-        //   for insert to authenticated
-        //   with check (
-        //     exists(select 1 from profiles where id = auth.uid() and role in ('admin','creative'))
-        //   );
         await supabase.from('shoot_uploads').insert({
           project_id:  project.id,
           file_url:    publicUrl,
@@ -619,7 +615,9 @@ function ShootDeliverySection({ project, uploads, shootNotes, onRefresh }) {
           file_size:   file.size,
           uploaded_by: profile.id,
         })
+        filesDone++
         setProgress((p) => ({ ...p, [file.name]: 100 }))
+        report(0, null)
       }))
       setFiles([])
       setUploadStats(null)
@@ -797,29 +795,31 @@ function ShootDeliverySection({ project, uploads, shootNotes, onRefresh }) {
 
           {uploadError && <p className="text-xs text-red-500 mt-2">{uploadError}</p>}
 
-          {uploading && uploadStats && (
-            <div className="mt-3 flex items-center gap-3 text-xs text-text-muted">
-              <div className="flex-1 h-1 bg-surface-3 rounded-full overflow-hidden">
-                {(() => {
-                  const cur = files.find((f) => (uploadProgress[f.name] || 0) < 100 && (uploadProgress[f.name] || 0) > 0) || files[0]
-                  const pct = cur ? (uploadProgress[cur.name] || 0) : 0
-                  return <div className="h-full bg-accent rounded-full transition-all duration-200" style={{ width: `${pct}%` }} />
-                })()}
-              </div>
-              <span className="shrink-0 font-medium text-text-secondary">{fmtSpeed(uploadStats.speed)}</span>
-              {uploadStats.eta != null && <span className="shrink-0">{fmtEta(uploadStats.eta)}</span>}
-            </div>
-          )}
-
           {files.length > 0 && (
-            <button
-              onClick={handleUpload}
-              disabled={uploading}
-              className="btn-primary mt-3 flex items-center gap-2 disabled:opacity-50"
-            >
-              {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-              {uploading ? 'Uploading…' : `Upload ${files.length} file${files.length !== 1 ? 's' : ''}`}
-            </button>
+            <div className="mt-3 flex items-center gap-3 flex-wrap">
+              <button
+                onClick={handleUpload}
+                disabled={uploading}
+                className="btn-primary flex items-center gap-2 shrink-0 disabled:opacity-50"
+              >
+                {uploading ? <><Loader2 size={14} className="animate-spin" /> Uploading…</> : <><Upload size={14} /> Upload {files.length} file{files.length !== 1 ? 's' : ''}</>}
+              </button>
+              {uploading && uploadStats && (
+                <div className="text-xs text-text-muted flex items-center gap-2 flex-wrap">
+                  <span className="font-semibold text-text-primary">{uploadStats.filesDone}/{uploadStats.filesTotal} files</span>
+                  <span className="text-text-muted/40">·</span>
+                  <span>{fmtBytes(uploadStats.loaded)} / {fmtBytes(uploadStats.total)}</span>
+                  {uploadStats.speed > 0 && <>
+                    <span className="text-text-muted/40">·</span>
+                    <span className="font-medium text-text-secondary">{fmtSpeed(uploadStats.speed)}</span>
+                  </>}
+                  {uploadStats.eta != null && uploadStats.eta > 1 && <>
+                    <span className="text-text-muted/40">·</span>
+                    <span className="font-semibold text-accent">{fmtEta(uploadStats.eta)}</span>
+                  </>}
+                </div>
+              )}
+            </div>
           )}
         </div>
       )}

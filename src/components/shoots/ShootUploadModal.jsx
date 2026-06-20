@@ -4,17 +4,10 @@ import {
   Check, Loader2, AlertCircle, Plus, Trash2,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
-import { uploadToR2, fmtSpeed, fmtEta } from '../../lib/r2'
+import { uploadToR2, fmtBytes, fmtSpeed, fmtEta } from '../../lib/r2'
 import { useAuth } from '../../contexts/AuthContext'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function fmtBytes(b) {
-  if (!b) return ''
-  if (b >= 1_073_741_824) return (b / 1_073_741_824).toFixed(1) + ' GB'
-  if (b >= 1_048_576)     return (b / 1_048_576).toFixed(1) + ' MB'
-  return (b / 1024).toFixed(1) + ' KB'
-}
-
 function fileIcon(name = '') {
   const ext = name.split('.').pop()?.toLowerCase()
   if (['mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v'].includes(ext)) return FileVideo
@@ -177,6 +170,14 @@ export default function ShootUploadModal({ shoot, clientId, clientName, onClose,
   const uploadingCount = items.filter((i) => i.status === 'uploading').length
   const doneCount      = items.filter((i) => i.status === 'done').length
 
+  // Aggregate stats shown next to the button while uploading
+  const activeItem  = items.find((i) => i.status === 'uploading')
+  const totalBytes  = items.reduce((s, i) => s + i.file.size, 0)
+  const doneBytes   = items.filter((i) => i.status === 'done').reduce((s, i) => s + i.file.size, 0)
+  const loadedBytes = doneBytes + (activeItem?.stats?.loaded || 0)
+  const aggSpeed    = activeItem?.stats?.speed || 0
+  const aggEta      = aggSpeed > 0 ? (totalBytes - loadedBytes) / aggSpeed : null
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={!running ? onClose : undefined} />
@@ -287,21 +288,35 @@ export default function ShootUploadModal({ shoot, clientId, clientName, onClose,
 
         {/* Footer */}
         {!allDone && (
-          <div className="px-6 py-4 border-t border-border shrink-0 flex items-center gap-3">
-            <div className="text-xs text-text-muted flex-1">
-              {uploadingCount > 0 && <span className="text-accent font-medium">Uploading {uploadingCount} file{uploadingCount !== 1 ? 's' : ''}…</span>}
-              {!running && pendingCount > 0 && `${pendingCount} file${pendingCount !== 1 ? 's' : ''} ready`}
-            </div>
+          <div className="px-6 py-4 border-t border-border shrink-0 flex items-center gap-3 flex-wrap">
             <button
               onClick={handleUploadAll}
               disabled={running || pendingCount === 0}
-              className="btn-primary flex items-center gap-2 disabled:opacity-50"
+              className="btn-primary flex items-center gap-2 shrink-0 disabled:opacity-50"
             >
               {running
                 ? <><Loader2 size={14} className="animate-spin" /> Uploading…</>
                 : <><Upload size={14} /> Upload {pendingCount > 0 ? pendingCount : ''} File{pendingCount !== 1 ? 's' : ''}</>
               }
             </button>
+            {running && items.length > 0 && (
+              <div className="text-xs text-text-muted flex items-center gap-2 flex-wrap">
+                <span className="font-semibold text-text-primary">{doneCount}/{items.length} files</span>
+                <span className="text-text-muted/40">·</span>
+                <span>{fmtBytes(loadedBytes)} / {fmtBytes(totalBytes)}</span>
+                {aggSpeed > 0 && <>
+                  <span className="text-text-muted/40">·</span>
+                  <span className="font-medium text-text-secondary">{fmtSpeed(aggSpeed)}</span>
+                </>}
+                {aggEta != null && aggEta > 1 && <>
+                  <span className="text-text-muted/40">·</span>
+                  <span className="font-semibold text-accent">{fmtEta(aggEta)}</span>
+                </>}
+              </div>
+            )}
+            {!running && pendingCount > 0 && (
+              <span className="text-xs text-text-muted">{pendingCount} file{pendingCount !== 1 ? 's' : ''} ready</span>
+            )}
           </div>
         )}
       </div>

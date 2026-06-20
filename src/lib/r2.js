@@ -219,6 +219,14 @@ export async function uploadToR2({ file, category, clientName, projectName, fold
 }
 
 // ── Format helpers ────────────────────────────────────────────────────────────
+export function fmtBytes(bytes) {
+  if (!bytes) return '0 B'
+  if (bytes >= 1_073_741_824) return `${(bytes / 1_073_741_824).toFixed(1)} GB`
+  if (bytes >= 1_048_576)     return `${(bytes / 1_048_576).toFixed(1)} MB`
+  if (bytes >= 1_024)         return `${Math.round(bytes / 1_024)} KB`
+  return `${bytes} B`
+}
+
 export function fmtSpeed(bytesPerSec) {
   if (bytesPerSec >= 1_048_576) return `${(bytesPerSec / 1_048_576).toFixed(1)} MB/s`
   if (bytesPerSec >= 1_024)     return `${Math.round(bytesPerSec / 1_024)} KB/s`

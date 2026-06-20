@@ -14,7 +14,7 @@ import { notify, notifyAdmins } from '../../lib/notify'
 import Avatar from '../../components/ui/Avatar'
 import { format, parseISO } from 'date-fns'
 import { fmtTime } from '../../lib/time'
-import { forceDownload, downloadAll, uploadToR2, fmtSpeed, fmtEta } from '../../lib/r2'
+import { forceDownload, downloadAll, uploadToR2, fmtBytes, fmtSpeed, fmtEta } from '../../lib/r2'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const DISPLAY_STAGES = [
@@ -111,11 +111,6 @@ const REVISION_STATUS_COLORS = {
   approved:                    'bg-green-50 text-green-700',
 }
 
-function fmtBytes(bytes) {
-  if (!bytes) return '—'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
-}
 
 // Same convention as the rest of the app: revision_number 1 is the first cut,
 // and each later number is "Revision (n-1)" — so the client and admin agree.
@@ -424,7 +419,7 @@ export default function ProjectDetail() {
   const [uploadingMedia, setUploadingMedia]   = useState(false)
   const [mediaUploadError, setMediaUploadError] = useState('')
   const [mediaProgress, setMediaProgress]     = useState(0)
-  const [mediaStats, setMediaStats]           = useState(null)
+  const [mediaStats, setMediaStats]           = useState(null)   // { speed, eta, loaded, total, filesDone, filesTotal }
   const [mediaDragOver, setMediaDragOver]     = useState(false)
 
   // Admin-only extra revision upload (used when the 3 client revisions run out)
@@ -770,22 +765,18 @@ export default function ProjectDetail() {
     setMediaProgress(0)
     setMediaStats(null)
     try {
-      // Track progress across all files by bytes so the bar reflects the whole batch.
-      const files = [...mediaFiles]
+      const files      = [...mediaFiles]
       const totalBytes = files.reduce((sum, f) => sum + f.size, 0)
       const loadedPer  = new Array(files.length).fill(0)
-      const startTime  = Date.now()
-      const report = () => {
-        const loaded  = loadedPer.reduce((a, b) => a + b, 0)
-        const pct     = totalBytes > 0 ? Math.round((loaded / totalBytes) * 100) : 0
-        const elapsed = (Date.now() - startTime) / 1000
-        const speed   = elapsed > 0 ? loaded / elapsed : 0
-        const eta     = speed > 0 ? (totalBytes - loaded) / speed : null
+      let   filesDone  = 0
+
+      const report = (speed, eta) => {
+        const loaded = loadedPer.reduce((a, b) => a + b, 0)
+        const pct    = totalBytes > 0 ? Math.round((loaded / totalBytes) * 100) : 0
         setMediaProgress(pct)
-        setMediaStats({ speed, eta })
+        setMediaStats({ speed, eta, loaded, total: totalBytes, filesDone, filesTotal: files.length })
       }
 
-      // Upload all files in parallel — much faster than one-at-a-time.
       const results = await Promise.all(files.map((file, i) =>
         uploadToR2({
           file,
@@ -793,8 +784,8 @@ export default function ProjectDetail() {
           clientName:  project.clients?.name || project.clients?.contact_name || 'client',
           projectName: project.name,
           folderType:  'projects',
-          onStats:     (s) => { loadedPer[i] = s.loaded || 0; report() },
-        }).then((r) => ({ file, publicUrl: r.publicUrl }))
+          onStats: (s) => { loadedPer[i] = s.loaded || 0; report(s.speed, s.eta) },
+        }).then((r) => { filesDone++; report(0, null); return { file, publicUrl: r.publicUrl } })
       ))
 
       for (const { file, publicUrl } of results) {
@@ -1249,31 +1240,33 @@ export default function ProjectDetail() {
                   </div>
                 ))}
                 {mediaUploadError && <p className="text-xs text-red-500">{mediaUploadError}</p>}
-                {uploadingMedia && (
-                  <div>
-                    <div className="flex items-center justify-between mb-1 text-xs text-text-muted">
-                      <span>Uploading…</span>
-                      <div className="flex items-center gap-2">
-                        {mediaStats?.speed ? <span className="font-medium text-text-secondary">{fmtSpeed(mediaStats.speed)}</span> : null}
-                        {mediaStats?.eta != null ? <span>{fmtEta(mediaStats.eta)}</span> : null}
-                        <span>{mediaProgress}%</span>
-                      </div>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <button
+                    onClick={handleMediaUpload}
+                    disabled={uploadingMedia}
+                    className="btn-primary flex items-center gap-2 shrink-0 disabled:opacity-50"
+                  >
+                    {uploadingMedia
+                      ? <><Loader2 size={14} className="animate-spin" /> Uploading…</>
+                      : <><Upload size={14} /> Upload {mediaFiles.length} file{mediaFiles.length !== 1 ? 's' : ''}</>
+                    }
+                  </button>
+                  {uploadingMedia && mediaStats && (
+                    <div className="text-xs text-text-muted flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-text-primary">{mediaStats.filesDone}/{mediaStats.filesTotal} files</span>
+                      <span className="text-text-muted/40">·</span>
+                      <span>{fmtBytes(mediaStats.loaded)} / {fmtBytes(mediaStats.total)}</span>
+                      {mediaStats.speed > 0 && <>
+                        <span className="text-text-muted/40">·</span>
+                        <span className="font-medium text-text-secondary">{fmtSpeed(mediaStats.speed)}</span>
+                      </>}
+                      {mediaStats.eta != null && mediaStats.eta > 1 && <>
+                        <span className="text-text-muted/40">·</span>
+                        <span className="font-semibold text-accent">{fmtEta(mediaStats.eta)}</span>
+                      </>}
                     </div>
-                    <div className="h-1.5 bg-surface-3 rounded-full overflow-hidden">
-                      <div className="h-full bg-accent rounded-full transition-all duration-200" style={{ width: `${mediaProgress}%` }} />
-                    </div>
-                  </div>
-                )}
-                <button
-                  onClick={handleMediaUpload}
-                  disabled={uploadingMedia}
-                  className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  {uploadingMedia
-                    ? <><Loader2 size={14} className="animate-spin" /> Uploading… {mediaProgress}%</>
-                    : <><Upload size={14} /> Upload {mediaFiles.length} file{mediaFiles.length !== 1 ? 's' : ''}</>
-                  }
-                </button>
+                  )}
+                </div>
               </div>
             )}
 
