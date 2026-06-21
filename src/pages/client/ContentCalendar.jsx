@@ -274,7 +274,7 @@ export default function ContentCalendar() {
   const [view, setView] = useState('calendar')   // 'calendar' | 'list'
   const [clientId, setClientId] = useState(null)
   const [clientResolved, setClientResolved] = useState(false)
-  const [debugInfo, setDebugInfo] = useState(null)   // temporary — remove after shoot visibility confirmed
+
   const [showRequestModal, setShowRequestModal] = useState(false)
   const [requestForm, setRequestForm] = useState({
     type: 'post', title: '', concept: '', reference_links: '',
@@ -304,7 +304,6 @@ export default function ContentCalendar() {
       if (cancelled) return
 
       if (clientErr) {
-        setDebugInfo({ step: 'clients lookup', error: clientErr.message, clientId: null, shootCount: null })
         setLoading(false)
         return
       }
@@ -312,27 +311,18 @@ export default function ContentCalendar() {
       const cid = clientRow?.id || null
 
       if (!cid) {
-        setDebugInfo({ step: 'clients lookup', error: 'No clients row found for this profile_id', clientId: null, shootCount: null })
         setClientResolved(true)
         setLoading(false)
         return
       }
 
       // ── 2. Fetch shoots directly and put them straight into allItems ───────
-      const { data: shootRows, error: shootErr } = await supabase
+      const { data: shootRows } = await supabase
         .from('shoots')
         .select('id, title, shoot_date, shoot_time, location, status')
         .eq('client_id', cid)
 
       if (cancelled) return
-
-      setDebugInfo({
-        step:       'shoots query',
-        error:      shootErr ? shootErr.message : null,
-        clientId:   cid,
-        shootCount: shootRows?.length ?? 0,
-        shoots:     (shootRows || []).map(s => `${s.title} (${s.shoot_date})`),
-      })
 
       // Build shoot calendar items and put them directly in state — don't
       // wait for loadData, which may have other queries that fail or return stale data.
@@ -368,11 +358,8 @@ export default function ContentCalendar() {
       setClientResolved(true)
     }
 
-    bootstrap().catch((err) => {
-      if (!cancelled) {
-        setDebugInfo({ step: 'bootstrap', error: err.message, clientId: null, shootCount: null })
-        setLoading(false)
-      }
+    bootstrap().catch(() => {
+      if (!cancelled) setLoading(false)
     })
 
     return () => { cancelled = true }
@@ -570,7 +557,6 @@ export default function ContentCalendar() {
       if (next) setMonth(startOfMonth(next.date))
     } catch (err) {
       console.error('[Calendar] loadData error:', err)
-      setDebugInfo((prev) => ({ ...(prev || {}), loadDataError: err.message }))
     } finally {
       setLoading(false)
     }
@@ -686,20 +672,6 @@ export default function ContentCalendar() {
 
   return (
     <div className="p-6 w-full">
-      {/* ── TEMPORARY DEBUG PANEL — remove once shoots confirmed visible ── */}
-      {debugInfo && (
-        <div className="mb-4 p-3 rounded-xl border text-xs font-mono bg-yellow-50 border-yellow-300 text-yellow-900 space-y-1">
-          <p><strong>Debug — Calendar data fetch</strong></p>
-          <p>Step: {debugInfo.step}</p>
-          <p>Client ID: {debugInfo.clientId || '❌ NOT FOUND'}</p>
-          <p>Shoots found: {debugInfo.shootCount ?? '?'}</p>
-          {debugInfo.shoots?.length > 0 && <p>Shoots: {debugInfo.shoots.join(', ')}</p>}
-          <p>Shoot items in calendar: {allItems.filter(i => i.id?.startsWith('shoot-')).length}</p>
-          {debugInfo.error && <p className="text-red-700">Error: {debugInfo.error}</p>}
-          {debugInfo.loadDataError && <p className="text-red-700">loadData error: {debugInfo.loadDataError}</p>}
-        </div>
-      )}
-
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div>
