@@ -28,7 +28,7 @@ export default function UploadProgressBar() {
     <>
       {/* Full-width bar pinned to very top of viewport */}
       <div
-        className="fixed top-0 left-0 right-0 z-[9999] h-[3px] bg-surface-3 overflow-hidden"
+        className="fixed top-0 left-0 right-0 z-[9999] h-[4px] bg-surface-3 overflow-hidden"
         style={{ pointerEvents: 'none' }}
       >
         <div

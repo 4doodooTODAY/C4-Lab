@@ -184,6 +184,8 @@ export async function uploadToR2({ file, category, clientName, projectName, fold
 
   // Register with global upload store so the app-wide progress bar tracks this file
   const storeId = uploadStore.register(file.name, file.size)
+  // Immediately push 0-byte loaded so the bar appears before the first XHR tick
+  uploadStore.update(storeId, { loaded: 0, speed: 0, eta: null })
 
   const fileInfo = {
     filename:    file.name,
