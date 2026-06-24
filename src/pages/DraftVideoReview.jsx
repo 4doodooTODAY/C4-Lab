@@ -366,6 +366,8 @@ export default function DraftVideoReview() {
                 src={version.video_url}
                 className="max-w-full max-h-full object-contain"
                 controls={false}
+                playsInline
+                preload="metadata"
                 onClick={() => videoRef.current?.paused ? videoRef.current.play() : videoRef.current.pause()}
                 onTimeUpdate={() => setCurrentTime(videoRef.current?.currentTime || 0)}
                 onLoadedMetadata={() => setDuration(videoRef.current?.duration || 0)}

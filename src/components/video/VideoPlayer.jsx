@@ -1,12 +1,6 @@
 import { useRef, useEffect, useImperativeHandle, forwardRef, useState } from 'react'
-import { AlertCircle } from 'lucide-react'
+import { AlertCircle, Loader2 } from 'lucide-react'
 
-/**
- * Extracts a Google Drive file ID from various share URL formats:
- * - https://drive.google.com/file/d/{id}/view
- * - https://drive.google.com/open?id={id}
- * - https://drive.google.com/uc?id={id}
- */
 function extractDriveFileId(url) {
   if (!url) return null
   const patterns = [
@@ -22,14 +16,10 @@ function extractDriveFileId(url) {
 
 function buildVideoSrc(videoUrl) {
   if (!videoUrl) return null
-  // Supabase Storage URL — use directly, supports range requests and full seeking
   if (videoUrl.includes('/storage/v1/object/public/')) return videoUrl
-  // Direct video file URL — use as-is
   if (/\.(mp4|webm|mov|avi|mkv)(\?|$)/i.test(videoUrl)) return videoUrl
-  // Google Drive fallback — extract file ID and build download URL
   const fileId = extractDriveFileId(videoUrl)
   if (fileId) return `https://drive.google.com/uc?export=download&id=${fileId}`
-  // Last resort: use the URL directly
   return videoUrl
 }
 
@@ -37,13 +27,10 @@ function isDriveUrl(videoUrl) {
   return videoUrl?.includes('drive.google.com')
 }
 
-/**
- * VideoPlayer exposes a seekTo(seconds) method via ref.
- * It calls onTimeUpdate(seconds) on every timeupdate event while playing.
- */
 const VideoPlayer = forwardRef(function VideoPlayer({ videoUrl, onTimeUpdate }, ref) {
   const videoRef = useRef(null)
-  const [error, setError] = useState(false)
+  const [error, setError]     = useState(false)
+  const [loading, setLoading] = useState(true)
   const src = buildVideoSrc(videoUrl)
 
   useImperativeHandle(ref, () => ({
@@ -66,6 +53,12 @@ const VideoPlayer = forwardRef(function VideoPlayer({ videoUrl, onTimeUpdate }, 
     return () => video.removeEventListener('timeupdate', handleTimeUpdate)
   }, [onTimeUpdate])
 
+  // Reset loading state when src changes
+  useEffect(() => {
+    setError(false)
+    setLoading(true)
+  }, [src])
+
   if (!src) {
     return (
       <div className="w-full aspect-video bg-black flex items-center justify-center rounded-xl">
@@ -76,25 +69,36 @@ const VideoPlayer = forwardRef(function VideoPlayer({ videoUrl, onTimeUpdate }, 
 
   return (
     <div className="w-full aspect-video bg-black rounded-xl overflow-hidden relative">
-      {error ? (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white/60 p-6 text-center">
+      {/* Loading spinner */}
+      {loading && !error && (
+        <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+          <Loader2 size={36} className="text-white/50 animate-spin" />
+        </div>
+      )}
+
+      {/* Error state */}
+      {error && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white/60 p-6 text-center z-10">
           <AlertCircle size={32} className="text-red-400" />
           <p className="text-sm font-medium text-white">Unable to load video</p>
           <p className="text-xs text-white/50">
             {isDriveUrl(videoUrl)
-              ? 'Make sure the Drive file is shared as "Anyone with the link can view". Large files may not stream reliably from Drive.'
-              : 'Could not load the video. Check that the file exists and the Supabase storage bucket is set to public.'}
+              ? 'Make sure the Drive file is shared as "Anyone with the link can view".'
+              : 'Could not load the video. The file may still be processing — try again in a moment.'}
           </p>
         </div>
-      ) : null}
+      )}
+
       <video
         ref={videoRef}
         src={src}
         controls
+        playsInline
         preload="metadata"
-        onError={() => setError(true)}
-        onLoadStart={() => setError(false)}
-        className={error ? 'opacity-0' : ''}
+        className={`w-full h-full object-contain ${error ? 'opacity-0' : ''}`}
+        onLoadStart={() => { setError(false); setLoading(true) }}
+        onCanPlay={() => setLoading(false)}
+        onError={() => { setError(true); setLoading(false) }}
       />
     </div>
   )

@@ -188,6 +188,7 @@ export default function VideoRevisionReview() {
   const [updatingComment, setUpdatingComment] = useState(null)
   const [submittingAction, setSubmittingAction] = useState(false)
   const [actionError, setActionError] = useState('')
+  const [videoLoading, setVideoLoading] = useState(true)
 
   const fetchAll = useCallback(async () => {
     if (!revisionId) { setError('Revision not found.'); setLoading(false); return }
@@ -601,6 +602,11 @@ export default function VideoRevisionReview() {
         <div className="flex-1 flex flex-col p-5 gap-4 min-w-0">
           {/* Video player */}
           <div className="bg-black rounded-xl overflow-hidden flex-1 flex items-center justify-center relative">
+            {videoLoading && (
+              <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+                <Loader2 size={36} className="text-white/50 animate-spin" />
+              </div>
+            )}
             <video
               ref={videoRef}
               src={revision.video_url}
@@ -608,6 +614,8 @@ export default function VideoRevisionReview() {
               controls
               preload="metadata"
               playsInline
+              onLoadStart={() => setVideoLoading(true)}
+              onCanPlay={() => setVideoLoading(false)}
               onClick={() => {
                 if (videoRef.current?.paused) videoRef.current.play()
                 else videoRef.current?.pause()
