@@ -29,7 +29,7 @@ function isDriveUrl(videoUrl) {
 
 const VideoPlayer = forwardRef(function VideoPlayer({ videoUrl, onTimeUpdate }, ref) {
   const videoRef = useRef(null)
-  const [error, setError]     = useState(false)
+  const [error,   setError]   = useState(false)
   const [loading, setLoading] = useState(true)
   const src = buildVideoSrc(videoUrl)
 
@@ -53,7 +53,6 @@ const VideoPlayer = forwardRef(function VideoPlayer({ videoUrl, onTimeUpdate }, 
     return () => video.removeEventListener('timeupdate', handleTimeUpdate)
   }, [onTimeUpdate])
 
-  // Reset loading state when src changes
   useEffect(() => {
     setError(false)
     setLoading(true)
@@ -69,16 +68,14 @@ const VideoPlayer = forwardRef(function VideoPlayer({ videoUrl, onTimeUpdate }, 
 
   return (
     <div className="w-full aspect-video bg-black rounded-xl overflow-hidden relative">
-      {/* Loading spinner */}
       {loading && !error && (
-        <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-          <Loader2 size={36} className="text-white/50 animate-spin" />
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <Loader2 size={36} className="text-white/40 animate-spin" />
         </div>
       )}
 
-      {/* Error state */}
       {error && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white/60 p-6 text-center z-10">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white/60 p-6 text-center">
           <AlertCircle size={32} className="text-red-400" />
           <p className="text-sm font-medium text-white">Unable to load video</p>
           <p className="text-xs text-white/50">
@@ -95,10 +92,11 @@ const VideoPlayer = forwardRef(function VideoPlayer({ videoUrl, onTimeUpdate }, 
         controls
         playsInline
         preload="metadata"
-        className={`w-full h-full object-contain ${error ? 'opacity-0' : ''}`}
+        style={{ width: '100%', display: 'block' }}
         onLoadStart={() => { setError(false); setLoading(true) }}
         onCanPlay={() => setLoading(false)}
         onError={() => { setError(true); setLoading(false) }}
+        className={error ? 'opacity-0' : ''}
       />
     </div>
   )
