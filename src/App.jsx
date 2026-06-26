@@ -97,6 +97,7 @@ const ClientMyProjects       = lazyWithRetry(() => import('./pages/client/MyProj
 const VideoRevisionReview    = lazyWithRetry(() => import('./pages/VideoRevisionReview'))
 const PhotoRevisionReview    = lazyWithRetry(() => import('./pages/PhotoRevisionReview'))
 const AdminFileSystem        = lazyWithRetry(() => import('./pages/admin/FileSystem'))
+const AdminOneOffShoots      = lazyWithRetry(() => import('./pages/admin/OneOffShoots'))
 const DraftsPage             = lazyWithRetry(() => import('./pages/DraftsPage'))
 const DraftVideoReview       = lazyWithRetry(() => import('./pages/DraftVideoReview'))
 const DraftPhotoReview       = lazyWithRetry(() => import('./pages/DraftPhotoReview'))
@@ -227,6 +228,9 @@ function AppRoutes() {
           } />
           <Route path="/admin/inbox" element={
             <ProtectedRoute roles={['admin']}><AdminInbox /></ProtectedRoute>
+          } />
+          <Route path="/admin/shoots" element={
+            <ProtectedRoute roles={['admin']}><AdminOneOffShoots /></ProtectedRoute>
           } />
           <Route path="/admin/files" element={
             <ProtectedRoute roles={['admin']}><AdminFileSystem /></ProtectedRoute>
