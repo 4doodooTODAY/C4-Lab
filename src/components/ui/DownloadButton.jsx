@@ -1,106 +1,37 @@
 import { useState } from 'react'
 import { Download, Loader2, Check } from 'lucide-react'
-
-const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream
+import { forceDownload } from '../../lib/r2'
 
 /**
- * DownloadButton — platform-aware with prominent progress feedback.
- *
- *  iOS      → fetch blob → Web Share API → native share sheet
- *  Desktop  → try direct anchor click first (fastest); fall back to blob
- *  Android  → blob → anchor click
+ * DownloadButton — gets a presigned attachment URL from the edge function
+ * and lets the browser handle the download natively. No blob, no memory
+ * pressure, no CORS issue. Works for any file size.
  */
 export default function DownloadButton({ url, filename, label = 'Download', className = '' }) {
-  const [status,   setStatus]   = useState('idle')   // idle | starting | loading | done
-  const [progress, setProgress] = useState(0)
+  const [status, setStatus] = useState('idle') // idle | loading | done
 
   const handleClick = async () => {
     if (!url || status !== 'idle') return
-
-    // Immediate feedback — show "Starting…" right away before any network call
-    setStatus('starting')
-    setProgress(0)
-
-    const fname = filename || decodeURIComponent(url.split('/').pop()?.split('?')[0] || 'download')
-
-    // NOTE: we deliberately do NOT use a plain <a download> anchor here.
-    // The video lives on R2 (a different origin), and browsers ignore the
-    // `download` attribute for cross-origin URLs — so the anchor just navigates
-    // (opening the file in a new tab) instead of saving it. Fetching the file
-    // into a blob and saving that blob is the only way to force a real download
-    // cross-origin. R2 CORS allows the fetch.
     setStatus('loading')
-
     try {
-      const res = await fetch(url)
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-
-      const contentLength = Number(res.headers.get('Content-Length') || 0)
-
-      if (contentLength > 0 && res.body) {
-        // Stream with progress
-        const reader = res.body.getReader()
-        const chunks = []
-        let received = 0
-
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          chunks.push(value)
-          received += value.length
-          setProgress(Math.round((received / contentLength) * 100))
-        }
-
-        const blob = new Blob(chunks, { type: res.headers.get('Content-Type') || 'application/octet-stream' })
-        await triggerSave(blob, fname)
-      } else {
-        // No content-length — just blob() directly
-        const blob = await res.blob()
-        await triggerSave(blob, fname)
-      }
-
+      await forceDownload(url, filename)
       setStatus('done')
       setTimeout(() => setStatus('idle'), 2000)
-    } catch (err) {
+    } catch {
       setStatus('idle')
-      if (err?.name !== 'AbortError') window.open(url, '_blank')
-    }
-  }
-
-  async function triggerSave(blob, fname) {
-    if (isIOS) {
-      const file = new File([blob], fname, { type: blob.type })
-      if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: fname })
-        return
-      }
-      // Fallback: object URL in new tab
-      window.open(URL.createObjectURL(blob), '_blank')
-    } else {
-      const blobUrl = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = blobUrl
-      a.download = fname
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 10_000)
+      window.open(url, '_blank')
     }
   }
 
   const base = 'flex items-center justify-center gap-2 font-semibold transition-all active:scale-[0.98]'
 
-  // Label and icon per state
   let icon, text
-  if (status === 'starting') {
+  if (status === 'loading') {
     icon = <Loader2 size={14} className="animate-spin" />
-    text = 'Take a deep breath…'
-  } else if (status === 'loading') {
-    icon = <Loader2 size={14} className="animate-spin" />
-    text = progress > 0 ? `Hold for ${Math.max(1, 4 - Math.floor(progress / 25))}… (${progress}%)` : 'Hold for 4…'
+    text = 'Preparing…'
   } else if (status === 'done') {
     icon = <Check size={14} />
-    text = 'Got it! ✓'
+    text = 'Done!'
   } else {
     icon = <Download size={14} />
     text = label
@@ -109,7 +40,7 @@ export default function DownloadButton({ url, filename, label = 'Download', clas
   return (
     <button
       onClick={handleClick}
-      disabled={status !== 'idle' && status !== 'done'}
+      disabled={status === 'loading'}
       className={`${base} ${className} ${status === 'done' ? 'opacity-80' : ''}`}
     >
       {icon}
