@@ -6,6 +6,7 @@ import {
 import { supabase } from '../../lib/supabase'
 import { uploadToR2, fmtBytes, fmtSpeed, fmtEta } from '../../lib/r2'
 import { useAuth } from '../../contexts/AuthContext'
+import { generateThumbnail } from '../../lib/thumbnail'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fileIcon(name = '') {
@@ -129,6 +130,22 @@ export default function ShootUploadModal({ shoot, clientId, clientName, onClose,
     for (const item of pending) {
       updateItem(item.id, { status: 'uploading', progress: 0 })
       try {
+        // Generate thumbnail silently before the main upload
+        const thumbBlob = await generateThumbnail(item.file)
+        let thumbnailUrl = null
+        if (thumbBlob) {
+          const thumbFile = new File([thumbBlob], `thumb_${item.file.name}.jpg`, { type: 'image/jpeg' })
+          const { publicUrl: tUrl } = await uploadToR2({
+            file:        thumbFile,
+            category:    'thumbnails',
+            clientName:  clientName || clientId || 'client',
+            projectName: shoot.title || 'shoot',
+            folderType:  'shoots',
+            shootDate:   shoot.shoot_date || null,
+          }).catch(() => ({ publicUrl: null }))
+          thumbnailUrl = tUrl
+        }
+
         const { publicUrl } = await uploadToR2({
           file:        item.file,
           category:    'footage',
@@ -142,13 +159,14 @@ export default function ShootUploadModal({ shoot, clientId, clientName, onClose,
 
         // Save record to shoot_uploads
         const { error: dbErr } = await supabase.from('shoot_uploads').insert({
-          shoot_id:    shoot.id,
-          client_id:   clientId || null,
-          file_name:   item.file.name,
-          file_url:    publicUrl,
-          file_size:   item.file.size,
-          notes:       notes || null,
-          uploaded_by: user?.id,
+          shoot_id:      shoot.id,
+          client_id:     clientId || null,
+          file_name:     item.file.name,
+          file_url:      publicUrl,
+          file_size:     item.file.size,
+          notes:         notes || null,
+          uploaded_by:   user?.id,
+          thumbnail_url: thumbnailUrl,
         })
         if (dbErr) throw new Error(dbErr.message)
 

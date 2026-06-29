@@ -185,7 +185,7 @@ function ShootFiles({ shootId, refreshKey = 0 }) {
     if (!shootId) return
     supabase
       .from('shoot_uploads')
-      .select('id, file_name, file_url, file_size, created_at, profiles(full_name)')
+      .select('id, file_name, file_url, file_size, thumbnail_url, created_at, profiles(full_name)')
       .eq('shoot_id', shootId)
       .order('created_at', { ascending: false })
       .then(({ data }) => { setFiles(data || []); setLoading(false) })
@@ -277,8 +277,13 @@ function ShootFiles({ shootId, refreshKey = 0 }) {
                 {selectedIds.has(f.id) ? <CheckSquare size={15} className="text-accent" /> : <Square size={15} className="text-text-muted" />}
               </button>
             )}
-            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${isVideo ? 'bg-blue-50' : isImage ? 'bg-purple-50' : 'bg-surface-3'}`}>
-              {isVideo ? <Film size={12} className="text-blue-500" /> : isImage ? <Image size={12} className="text-purple-500" /> : <File size={12} className="text-text-muted" />}
+            <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 bg-surface-3 flex items-center justify-center">
+              {f.thumbnail_url
+                ? <img src={f.thumbnail_url} alt="" className="w-full h-full object-cover" />
+                : isVideo ? <Film size={12} className="text-blue-500" />
+                : isImage ? <Image size={12} className="text-purple-500" />
+                : <File size={12} className="text-text-muted" />
+              }
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-medium text-text-primary truncate">{f.file_name}</p>
