@@ -3,10 +3,176 @@ import { useNavigate } from 'react-router-dom'
 import { Plus, X, Loader2, Users, Check, Trash2, AlertTriangle, Mail, ChevronRight, Shield, Palette, Briefcase } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
-import { formatDistanceToNow } from 'date-fns'
+import { format, formatDistanceToNow, startOfWeek, endOfWeek, addWeeks } from 'date-fns'
 import Avatar, { TagBadge } from '../../components/ui/Avatar'
 
 const ROLES = ['creative', 'editor', 'client', 'admin']
+
+// ─── Weekly per-user stats ────────────────────────────────────────────────────
+function MiniRing({ value, peak, color, size = 56, stroke = 6 }) {
+  const R = (size - stroke) / 2
+  const circ = 2 * Math.PI * R
+  const fill = peak > 0 ? Math.min(value / peak, 1) : 0
+  const offset = circ * (1 - fill)
+  const c = size / 2
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <circle cx={c} cy={c} r={R} fill="none" stroke="#f1f0fe" strokeWidth={stroke} />
+      {value > 0 && (
+        <circle cx={c} cy={c} r={R} fill="none" stroke={color} strokeWidth={stroke}
+          strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
+          transform={`rotate(-90 ${c} ${c})`}
+          style={{ transition: 'stroke-dashoffset 0.35s ease' }} />
+      )}
+    </svg>
+  )
+}
+
+function WeeklyUserStats() {
+  const [weekOffset, setWeekOffset] = useState(0)
+  const [creatives, setCreatives] = useState([])  // { id, full_name, avatar_url, count }
+  const [editors,   setEditors]   = useState([])
+  const [loading,   setLoading]   = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      setLoading(true)
+      const base     = startOfWeek(new Date(), { weekStartsOn: 1 })
+      const wkStart  = addWeeks(base, weekOffset)
+      const wkEnd    = endOfWeek(wkStart, { weekStartsOn: 1 })
+      const wkStartD = format(wkStart, 'yyyy-MM-dd')
+      const wkEndD   = format(wkEnd,   'yyyy-MM-dd')
+
+      const [profilesRes, shootsRes, revisionsRes] = await Promise.all([
+        supabase.from('profiles').select('id, full_name, avatar_url, role')
+          .in('role', ['creative', 'editor'])
+          .order('full_name'),
+        // Shoots done by photographer this week
+        supabase.from('shoots').select('photographer_id')
+          .not('photographer_id', 'is', null)
+          .gte('shoot_date', wkStartD)
+          .lte('shoot_date', wkEndD),
+        // Revisions uploaded by editor this week
+        supabase.from('project_revisions').select('uploaded_by')
+          .not('uploaded_by', 'is', null)
+          .gte('created_at', wkStart.toISOString())
+          .lte('created_at', wkEnd.toISOString()),
+      ])
+
+      if (cancelled) return
+
+      const profiles = profilesRes.data || []
+
+      // Count shoots per photographer
+      const shootCounts = {}
+      ;(shootsRes.data || []).forEach(({ photographer_id }) => {
+        shootCounts[photographer_id] = (shootCounts[photographer_id] || 0) + 1
+      })
+
+      // Count revisions per editor
+      const revCounts = {}
+      ;(revisionsRes.data || []).forEach(({ uploaded_by }) => {
+        revCounts[uploaded_by] = (revCounts[uploaded_by] || 0) + 1
+      })
+
+      const creativeList = profiles
+        .filter((p) => p.role === 'creative')
+        .map((p) => ({ ...p, count: shootCounts[p.id] || 0 }))
+
+      const editorList = profiles
+        .filter((p) => p.role === 'editor')
+        .map((p) => ({ ...p, count: revCounts[p.id] || 0 }))
+
+      const peakC = Math.max(...creativeList.map((p) => p.count), 1)
+      const peakE = Math.max(...editorList.map((p) => p.count), 1)
+
+      setCreatives(creativeList.map((p) => ({ ...p, peak: peakC })))
+      setEditors(editorList.map((p) => ({ ...p, peak: peakE })))
+      setLoading(false)
+    }
+    load()
+    return () => { cancelled = true }
+  }, [weekOffset])
+
+  const base      = startOfWeek(new Date(), { weekStartsOn: 1 })
+  const wkStart   = addWeeks(base, weekOffset)
+  const wkEnd     = endOfWeek(wkStart, { weekStartsOn: 1 })
+  const isCurrent = weekOffset === 0
+  const weekLabel = isCurrent
+    ? 'This Week'
+    : `${format(wkStart, 'MMM d')} – ${format(wkEnd, 'MMM d')}`
+
+  const UserCard = ({ user, color, sublabel }) => (
+    <div className="flex flex-col items-center gap-2 min-w-0">
+      <div className="relative">
+        <MiniRing value={user.count} peak={user.peak} color={color} />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="text-base font-bold text-text-primary">{user.count}</span>
+        </div>
+      </div>
+      <div className="text-center">
+        <p className="text-xs font-medium text-text-primary truncate max-w-[72px]">
+          {user.full_name?.split(' ')[0] || '—'}
+        </p>
+        <p className="text-[10px] text-text-muted">{sublabel}</p>
+      </div>
+    </div>
+  )
+
+  return (
+    <div className="card p-5 mb-6">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-sm font-semibold text-text-primary">Weekly Output</h2>
+          <p className="text-xs text-text-muted mt-0.5">Shoots done · Revisions submitted</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setWeekOffset((o) => o - 1)}
+            className="w-7 h-7 rounded-lg bg-surface-2 hover:bg-surface-3 flex items-center justify-center text-text-muted hover:text-text-primary transition-colors">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M8 2L4 6l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </button>
+          <span className="text-xs font-medium text-text-secondary w-36 text-center">{weekLabel}</span>
+          <button onClick={() => setWeekOffset((o) => Math.min(0, o + 1))} disabled={isCurrent}
+            className="w-7 h-7 rounded-lg bg-surface-2 hover:bg-surface-3 flex items-center justify-center text-text-muted hover:text-text-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </button>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-6"><Loader2 size={16} className="animate-spin text-text-muted" /></div>
+      ) : (
+        <div className="space-y-5">
+          {/* Creatives / Photographers */}
+          {creatives.length > 0 && (
+            <div>
+              <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wide mb-3">Photographers · shoots</p>
+              <div className="flex gap-6 flex-wrap">
+                {creatives.map((u) => <UserCard key={u.id} user={u} color="#6C63FF" sublabel="shoots" />)}
+              </div>
+            </div>
+          )}
+          {/* Editors */}
+          {editors.length > 0 && creatives.length > 0 && (
+            <div className="border-t border-border pt-4" />
+          )}
+          {editors.length > 0 && (
+            <div>
+              <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wide mb-3">Editors · revisions</p>
+              <div className="flex gap-6 flex-wrap">
+                {editors.map((u) => <UserCard key={u.id} user={u} color="#10b981" sublabel="submitted" />)}
+              </div>
+            </div>
+          )}
+          {creatives.length === 0 && editors.length === 0 && (
+            <p className="text-sm text-text-muted text-center py-4">No creatives or editors yet.</p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 function callUserAction(body, session) {
   return fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-user`, {
@@ -291,6 +457,8 @@ export default function UserManagement() {
           <Plus size={15} /> Invite User
         </button>
       </div>
+
+      <WeeklyUserStats />
 
       {loading ? (
         <div className="flex justify-center py-16"><Loader2 size={22} className="animate-spin text-text-muted" /></div>
