@@ -3,6 +3,7 @@ import { Loader2, Check, User, Lock, Camera } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import Avatar from '../components/ui/Avatar'
+import NotificationSettings from '../components/settings/NotificationSettings'
 
 const ROLE_LABELS = { admin: 'Admin', creative: 'Creative', client: 'Client' }
 
@@ -176,6 +177,9 @@ export default function Settings() {
             </button>
           </form>
         </div>
+
+        {/* Notifications */}
+        <NotificationSettings />
       </div>
     </div>
   )

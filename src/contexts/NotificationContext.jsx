@@ -5,7 +5,9 @@ import { useAuth } from './AuthContext'
 // Notification types that are internal to the team — clients should never see these
 const TEAM_ONLY_TYPES = ['message']
 
-const VAPID_PUBLIC_KEY = 'BJhLo2Yrmpz1sspZUGYB_hStsFhz5-9-HGUXcVfrPm4-EuovmBH6n57TgwTtUlxgo3NnQvewY6ZAnWhRBbYpwTY'
+// VAPID key pair rotated 2026-07-02 (old private key was replaced server-side).
+// The resync effect below re-subscribes anyone still on the old key.
+export const VAPID_PUBLIC_KEY = 'BM4xpgWxKB7zEBp9tFeMxi8vPCRRrSEnZeJT1URp8ZMHR1yTlynS96YbcCApmOuq54lVahUTm5bz3TD-tBsIYT4'
 
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
@@ -59,14 +61,43 @@ export function NotificationProvider({ children }) {
     return () => supabase.removeChannel(ch)
   }, [user?.id])
 
-  // Check if push already enabled
+  // Check if push already enabled — and self-heal after the VAPID key rotation:
+  // if an existing subscription was created with a different applicationServerKey,
+  // drop it and re-subscribe with the current key, then upsert to the DB.
   useEffect(() => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
+    if (!user?.id) return
     navigator.serviceWorker.ready.then(async (reg) => {
-      const sub = await reg.pushManager.getSubscription()
+      let sub = await reg.pushManager.getSubscription()
+      if (sub && Notification.permission === 'granted') {
+        const currentKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+        const subKey = sub.options?.applicationServerKey
+          ? new Uint8Array(sub.options.applicationServerKey)
+          : null
+        const keyMatches = subKey && subKey.length === currentKey.length &&
+          subKey.every((b, i) => b === currentKey[i])
+        if (!keyMatches) {
+          const oldEndpoint = sub.endpoint
+          await sub.unsubscribe().catch(() => {})
+          await supabase.from('push_subscriptions').delete().eq('endpoint', oldEndpoint)
+          sub = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: currentKey,
+          }).catch(() => null)
+          if (sub) {
+            const json = sub.toJSON()
+            await supabase.from('push_subscriptions').upsert({
+              profile_id: user.id,
+              endpoint: json.endpoint,
+              p256dh: json.keys.p256dh,
+              auth_key: json.keys.auth,
+            }, { onConflict: 'endpoint' })
+          }
+        }
+      }
       setPushEnabled(!!sub)
     }).catch(() => {})
-  }, [])
+  }, [user?.id])
 
   const markRead = useCallback(async (id) => {
     await supabase.from('notifications').update({ read: true }).eq('id', id)
