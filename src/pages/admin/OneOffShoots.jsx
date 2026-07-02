@@ -7,7 +7,7 @@ import {
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { format } from 'date-fns'
-import { generateDerivatives, isGalleryImage } from '../../lib/derivatives'
+import { generateDerivatives, isGalleryImage, sha256Hex, runPool } from '../../lib/derivatives'
 
 function publicLink(slug) {
   return `${window.location.origin}/s/${slug}`
@@ -130,20 +130,26 @@ function GalleryDrawer({ shoot }) {
   const { user } = useAuth()
   const fileInputRef = useRef(null)
   const [images, setImages]     = useState(null)
+  const [trash, setTrash]       = useState([])       // soft-deleted duplicates
+  const [showTrash, setShowTrash] = useState(false)
   const [favCounts, setFavCounts] = useState({})     // image_id -> count
   const [comments, setComments] = useState([])       // pin comments across images
   const [uploading, setUploading] = useState(false)
   const [progress, setProgress]   = useState(null)   // { done, total, failed }
   const [dragOver, setDragOver]   = useState(false)
+  const [summary, setSummary]     = useState('')     // post-upload dedup summary
 
   const load = useCallback(async () => {
-    const { data: imgs } = await supabase
+    const { data: allRows } = await supabase
       .from('one_off_shoot_images')
-      .select('id, file_name, file_size, thumb_path, preview_path, sort_order, created_at')
+      .select('id, file_name, file_size, thumb_path, preview_path, sort_order, created_at, deleted_at, deleted_reason')
       .eq('shoot_id', shoot.id)
       .order('sort_order')
       .order('created_at')
-    setImages(imgs || [])
+    const rows = allRows || []
+    const imgs = rows.filter((r) => !r.deleted_at)
+    setImages(imgs)
+    setTrash(rows.filter((r) => r.deleted_at))
 
     const ids = (imgs || []).map((i) => i.id)
     if (!ids.length) { setFavCounts({}); setComments([]); return }
@@ -163,75 +169,166 @@ function GalleryDrawer({ shoot }) {
 
   useEffect(() => { load() }, [load])
 
-  // ── Upload: original untouched → private bucket; derivatives → public ──────
+  // Prevent the browser from navigating to a dropped file when the drop lands
+  // outside the dropzone — the #1 cause of "drag-and-drop doesn't work".
+  useEffect(() => {
+    const prevent = (e) => { e.preventDefault() }
+    window.addEventListener('dragover', prevent)
+    window.addEventListener('drop', prevent)
+    return () => {
+      window.removeEventListener('dragover', prevent)
+      window.removeEventListener('drop', prevent)
+    }
+  }, [])
+
+  // ── Upload: hash → dedup → parallel upload (originals untouched) ────────────
+  // Duplicate = identical SHA-256 within this shoot. Exact bytes only; files
+  // with ANY difference are never treated as duplicates. Duplicates become
+  // soft-deleted rows (recoverable trash) sharing the canonical copy's storage.
   const uploadFiles = async (fileList) => {
     const files = Array.from(fileList).filter((f) => isGalleryImage(f.name))
     if (!files.length) return
     setUploading(true)
+    setSummary('')
     setProgress({ done: 0, total: files.length, failed: 0 })
 
-    for (const file of files) {
-      try {
-        const id = crypto.randomUUID()
-        const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
-        const originalPath = `${shoot.id}/${id}.${ext}`
-        const thumbPath    = `${shoot.id}/${id}_thumb.webp`
-        const prevPath     = `${shoot.id}/${id}_prev.webp`
+    // 1. Hash every file (exact-byte identity) + existing hashes in this shoot
+    const [hashes, { data: existingRows }] = await Promise.all([
+      Promise.all(files.map((f) => sha256Hex(f))),
+      supabase.from('one_off_shoot_images')
+        .select('id, content_hash, original_path, preview_path, thumb_path, width, height')
+        .eq('shoot_id', shoot.id)
+        .is('deleted_at', null)
+        .not('content_hash', 'is', null),
+    ])
+    const canonicalByHash = new Map()
+    ;(existingRows || []).forEach((r) => canonicalByHash.set(r.content_hash, r))
 
-        // Derivatives first (fails fast on undecodable files, before any upload)
-        const { thumb, preview, width, height } = await generateDerivatives(file)
-
-        // Original — raw bytes, no recompression, private bucket
-        const { error: origErr } = await supabase.storage
-          .from('shoot-originals')
-          .upload(originalPath, file, { contentType: file.type || 'application/octet-stream' })
-        if (origErr) throw new Error(origErr.message)
-
-        // Derivatives — public previews bucket
-        const [{ error: tErr }, { error: pErr }] = await Promise.all([
-          supabase.storage.from('shoot-previews').upload(thumbPath, thumb, { contentType: 'image/webp' }),
-          supabase.storage.from('shoot-previews').upload(prevPath, preview, { contentType: 'image/webp' }),
-        ])
-        if (tErr || pErr) throw new Error((tErr || pErr).message)
-
-        const { error: dbErr } = await supabase.from('one_off_shoot_images').insert({
-          id,
-          shoot_id:      shoot.id,
-          file_name:     file.name,
-          file_size:     file.size,
-          width, height,
-          original_path: originalPath,
-          preview_path:  prevPath,
-          thumb_path:    thumbPath,
-          uploaded_by:   user?.id,
-        })
-        if (dbErr) throw new Error(dbErr.message)
-
-        setProgress((p) => ({ ...p, done: p.done + 1 }))
-      } catch (err) {
-        console.error(`Upload failed for ${file.name}:`, err)
-        setProgress((p) => ({ ...p, done: p.done + 1, failed: p.failed + 1 }))
+    // 2. Split batch into canonical uploads vs exact duplicates
+    const jobs = files.map((file, i) => ({ file, hash: hashes[i], dupOf: null }))
+    for (const job of jobs) {
+      const seen = canonicalByHash.get(job.hash)
+      if (seen) {
+        job.dupOf = seen
+      } else {
+        // First occurrence in this batch becomes the canonical placeholder
+        canonicalByHash.set(job.hash, job)
       }
     }
+
+    let dupCount = 0
+
+    // 3. Canonical files: parallel upload, capped at 3 lanes
+    const results = await runPool(jobs, async (job) => {
+      if (job.dupOf) {
+        // Exact duplicate → recoverable trash row pointing at canonical files.
+        // Canonical may be a just-uploaded job (has .row after upload) or an
+        // existing DB row.
+        const canonical = job.dupOf.row || job.dupOf
+        if (!canonical.original_path) throw new Error('canonical upload failed — duplicate skipped')
+        const { error } = await supabase.from('one_off_shoot_images').insert({
+          shoot_id:       shoot.id,
+          file_name:      job.file.name,
+          file_size:      job.file.size,
+          width:          canonical.width,
+          height:         canonical.height,
+          original_path:  canonical.original_path,
+          preview_path:   canonical.preview_path,
+          thumb_path:     canonical.thumb_path,
+          content_hash:   job.hash,
+          uploaded_by:    user?.id,
+          deleted_at:     new Date().toISOString(),
+          deleted_reason: `exact duplicate (SHA-256 match) of ${canonical.id || 'batch upload'}`,
+        })
+        if (error) throw new Error(error.message)
+        dupCount++
+        setProgress((p) => ({ ...p, done: p.done + 1 }))
+        return
+      }
+
+      const id = crypto.randomUUID()
+      const ext = job.file.name.split('.').pop()?.toLowerCase() || 'jpg'
+      const originalPath = `${shoot.id}/${id}.${ext}`
+      const thumbPath    = `${shoot.id}/${id}_thumb.webp`
+      const prevPath     = `${shoot.id}/${id}_prev.webp`
+
+      // Derivatives first (fails fast on undecodable files, before any upload)
+      const { thumb, preview, width, height } = await generateDerivatives(job.file)
+
+      // Original — raw bytes, no recompression, private bucket
+      const { error: origErr } = await supabase.storage
+        .from('shoot-originals')
+        .upload(originalPath, job.file, { contentType: job.file.type || 'application/octet-stream' })
+      if (origErr) throw new Error(origErr.message)
+
+      const [{ error: tErr }, { error: pErr }] = await Promise.all([
+        supabase.storage.from('shoot-previews').upload(thumbPath, thumb, { contentType: 'image/webp' }),
+        supabase.storage.from('shoot-previews').upload(prevPath, preview, { contentType: 'image/webp' }),
+      ])
+      if (tErr || pErr) throw new Error((tErr || pErr).message)
+
+      const row = {
+        id,
+        shoot_id:      shoot.id,
+        file_name:     job.file.name,
+        file_size:     job.file.size,
+        width, height,
+        original_path: originalPath,
+        preview_path:  prevPath,
+        thumb_path:    thumbPath,
+        content_hash:  job.hash,
+        uploaded_by:   user?.id,
+      }
+      const { error: dbErr } = await supabase.from('one_off_shoot_images').insert(row)
+      if (dbErr) throw new Error(dbErr.message)
+      job.row = row // duplicates later in the batch reference these paths
+      setProgress((p) => ({ ...p, done: p.done + 1 }))
+    }, 3)
+
+    const failed = results.filter((r) => !r.ok).length
+    results.filter((r) => !r.ok).forEach((r) => console.error('Upload failed:', r.error))
+    if (failed) setProgress((p) => ({ ...p, failed }))
+
+    const parts = []
+    parts.push(`${files.length - dupCount - failed} uploaded`)
+    if (dupCount) parts.push(`${dupCount} exact duplicate${dupCount !== 1 ? 's' : ''} removed (recoverable in Trash)`)
+    if (failed) parts.push(`${failed} failed`)
+    setSummary(parts.join(' · '))
 
     setUploading(false)
     load()
   }
 
+  const restoreFromTrash = async (row) => {
+    const { error } = await supabase.from('one_off_shoot_images')
+      .update({ deleted_at: null, deleted_reason: null })
+      .eq('id', row.id)
+    if (error) window.alert(error.message)
+    load()
+  }
+
   const deleteImage = async (img) => {
     if (!window.confirm(`Remove "${img.file_name}" from the gallery?`)) return
-    // Fetch the original path (not in local state by design) then remove storage + row
     const { data: row } = await supabase
       .from('one_off_shoot_images')
       .select('original_path')
       .eq('id', img.id)
       .single()
-    await Promise.all([
-      row?.original_path
-        ? supabase.storage.from('shoot-originals').remove([row.original_path])
-        : Promise.resolve(),
-      supabase.storage.from('shoot-previews').remove([img.thumb_path, img.preview_path]),
-    ])
+    // Storage objects may be shared with duplicate rows in Trash — only remove
+    // the underlying files when no other row references them.
+    if (row?.original_path) {
+      const { count } = await supabase
+        .from('one_off_shoot_images')
+        .select('id', { count: 'exact', head: true })
+        .eq('original_path', row.original_path)
+        .neq('id', img.id)
+      if (!count) {
+        await Promise.all([
+          supabase.storage.from('shoot-originals').remove([row.original_path]),
+          supabase.storage.from('shoot-previews').remove([img.thumb_path, img.preview_path]),
+        ])
+      }
+    }
     const { error } = await supabase.from('one_off_shoot_images').delete().eq('id', img.id)
     if (error) window.alert(error.message)
     load()
@@ -274,6 +371,13 @@ function GalleryDrawer({ shoot }) {
         )}
       </div>
 
+      {/* Post-upload dedup summary */}
+      {summary && (
+        <p className="text-xs text-text-secondary bg-surface-2 border border-border rounded-lg px-3 py-2 flex items-center gap-1.5">
+          <Check size={12} className="text-green-500 shrink-0" /> {summary}
+        </p>
+      )}
+
       {/* Image grid */}
       {images === null ? (
         <div className="flex justify-center py-4"><Loader2 size={14} className="animate-spin text-text-muted" /></div>
@@ -311,6 +415,38 @@ function GalleryDrawer({ shoot }) {
               </button>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Trash — recoverable duplicates / removals */}
+      {trash.length > 0 && (
+        <div>
+          <button
+            onClick={() => setShowTrash((v) => !v)}
+            className="text-[10px] font-semibold text-text-muted uppercase tracking-wide flex items-center gap-1 hover:text-text-primary transition-colors"
+          >
+            <Trash2 size={10} /> Trash ({trash.length})
+            {showTrash ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+          </button>
+          {showTrash && (
+            <div className="mt-1.5 space-y-1">
+              {trash.map((t) => (
+                <div key={t.id} className="flex items-center gap-2 bg-white border border-border rounded-lg px-2.5 py-1.5">
+                  <img src={previewUrl(t.thumb_path)} alt="" className="w-7 h-7 rounded object-cover shrink-0 opacity-50" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-text-primary truncate">{t.file_name}</p>
+                    <p className="text-[10px] text-text-muted truncate">{t.deleted_reason || 'removed'}</p>
+                  </div>
+                  <button
+                    onClick={() => restoreFromTrash(t)}
+                    className="text-[10px] text-accent font-medium hover:underline shrink-0"
+                  >
+                    Restore
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

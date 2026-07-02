@@ -63,3 +63,38 @@ const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'avif', 'tif', 
 export function isGalleryImage(name = '') {
   return IMAGE_EXTS.includes(name.split('.').pop()?.toLowerCase() || '')
 }
+
+/**
+ * sha256Hex(file) → lowercase hex SHA-256 of the raw file bytes.
+ * Used for exact-duplicate detection only: two files are duplicates iff their
+ * hashes are byte-for-byte identical. No perceptual/similarity matching.
+ */
+export async function sha256Hex(file) {
+  const buf = await file.arrayBuffer()
+  const digest = await crypto.subtle.digest('SHA-256', buf)
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')
+}
+
+/**
+ * runPool(items, worker, concurrency) — run `worker(item, index)` over items
+ * with a fixed concurrency cap. Rejections are caught per-item; the pool
+ * always drains. Returns per-item results ({ ok, value | error }).
+ */
+export async function runPool(items, worker, concurrency = 3) {
+  const results = new Array(items.length)
+  let next = 0
+  async function lane() {
+    while (next < items.length) {
+      const i = next++
+      try {
+        results[i] = { ok: true, value: await worker(items[i], i) }
+      } catch (error) {
+        results[i] = { ok: false, error }
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, lane))
+  return results
+}

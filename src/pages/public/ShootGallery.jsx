@@ -5,6 +5,7 @@ import {
   MessageCircle, Phone, Check, Camera,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { zip } from 'fflate'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const previewUrl = (path) =>
@@ -372,12 +373,50 @@ export default function ShootGallery() {
     setDownloadingAll(true)
     try {
       const { files } = await callDownload({ claim: c, all: true })
-      // Sequential with a small gap so the browser accepts each download
-      for (const f of files) {
-        triggerBrowserDownload(f.url)
-        await new Promise((r) => setTimeout(r, 600))
-      }
-      showToast(`${files.length} original${files.length !== 1 ? 's' : ''} downloading`)
+
+      // Zip the originals client-side (store mode — images are already
+      // compressed; zipping is for the single-file UX, not size).
+      // Fetch with capped concurrency so big galleries don't stampede.
+      const entries = {}
+      let fetched = 0
+      const queue = [...files]
+      const lanes = Array.from({ length: 4 }, async () => {
+        while (queue.length) {
+          const f = queue.shift()
+          try {
+            const res = await fetch(f.url)
+            if (!res.ok) throw new Error(`fetch ${res.status}`)
+            const buf = new Uint8Array(await res.arrayBuffer())
+            // Avoid name collisions inside the zip
+            let name = f.fileName
+            let n = 1
+            while (entries[name]) name = f.fileName.replace(/(\.[^.]*)?$/, `-${n++}$1`)
+            entries[name] = [buf, { level: 0 }]
+          } catch (e) {
+            console.error('zip fetch failed:', f.fileName, e)
+          }
+          fetched++
+          setToast(`Preparing ${fetched}/${files.length} originals…`)
+        }
+      })
+      await Promise.all(lanes)
+      setToast('')
+
+      const names = Object.keys(entries)
+      if (!names.length) throw new Error('Download failed — try again')
+
+      const zipped = await new Promise((resolve, reject) =>
+        zip(entries, (err, data) => (err ? reject(err) : resolve(data)))
+      )
+      const blobUrl = URL.createObjectURL(new Blob([zipped], { type: 'application/zip' }))
+      const a = document.createElement('a')
+      a.href = blobUrl
+      a.download = `${title.replace(/[^\w\- ]+/g, '').trim() || 'gallery'}.zip`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 30000)
+      showToast(`${names.length} full-quality original${names.length !== 1 ? 's' : ''} zipped`)
     } catch (err) {
       if (/claim/i.test(err.message)) {
         sessionStorage.removeItem(claimKey(slug))
@@ -440,7 +479,10 @@ export default function ShootGallery() {
             <p className="text-white/40 text-sm">Photos are on the way — check back soon.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+          <div
+            className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2"
+            style={{ contentVisibility: 'auto' }}
+          >
             {images.map((img, i) => {
               const isFav = favorites.has(img.image_id)
               const noteCount = comments.filter((c) => c.image_id === img.image_id).length
@@ -454,6 +496,7 @@ export default function ShootGallery() {
                     src={previewUrl(img.thumb_path)}
                     alt={img.file_name}
                     loading="lazy"
+                    decoding="async"
                     className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
                   />
                   {(isFav || noteCount > 0) && (

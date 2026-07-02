@@ -56,6 +56,7 @@ Deno.serve(async (req) => {
     .from('one_off_shoot_images')
     .select('id, original_path, file_name')
     .eq('shoot_id', claimRow.shoot_id)
+    .is('deleted_at', null)
   if (!all) imgQuery = imgQuery.eq('id', imageId!)
 
   const { data: images, error: imgErr } = await imgQuery
