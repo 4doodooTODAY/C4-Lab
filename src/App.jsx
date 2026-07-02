@@ -98,6 +98,7 @@ const VideoRevisionReview    = lazyWithRetry(() => import('./pages/VideoRevision
 const PhotoRevisionReview    = lazyWithRetry(() => import('./pages/PhotoRevisionReview'))
 const AdminFileSystem        = lazyWithRetry(() => import('./pages/admin/FileSystem'))
 const AdminOneOffShoots      = lazyWithRetry(() => import('./pages/admin/OneOffShoots'))
+const ShootGallery           = lazyWithRetry(() => import('./pages/public/ShootGallery'))
 const DraftsPage             = lazyWithRetry(() => import('./pages/DraftsPage'))
 const DraftVideoReview       = lazyWithRetry(() => import('./pages/DraftVideoReview'))
 const DraftPhotoReview       = lazyWithRetry(() => import('./pages/DraftPhotoReview'))
@@ -197,6 +198,8 @@ function AppRoutes() {
     <Suspense fallback={<PageLoader />}>
       <Routes>
         <Route path="/login" element={<Login />} />
+        {/* Public one-off shoot gallery — no auth, viewable by anyone with the link */}
+        <Route path="/s/:slug" element={<ShootGallery />} />
         <Route path="/change-password" element={
           <ProtectedRoute><ChangePassword /></ProtectedRoute>
         } />
