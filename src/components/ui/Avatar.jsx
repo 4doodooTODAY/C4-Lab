@@ -1,5 +1,13 @@
-// Shared avatar component — shows photo if available, otherwise initials
+import { useState, useEffect } from 'react'
+
+// Shared avatar component — shows photo if available, otherwise initials.
+// A broken photo URL falls back to initials via onError instead of
+// rendering a broken image.
 export default function Avatar({ name, url, size = 8, className = '' }) {
+  const [broken, setBroken] = useState(false)
+  // If the url changes (e.g. user uploads a new photo), give it another chance
+  useEffect(() => { setBroken(false) }, [url])
+
   const initials = name
     ? name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
     : '?'
@@ -14,11 +22,12 @@ export default function Avatar({ name, url, size = 8, className = '' }) {
     14: 'w-14 h-14 text-lg',
   }[size] || 'w-8 h-8 text-xs'
 
-  if (url) {
+  if (url && !broken) {
     return (
       <img
         src={url}
         alt={name || 'Avatar'}
+        onError={() => setBroken(true)}
         className={`${px} rounded-full object-cover shrink-0 ${className}`}
       />
     )

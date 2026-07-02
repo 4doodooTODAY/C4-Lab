@@ -1,0 +1,85 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   C4-Lab Design Tokens
+   ─────────────────────────────────────────────────────────────────────────
+   Single source of truth for type, spacing, radius, elevation, and status
+   colors. Additive — existing Tailwind classes keep working; new work should
+   consume these variables (directly or via the tailwind `status.*` colors).
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Horizon (display) — self-hosted, activates when licensed files exist.
+      Drop licensed webfont files at public/fonts/horizon/Horizon.woff2 (and
+      .woff). If absent, the browser silently falls through to Poppins — the
+      fallback stack means nothing breaks. */
+@font-face {
+  font-family: 'Horizon';
+  src: url('/fonts/horizon/Horizon.woff2') format('woff2'),
+       url('/fonts/horizon/Horizon.woff') format('woff');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* ── Font stacks ──────────────────────────────────────────────────────── */
+  --font-display: 'Horizon', 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-body:    'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  /* ── Type scale (mobile-first; display sizes step up at md via utilities) */
+  --text-display:      2.25rem;   /* 36px — hero / page display */
+  --text-display-lh:   1.1;
+  --text-h1:           1.5rem;    /* 24px */
+  --text-h1-lh:        1.2;
+  --text-h2:           1.125rem;  /* 18px */
+  --text-h2-lh:        1.3;
+  --text-body:         0.875rem;  /* 14px — matches existing app body */
+  --text-body-lh:      1.5;
+  --text-caption:      0.75rem;   /* 12px */
+  --text-caption-lh:   1.4;
+
+  /* ── Spacing scale (4px base) ─────────────────────────────────────────── */
+  --space-1: 0.25rem;   /*  4px */
+  --space-2: 0.5rem;    /*  8px */
+  --space-3: 0.75rem;   /* 12px */
+  --space-4: 1rem;      /* 16px */
+  --space-5: 1.5rem;    /* 24px */
+  --space-6: 2rem;      /* 32px */
+  --space-7: 3rem;      /* 48px */
+  --space-8: 4rem;      /* 64px */
+
+  /* ── Radius ───────────────────────────────────────────────────────────── */
+  --radius-sm:   0.5rem;    /*  8px — inputs, chips */
+  --radius-md:   0.75rem;   /* 12px — buttons, small cards */
+  --radius-lg:   1rem;      /* 16px — cards, modals */
+  --radius-full: 9999px;
+
+  /* ── Elevation ────────────────────────────────────────────────────────── */
+  --elevation-1: 0 1px 2px rgba(15, 17, 23, 0.05);
+  --elevation-2: 0 4px 12px rgba(15, 17, 23, 0.08);
+  --elevation-3: 0 12px 32px rgba(15, 17, 23, 0.14);
+
+  /* ── Status colors ────────────────────────────────────────────────────── */
+  /* due-soon: orange */
+  --status-due-soon:      #f59e0b;
+  --status-due-soon-bg:   #fef3c7;
+  --status-due-soon-text: #b45309;
+  /* overdue: red */
+  --status-overdue:       #ef4444;
+  --status-overdue-bg:    #fee2e2;
+  --status-overdue-text:  #b91c1c;
+  /* submitted / in-review: violet (distinct from brand accent) */
+  --status-review:        #8b5cf6;
+  --status-review-bg:     #ede9fe;
+  --status-review-text:   #6d28d9;
+  /* approved-final: green */
+  --status-approved:      #10b981;
+  --status-approved-bg:   #d1fae5;
+  --status-approved-text: #047857;
+  /* neutral / idle: muted gray */
+  --status-idle:          #9ca3af;
+  --status-idle-bg:       #f4f5f7;
+  --status-idle-text:     #6b7280;
+
+  /* ── Brand ────────────────────────────────────────────────────────────── */
+  --color-accent:       #6C63FF;
+  --color-accent-hover: #5a52e0;
+}

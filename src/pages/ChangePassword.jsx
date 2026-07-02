@@ -18,7 +18,7 @@ function getInitials(name) {
 
 function roleHome(role) {
   if (role === 'admin') return '/admin'
-  if (role === 'creative') return '/dashboard'
+  if (role === 'creative' || role === 'editor') return '/dashboard'
   return '/client'
 }
 
@@ -82,9 +82,20 @@ export default function ChangePassword() {
   }
 
   // ── Step 2: Photo upload ───────────────────────────────────────────────────
+  const MAX_PHOTO_BYTES = 5 * 1024 * 1024 // 5 MB
+
   const handleFileChange = (e) => {
     const file = e.target.files?.[0]
     if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setError('Please choose an image file (JPG or PNG).')
+      return
+    }
+    if (file.size > MAX_PHOTO_BYTES) {
+      setError('Photo is too large — please pick one under 5 MB.')
+      return
+    }
+    setError('')
     setPhotoFile(file)
     setPhotoPreview(URL.createObjectURL(file))
   }
@@ -95,9 +106,14 @@ export default function ChangePassword() {
     try {
       const ext = photoFile.name.split('.').pop()
       const path = `${user.id}/avatar.${ext}`
-      const { error: upErr } = await supabase.storage
+      // Never let a hung storage request block signup — 15s cap, then move on
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Upload timed out')), 15000)
+      )
+      const upload = supabase.storage
         .from('avatars')
         .upload(path, photoFile, { upsert: true, contentType: photoFile.type })
+      const { error: upErr } = await Promise.race([upload, timeout])
       if (upErr) throw upErr
 
       const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path)
@@ -273,6 +289,7 @@ export default function ChangePassword() {
                 <input
                   ref={fileInputRef}
                   type="file"
+                  accept="image/*"
                   className="hidden"
                   onChange={handleFileChange}
                 />
@@ -284,6 +301,10 @@ export default function ChangePassword() {
                   {photoPreview ? 'Change photo' : 'Choose a photo'}
                 </button>
               </div>
+
+              {error && (
+                <p className="text-xs text-red-500 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p>
+              )}
 
               <div className="space-y-2 pt-1">
                 <button

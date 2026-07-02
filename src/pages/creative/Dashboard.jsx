@@ -125,11 +125,14 @@ export default function CreativeDashboard() {
   const [revisions,  setRevisions]  = useState([])
   const [events,     setEvents]     = useState([])
   const [loading,    setLoading]    = useState(true)
+  const [loadError,  setLoadError]  = useState(null)
+  const [retryKey,   setRetryKey]   = useState(0)
 
   useEffect(() => {
     if (!user?.id) return
 
     async function load() {
+      setLoadError(null)
       const now     = new Date()
       const cutoff  = addDays(now, 21) // look 3 weeks ahead
 
@@ -189,11 +192,17 @@ export default function CreativeDashboard() {
       setProjects(visibleProjects)
       setRevisions(revData || [])
       setEvents(visibleEvents)
-      setLoading(false)
     }
 
+    // One bad record or failed query must never blank the whole page:
+    // catch anything thrown, show a retry card, and always clear the spinner.
     load()
-  }, [user, isAdmin])
+      .catch((err) => {
+        console.error('Dashboard load failed:', err)
+        setLoadError(err?.message || 'Something went wrong loading your dashboard.')
+      })
+      .finally(() => setLoading(false))
+  }, [user, isAdmin, retryKey])
 
   const firstName    = profile?.full_name?.split(' ')[0] || 'there'
   const activeProjs  = projects.filter((p) => p.stage !== 'delivered')
@@ -245,6 +254,26 @@ export default function CreativeDashboard() {
   if (loading) return (
     <div className="flex justify-center py-24">
       <Loader2 size={22} className="animate-spin text-text-muted" />
+    </div>
+  )
+
+  if (loadError) return (
+    <div className="p-8 max-w-4xl">
+      <div className="card px-6 py-8 flex flex-col items-center text-center gap-3">
+        <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center">
+          <AlertCircle size={18} className="text-red-500" />
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-text-primary">Couldn't load your overview</p>
+          <p className="text-xs text-text-muted mt-1">{loadError}</p>
+        </div>
+        <button
+          onClick={() => { setLoading(true); setRetryKey((k) => k + 1) }}
+          className="btn-primary mt-1"
+        >
+          Try again
+        </button>
+      </div>
     </div>
   )
 
