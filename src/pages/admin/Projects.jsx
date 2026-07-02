@@ -8,8 +8,11 @@ import { useProjects } from '../../hooks/useProjects'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import Avatar from '../../components/ui/Avatar'
-import { format, isAfter, addDays, isBefore, startOfDay } from 'date-fns'
+import { format, addDays, isBefore, startOfDay, parseISO } from 'date-fns'
 import NewProjectModal from './NewProjectModal'
+import StatusBadge, { usePins, PinButton } from '../../components/projects/StatusBadge'
+import { computeProjectStatus, latestRevisionFor } from '../../lib/projectStatus'
+import { CheckCircle2 } from 'lucide-react'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const TYPE_LABELS = {
@@ -69,11 +72,8 @@ const IN_CONTROL = {
 }
 
 // ── Project Card ──────────────────────────────────────────────────────────────
-function ProjectCard({ project, onClick }) {
-  const today  = startOfDay(new Date())
-  const due    = project.due_date ? new Date(project.due_date) : null
-  const isOD   = due && isBefore(due, today)
-  const isSoon = due && !isOD && isBefore(due, addDays(today, 7))
+function ProjectCard({ project, onClick, status, isPinned, onTogglePin }) {
+  const due = project.due_date ? startOfDay(parseISO(project.due_date)) : null
 
   // Build team from the actual assignment fields (creative + editor join profiles)
   const teamMembers = [
@@ -92,31 +92,34 @@ function ProjectCard({ project, onClick }) {
     >
       {/* Top row */}
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-text-primary truncate">{project.name}</p>
           <p className="text-xs text-text-muted mt-0.5 truncate">{clientName}</p>
         </div>
+        <PinButton pinned={isPinned} onToggle={onTogglePin} />
+      </div>
+
+      {/* Status + stage — the at-a-glance row */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <StatusBadge status={status} />
+        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${STAGE_COLORS[project.stage] || 'bg-surface-2 text-text-muted'}`}>
+          {STAGE_LABELS[project.stage] || project.stage}
+        </span>
         {project.type && (
-          <span className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full ${TYPE_COLORS[project.type] || 'bg-surface-2 text-text-muted'}`}>
+          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${TYPE_COLORS[project.type] || 'bg-surface-2 text-text-muted'}`}>
             {TYPE_LABELS[project.type]}
           </span>
         )}
       </div>
 
-      {/* Stage badge */}
-      <div className="flex items-center gap-1.5">
-        <span className={`inline-block w-1.5 h-1.5 rounded-full ${STAGE_DOT[project.stage] || 'bg-gray-400'}`} />
-        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${STAGE_COLORS[project.stage] || 'bg-surface-2 text-text-muted'}`}>
-          {STAGE_LABELS[project.stage] || project.stage}
-        </span>
-      </div>
-
       {/* Due date */}
       {due ? (
-        <div className={`flex items-center gap-1 text-xs font-medium ${isOD ? 'text-red-600' : isSoon ? 'text-amber-600' : 'text-text-muted'}`}>
-          {isOD && <AlertCircle size={11} />}
+        <div className={`flex items-center gap-1 text-xs font-medium ${
+          status === 'overdue' ? 'text-status-overdue-text' :
+          status === 'due-soon' ? 'text-status-due-soon-text' : 'text-text-muted'
+        }`}>
           <CalendarDays size={11} />
-          {isOD ? 'Overdue · ' : ''}{format(due, 'MMM d')}
+          {status === 'overdue' ? 'Overdue · ' : ''}{format(due, 'MMM d')}
         </div>
       ) : (
         <span className="text-xs text-text-muted">No due date</span>
@@ -158,6 +161,15 @@ export default function Projects() {
   const [search, setSearch]     = useState('')
   const [filterType, setFT]     = useState('')
   const [filterStage, setFS]    = useState('')
+  const [revisions, setRevisions] = useState([])
+  const { pinned, toggle: togglePin, sortPinned } = usePins(user?.id)
+
+  // Latest-revision statuses drive the green (approved+final) computation
+  useEffect(() => {
+    supabase.from('project_revisions')
+      .select('id, project_id, revision_number, status')
+      .then(({ data }) => setRevisions(data || []))
+  }, [])
 
   const today = startOfDay(new Date())
   const nextWeek = addDays(today, 7)
@@ -187,7 +199,10 @@ export default function Projects() {
       {readyToPost.length > 0 && (
         <div className="mb-6 rounded-2xl bg-green-500 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg shadow-green-500/20">
           <div>
-            <p className="text-base font-bold text-white">🎉 {readyToPost.length} project{readyToPost.length !== 1 ? 's' : ''} approved & ready to post!</p>
+            <p className="text-base font-bold text-white flex items-center gap-2">
+              <CheckCircle2 size={18} strokeWidth={2} />
+              {readyToPost.length} project{readyToPost.length !== 1 ? 's' : ''} approved & ready to post
+            </p>
             <p className="text-sm text-green-100 mt-0.5">{readyToPost.map(p => p.name).join(', ')}</p>
           </div>
           <div className="flex gap-2 flex-wrap">
@@ -204,7 +219,7 @@ export default function Projects() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-text-primary">Projects</h1>
+          <h1 className="font-display text-xl font-bold text-text-primary">Projects</h1>
           <p className="text-sm text-text-secondary mt-0.5">{total} project{total !== 1 ? 's' : ''} total</p>
         </div>
         <button onClick={() => setShowNew(true)} className="btn-primary flex items-center gap-2">
@@ -265,8 +280,15 @@ export default function Projects() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((p) => (
-            <ProjectCard key={p.id} project={p} onClick={() => navigate(`/projects/${p.id}`)} />
+          {sortPinned(filtered).map((p) => (
+            <ProjectCard
+              key={p.id}
+              project={p}
+              status={computeProjectStatus(p, latestRevisionFor(p.id, revisions))}
+              isPinned={pinned.has(p.id)}
+              onTogglePin={() => togglePin(p.id)}
+              onClick={() => navigate(`/projects/${p.id}`)}
+            />
           ))}
         </div>
       )}

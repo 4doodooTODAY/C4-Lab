@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Loader2, Camera, Scissors, CalendarDays, MapPin, ArrowRight, Upload, MessageSquare, Check } from 'lucide-react'
+import { Loader2, Camera, Scissors, CalendarDays, MapPin, ArrowRight, Upload, MessageSquare, Check, Send } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { format, parseISO } from 'date-fns'
 import ShootDetailModal from '../../components/shoots/ShootDetailModal'
 import { fmtTime } from '../../lib/time'
+import StatusBadge, { usePins, PinButton } from '../../components/projects/StatusBadge'
+import { computeProjectStatus, latestRevisionFor } from '../../lib/projectStatus'
 
 const STAGE_COLORS = {
   post_production: 'bg-purple-50 text-purple-600',
@@ -79,24 +81,27 @@ function ShootCard({ shoot, onOpen, onMarkDone }) {
 }
 
 // ── Edit Card ─────────────────────────────────────────────────────────────────
-function EditCard({ project, revisions, myId, onClick, onMarkDone }) {
-  const latest = revisions
-    .filter((r) => r.project_id === project.id)
-    .sort((a, b) => b.revision_number - a.revision_number)[0]
+function EditCard({ project, revisions, myId, onClick, onMarkDone, isPinned, onTogglePin }) {
+  const latest = latestRevisionFor(project.id, revisions)
+  const status = computeProjectStatus(project, latest)
 
   const hasPendingUpload = latest?.status === 'pending_editor'
   const stage = project.stage
-  const isDone = stage === 'delivered'
 
   return (
     <div className="bg-white rounded-2xl border border-border p-5 hover:shadow-md hover:border-border-strong transition-all">
-      <div className="flex items-start justify-between gap-2 mb-3 cursor-pointer" onClick={onClick}>
-        <div className="min-w-0">
+      <div className="flex items-start justify-between gap-2 mb-2 cursor-pointer" onClick={onClick}>
+        <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-text-primary truncate">{project.name}</p>
           <p className="text-xs text-text-muted mt-0.5 truncate">
             {project.clients?.contact_name || project.clients?.name || '—'}
           </p>
         </div>
+        {onTogglePin && <PinButton pinned={isPinned} onToggle={onTogglePin} />}
+      </div>
+
+      <div className="flex items-center gap-1.5 flex-wrap mb-3">
+        <StatusBadge status={status} />
         <span className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full ${STAGE_COLORS[stage] || 'bg-surface-2 text-text-muted'}`}>
           {STAGE_LABELS[stage] || stage}
         </span>
@@ -121,7 +126,7 @@ function EditCard({ project, revisions, myId, onClick, onMarkDone }) {
         </button>
         {stage === 'ready_to_post' && (
           <span className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-blue-50 text-blue-700 flex items-center gap-1 shrink-0">
-            ✅ Awaiting post
+            <Send size={11} strokeWidth={2} /> Awaiting post
           </span>
         )}
       </div>
@@ -144,6 +149,7 @@ export default function CreativeProjectList() {
   const [revisions,    setRevisions]    = useState([])
   const [loading,      setLoading]      = useState(true)
   const [detailShoot, setDetailShoot] = useState(null)  // shoot detail modal
+  const { pinned, toggle: togglePin, sortPinned } = usePins(myId)
 
   useEffect(() => {
     if (!myId) return
@@ -173,7 +179,7 @@ export default function CreativeProjectList() {
       isAdmin
         ? supabase
             .from('projects')
-            .select('id, name, stage, editor_id, client_id, clients(name, contact_name)')
+            .select('id, name, stage, due_date, editor_id, client_id, clients(name, contact_name)')
             .order('created_at', { ascending: false })
         : supabase
             .from('client_creatives')
@@ -184,7 +190,7 @@ export default function CreativeProjectList() {
               if (!clientIds.length) return { data: [] }
               return supabase
                 .from('projects')
-                .select('id, name, stage, editor_id, client_id, clients(name, contact_name)')
+                .select('id, name, stage, due_date, editor_id, client_id, clients(name, contact_name)')
                 .in('client_id', clientIds)
                 .order('created_at', { ascending: false })
             }),
@@ -224,7 +230,7 @@ export default function CreativeProjectList() {
   return (
     <div className="p-8 max-w-4xl">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-text-primary">My Work</h1>
+        <h1 className="font-display text-2xl font-bold text-text-primary">My Work</h1>
         <p className="text-sm text-text-muted mt-1">
           {isEditor ? 'Your editing projects' : 'Your shoots and editing assignments'}
         </p>
@@ -280,12 +286,14 @@ export default function CreativeProjectList() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {myAssignedEdits.map((p) => (
+            {sortPinned(myAssignedEdits).map((p) => (
               <EditCard
                 key={p.id}
                 project={p}
                 revisions={revisions}
                 myId={myId}
+                isPinned={pinned.has(p.id)}
+                onTogglePin={() => togglePin(p.id)}
                 onClick={() => navigate(`/projects/${p.id}/creative`)}
                 onMarkDone={async () => {
                   await supabase.from('projects').update({ stage: 'delivered' }).eq('id', p.id)
@@ -307,12 +315,14 @@ export default function CreativeProjectList() {
           </div>
           <p className="text-xs text-text-muted mb-4">Other active projects for your clients — not assigned to you to edit.</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {clientEdits.map((p) => (
+            {sortPinned(clientEdits).map((p) => (
               <EditCard
                 key={p.id}
                 project={p}
                 revisions={revisions}
                 myId={myId}
+                isPinned={pinned.has(p.id)}
+                onTogglePin={() => togglePin(p.id)}
                 onClick={() => navigate(`/projects/${p.id}/creative`)}
                 onMarkDone={async () => {
                   await supabase.from('projects').update({ stage: 'delivered' }).eq('id', p.id)
