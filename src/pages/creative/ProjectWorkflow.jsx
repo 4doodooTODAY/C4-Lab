@@ -1562,6 +1562,130 @@ function AdminReviewSection({ revision, project, onRefresh }) {
 
 // ── Upload Revision Section (Editor only) ─────────────────────────────────────
 
+// ── Draft cut panel ───────────────────────────────────────────────────────────
+// A cut that's been uploaded but NOT sent. Editor can freely replace, delete,
+// or explicitly send it for review. Nothing reaches the client until Send.
+// Once sent, the DB trigger locks the file until the client requests revisions.
+function DraftCutPanel({ project, draftRev, onReplace, onRefresh }) {
+  const { profile } = useAuth()
+  const [sending,  setSending]  = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [error,    setError]    = useState('')
+
+  const isPhoto  = draftRev.media_type === 'photo'
+  const revLabel = draftRev.revision_number === 1
+    ? (isPhoto ? 'Initial Photos' : 'Initial Cut')
+    : `Revision ${draftRev.revision_number}`
+
+  const handleSend = async () => {
+    setSending(true)
+    setError('')
+    try {
+      // Photos and admin-reviewed reworks go straight to the client; fresh
+      // video cuts go to the photographer/creative first (existing flow).
+      const toClient = isPhoto || draftRev.admin_reviewed === true || !project.creative_id
+      const newStatus = toClient ? 'pending_client_review' : 'pending_creative_review'
+
+      const { error: e } = await supabase.from('project_revisions')
+        .update({ status: newStatus })
+        .eq('id', draftRev.id)
+      if (e) throw new Error(e.message)
+
+      await updateProject(project.id, { stage: 'review', revision_count: draftRev.revision_number })
+
+      const { notify: notifyFn, notifyAdmins: notifyAdminsFn } = await import('../../lib/notify')
+      await notifyAdminsFn({
+        actorId: profile.id,
+        type:    'revision_uploaded',
+        title:   `${revLabel} sent for review — "${project.name}"`,
+        body:    toClient ? 'Now with the client for review.' : 'Photographer review is next.',
+        link:    `/projects/${project.id}`,
+      })
+      if (toClient) {
+        const { data: clientRow } = await supabase
+          .from('clients').select('profile_id').eq('id', project.client_id).maybeSingle()
+        if (clientRow?.profile_id) {
+          await notifyFn({
+            profileId: clientRow.profile_id,
+            actorId:   profile.id,
+            type:      'revision_ready',
+            title:     `${revLabel} ${isPhoto ? 'are' : 'is'} ready for your review!`,
+            body:      `"${project.name}" is ready. Tap to review and leave feedback.`,
+            link:      `/my-projects`,
+          })
+        }
+      } else if (project.creative_id) {
+        await notifyFn({
+          profileId: project.creative_id,
+          actorId:   profile.id,
+          type:      'revision_uploaded',
+          title:     `${revLabel} ready for your review — "${project.name}"`,
+          body:      'Leave your timeline notes before the client sees it.',
+          link:      `/projects/${project.id}`,
+        })
+      }
+      onRefresh()
+    } catch (err) {
+      setError(err.message)
+      setSending(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!window.confirm(`Delete this draft ${isPhoto ? 'photo set' : 'cut'}? You can upload a new one after.`)) return
+    setDeleting(true)
+    setError('')
+    const { error: e } = await supabase.from('project_revisions').delete().eq('id', draftRev.id)
+    if (e) { setError(e.message); setDeleting(false); return }
+    onRefresh()
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border-2 border-dashed border-accent/40 p-5 space-y-3">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-surface-2 text-text-secondary uppercase tracking-wide">
+          Draft — not sent
+        </span>
+        <h2 className="text-sm font-bold text-text-primary">{revLabel}</h2>
+      </div>
+      <p className="text-xs text-text-muted">
+        {isPhoto
+          ? `${draftRev.photo_urls?.length || 0} photo${(draftRev.photo_urls?.length || 0) !== 1 ? 's' : ''} uploaded.`
+          : 'Cut uploaded.'}{' '}
+        Nothing has gone to anyone yet — replace, delete, or send it when you're ready.
+        Once sent, it locks until the client requests revisions.
+      </p>
+      {!isPhoto && draftRev.video_url && (
+        <video src={draftRev.video_url} controls preload="metadata"
+          className="w-full rounded-xl max-h-64" style={{ background: '#000' }} />
+      )}
+      {error && (
+        <p className="text-xs text-red-500 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p>
+      )}
+      <div className="flex gap-2 flex-wrap">
+        <button
+          onClick={handleSend}
+          disabled={sending || deleting}
+          className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50"
+        >
+          {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+          Send for review
+        </button>
+        <button onClick={onReplace} disabled={sending || deleting} className="btn-secondary disabled:opacity-50">
+          Replace {isPhoto ? 'photos' : 'file'}
+        </button>
+        <button
+          onClick={handleDelete}
+          disabled={sending || deleting}
+          className="px-4 py-2 rounded-lg text-sm font-medium text-red-600 border border-red-200 hover:bg-red-50 transition-colors disabled:opacity-50"
+        >
+          {deleting ? <Loader2 size={14} className="animate-spin" /> : 'Delete'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── Photo revision upload (for photo projects) ────────────────────────────────
 
 function UploadPhotoRevisionSection({ project, revisions, onRefresh }) {
@@ -1578,8 +1702,9 @@ function UploadPhotoRevisionSection({ project, revisions, onRefresh }) {
 
   const stage     = STAGE_KEY_MAP[project.stage] || project.stage
   const latestRev = [...revisions].sort((a, b) => b.revision_number - a.revision_number)[0]
-  const nextRevNum = latestRev ? latestRev.revision_number + 1 : 1
-  const canUpload = ['production', 'post_production'].includes(stage) || (latestRev && latestRev.status === 'pending_editor')
+  const draftRev  = latestRev?.status === 'draft' ? latestRev : null
+  const nextRevNum = draftRev ? draftRev.revision_number : (latestRev ? latestRev.revision_number + 1 : 1)
+  const canUpload = ['production', 'post_production'].includes(stage) || (latestRev && ['pending_editor', 'draft'].includes(latestRev.status))
   const pendingAdminRev = revisions.find((r) => r.status === 'pending_admin_review')
   if (!canUpload || pendingAdminRev) return null
 
@@ -1608,42 +1733,23 @@ function UploadPhotoRevisionSection({ project, revisions, onRefresh }) {
         setDoneCount(i + 1)
       }
 
-      const { error: e } = await supabase.from('project_revisions').insert({
-        project_id:      project.id,
-        revision_number: nextRevNum,
-        photo_urls:      photoUrls,
-        video_url:       null,
-        status:          'pending_client_review',
-        uploaded_by:     profile.id,
-        media_type:      'photo',
-      })
-      if (e) throw new Error(e.message)
-
-      await updateProject(project.id, { stage: 'review', revision_count: nextRevNum })
-
-      const { notifyAdmins: notifyAdminsFn, notify: notifyFn } = await import('../../lib/notify')
-      const revLabel = nextRevNum === 1 ? 'Initial Photos' : `Revision ${nextRevNum}`
-
-      await notifyAdminsFn({
-        actorId: profile.id,
-        type:    'revision_uploaded',
-        title:   `${revLabel} uploaded for "${project.name}"`,
-        body:    'Photos are ready for client review.',
-        link:    `/projects/${project.id}`,
-      })
-
-      // Notify the client directly
-      const { data: clientRow } = await supabase
-        .from('clients').select('profile_id').eq('id', project.client_id).maybeSingle()
-      if (clientRow?.profile_id) {
-        await notifyFn({
-          profileId: clientRow.profile_id,
-          actorId:   profile.id,
-          type:      'revision_ready',
-          title:     `${revLabel} are ready for your review!`,
-          body:      `Your photos for "${project.name}" are ready. Tap to review and leave feedback.`,
-          link:      `/my-projects`,
+      // Upload NEVER auto-sends — lands as a draft; explicit Send in DraftCutPanel.
+      if (draftRev) {
+        const { error: e } = await supabase.from('project_revisions')
+          .update({ photo_urls: photoUrls, uploaded_by: profile.id })
+          .eq('id', draftRev.id)
+        if (e) throw new Error(e.message)
+      } else {
+        const { error: e } = await supabase.from('project_revisions').insert({
+          project_id:      project.id,
+          revision_number: nextRevNum,
+          photo_urls:      photoUrls,
+          video_url:       null,
+          status:          'draft',
+          uploaded_by:     profile.id,
+          media_type:      'photo',
         })
+        if (e) throw new Error(e.message)
       }
 
       if (editorNote.trim()) {
@@ -1668,6 +1774,17 @@ function UploadPhotoRevisionSection({ project, revisions, onRefresh }) {
   }
 
   if (!open) {
+    // A draft exists — show the draft panel (send / replace / delete) instead
+    if (draftRev) {
+      return (
+        <DraftCutPanel
+          project={project}
+          draftRev={draftRev}
+          onReplace={() => setOpen(true)}
+          onRefresh={onRefresh}
+        />
+      )
+    }
     return (
       <div className="bg-white rounded-2xl border border-border p-6 text-center">
         <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center mx-auto mb-3">
@@ -1676,7 +1793,7 @@ function UploadPhotoRevisionSection({ project, revisions, onRefresh }) {
         <h2 className="text-sm font-bold text-text-primary mb-1">
           {nextRevNum === 1 ? 'Ready to submit your photos?' : `Ready to upload Revision ${nextRevNum}?`}
         </h2>
-        <p className="text-xs text-text-muted mb-4">Upload your edited photos — clients can leave pinpoint comments on each one.</p>
+        <p className="text-xs text-text-muted mb-4">Upload your edited photos — nothing goes to the client until you press Send.</p>
         <button onClick={() => setOpen(true)} className="btn-primary">
           {nextRevNum === 1 ? 'Upload Initial Photos' : `Upload Revision ${nextRevNum}`}
         </button>
@@ -1799,17 +1916,17 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
 
   const stage      = STAGE_KEY_MAP[project.stage] || project.stage
   const latestRev  = [...revisions].sort((a, b) => b.revision_number - a.revision_number)[0]
+  const draftRev   = latestRev?.status === 'draft' ? latestRev : null
 
   // "Rework" = admin rejected and editor is fixing it — update same revision, skip to client
   const isAdminRework = latestRev?.status === 'pending_editor' && latestRev?.admin_reviewed === true
   // "Open slot" = admin added an extra revision but no video yet — fill it in place
-  // and send straight to the client (it's an admin-requested extra round).
   const isOpenSlot    = latestRev?.status === 'pending_editor' && !latestRev?.video_url && !isAdminRework
-  const nextRevNum    = (isAdminRework || isOpenSlot)
+  const nextRevNum    = (isAdminRework || isOpenSlot || draftRev)
     ? latestRev.revision_number  // same number — fill the existing revision
     : (latestRev ? latestRev.revision_number + 1 : 1)
 
-  const canUpload = ['production', 'post_production'].includes(stage) || (latestRev && latestRev.status === 'pending_editor')
+  const canUpload = ['production', 'post_production'].includes(stage) || (latestRev && ['pending_editor', 'draft'].includes(latestRev.status))
   // Don't show upload while awaiting admin review
   const pendingAdminRev = revisions.find((r) => r.status === 'pending_admin_review')
   if (!canUpload || pendingAdminRev) return null
@@ -1832,48 +1949,32 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
         onStats:     setUploadStats,
       })
 
-      if (isAdminRework || isOpenSlot) {
-        // Admin already reviewed (rework) or admin opened this extra revision —
-        // fill the existing slot and send straight to the client.
+      // Upload NEVER auto-sends. Every path lands in 'draft'; the editor sends
+      // explicitly via the Send-for-review button (DraftCutPanel).
+      if (draftRev) {
+        // Replacing the file on an existing draft (unlocked — DB trigger allows)
         const { error: e } = await supabase.from('project_revisions')
-          .update({ video_url: publicUrl, status: 'pending_client_review', uploaded_by: profile.id })
+          .update({ video_url: publicUrl, uploaded_by: profile.id })
+          .eq('id', draftRev.id)
+        if (e) throw new Error(e.message)
+      } else if (isAdminRework || isOpenSlot) {
+        // Fill the existing slot — but as a draft, not straight to the client.
+        const { error: e } = await supabase.from('project_revisions')
+          .update({ video_url: publicUrl, status: 'draft', uploaded_by: profile.id })
           .eq('id', latestRev.id)
         if (e) throw new Error(e.message)
-        await updateProject(project.id, { stage: 'review' })
       } else {
-        // New revision → goes to photographer first for review, then client
         const { error: e } = await supabase.from('project_revisions').insert({
           project_id:      project.id,
           revision_number: nextRevNum,
           video_url:       publicUrl,
-          status:          'pending_creative_review',
+          status:          'draft',
           uploaded_by:     profile.id,
         })
         if (e) throw new Error(e.message)
-
-        await updateProject(project.id, { stage: 'review', revision_count: nextRevNum })
-
-        // Notify photographer and admins
-        const revLabel = nextRevNum === 1 ? 'Initial Cut' : `Revision ${nextRevNum}`
-        const { notify: notifyFn, notifyAdmins: notifyAdminsFn } = await import('../../lib/notify')
-        if (project.creative_id) {
-          await notifyFn({
-            profileId: project.creative_id,
-            actorId:   profile.id,
-            type:      'revision_uploaded',
-            title:     `${revLabel} ready for your review — "${project.name}"`,
-            body:      'Leave your timeline notes before the client sees it.',
-            link:      `/projects/${project.id}`,
-          })
-        }
-        await notifyAdminsFn({
-          actorId: profile.id,
-          type:    'revision_uploaded',
-          title:   `${revLabel} uploaded for "${project.name}"`,
-          body:    'Photographer review is next.',
-          link:    `/projects/${project.id}`,
-        })
       }
+
+      // Send-time notifications now live in DraftCutPanel — nothing is sent here.
 
       // Save editor note
       if (editorNote.trim()) {
@@ -1906,16 +2007,27 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
     : `Ready to upload ${revisionLabel(nextRevNum)}?`
 
   const gateBody = isAdminRework
-    ? 'Admin requested changes. Fix them and upload — it will go straight to the client (no extra revision count).'
+    ? 'Admin requested changes. Fix them and upload — you review it as a draft, then send it to the client (no extra revision count).'
     : isOpenSlot
-    ? 'Admin opened an extra revision. Upload the cut and it goes straight to the client.'
+    ? 'Admin opened an extra revision. Upload the cut — it stays a draft until you send it.'
     : nextRevNum > 1
-    ? `Address the client's feedback on the initial cut and upload your revised cut.`
+    ? `Address the client's feedback and upload your revised cut — nothing is sent until you press Send.`
     : project.admin_review_required
-    ? 'Your cut will go to admin for approval before the client sees it.'
-    : 'Upload your initial cut for the creative team to review.'
+    ? 'Your cut uploads as a draft; when you send it, admin approves before the client sees it.'
+    : 'Upload your initial cut — it stays a private draft until you send it for review.'
 
   if (!open) {
+    // A draft cut exists — show the draft panel (send / replace / delete)
+    if (draftRev) {
+      return (
+        <DraftCutPanel
+          project={project}
+          draftRev={draftRev}
+          onReplace={() => setOpen(true)}
+          onRefresh={onRefresh}
+        />
+      )
+    }
     return (
       <div className="bg-white rounded-2xl border border-border p-6 text-center">
         <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center mx-auto mb-3">
