@@ -15,6 +15,8 @@ export default function NewProjectModal({ onClose, onCreated }) {
     client_id: '',
     media_type: 'video',
     admin_review_required: false,
+    first_revision_date: '',
+    due_date: '',
   })
   const [selectedEditor, setSelectedEditor] = useState('')
   const [selectedShoot,  setSelectedShoot]  = useState('')
@@ -83,8 +85,17 @@ export default function NewProjectModal({ onClose, onCreated }) {
         shoot_id:              selectedShoot || null,
         status:                'active',
         media_type:            form.media_type,
+        first_revision_date:   form.first_revision_date || null,
+        due_date:              form.due_date || null,
       }
       const row = await createProject(payload)
+      // Also register the editor in the project_editors junction table — the
+      // project page's team list reads from there, so without this the admin
+      // had to assign the same editor a second time after creating.
+      if (selectedEditor) {
+        await supabase.from('project_editors')
+          .upsert({ project_id: row.id, profile_id: selectedEditor })
+      }
       onCreated(row.id)
     } catch (err) {
       setError(err.message)
@@ -152,6 +163,32 @@ export default function NewProjectModal({ onClose, onCreated }) {
                   </div>
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* Key dates */}
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="label">First Revision Due</label>
+              <input
+                type="date"
+                className="input"
+                value={form.first_revision_date}
+                onChange={set('first_revision_date')}
+                max={form.due_date || undefined}
+              />
+              <p className="text-[11px] text-text-muted mt-1">When the first cut should be ready.</p>
+            </div>
+            <div>
+              <label className="label">Post Date</label>
+              <input
+                type="date"
+                className="input"
+                value={form.due_date}
+                onChange={set('due_date')}
+                min={form.first_revision_date || undefined}
+              />
+              <p className="text-[11px] text-text-muted mt-1">When the final content goes live.</p>
             </div>
           </div>
 

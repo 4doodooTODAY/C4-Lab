@@ -12,6 +12,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { notify, notifyAdmins } from '../../lib/notify'
 import Avatar from '../../components/ui/Avatar'
+import MediaThumb from '../../components/ui/MediaThumb'
 import { format, parseISO } from 'date-fns'
 import { fmtTime } from '../../lib/time'
 import { forceDownload, downloadAll, uploadToR2, fmtBytes, fmtSpeed, fmtEta } from '../../lib/r2'
@@ -1050,6 +1051,15 @@ export default function ProjectDetail() {
         <p className="text-xs font-semibold text-text-muted mb-4 uppercase tracking-wide">Project Details</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-5">
           <InlineField
+            label="First Revision Due"
+            icon={CalendarDays}
+            type="date"
+            value={project.first_revision_date || ''}
+            displayValue={project.first_revision_date ? format(parseISO(project.first_revision_date), 'MMM d, yyyy') : ''}
+            onSave={(v) => handleSaveField('first_revision_date', v)}
+            readOnly={!isAdmin}
+          />
+          <InlineField
             label="Post Date"
             icon={CalendarDays}
             type="date"
@@ -1339,9 +1349,11 @@ export default function ProjectDetail() {
                           {selectedFiles.has(f.id) ? <CheckSquare size={16} className="text-accent" /> : <Square size={16} className="text-text-muted" />}
                         </button>
                       )}
-                      <div className="w-8 h-8 rounded-lg bg-surface-2 flex items-center justify-center shrink-0">
-                        <Film size={14} className="text-text-muted" />
-                      </div>
+                      <MediaThumb
+                        photoUrl={f.thumbnail_url || (/\.(jpe?g|png|gif|webp)$/i.test(f.file_name || '') ? f.file_url : null)}
+                        videoUrl={/\.(mp4|mov|webm|m4v)$/i.test(f.file_name || '') ? f.file_url : null}
+                        size="w-12 h-8"
+                      />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-text-primary truncate">{f.file_name}</p>
                         <p className="text-xs text-text-muted">{fmtBytes(f.file_size)} · {new Date(f.created_at).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })} EST</p>
@@ -1480,9 +1492,11 @@ export default function ProjectDetail() {
               <div className="space-y-3">
                 {revisions.map((r) => (
                   <div key={r.id} className="flex items-center gap-3 p-3 rounded-xl border border-border">
-                    <div className="w-10 h-10 rounded-lg bg-surface-2 flex items-center justify-center shrink-0">
-                      {project?.media_type === 'photo' ? <Camera size={16} className="text-text-muted" /> : <FileVideo size={16} className="text-text-muted" />}
-                    </div>
+                    <MediaThumb
+                      videoUrl={r.video_url}
+                      photoUrl={r.photo_urls?.[0]}
+                      size="w-14 h-10"
+                    />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-text-primary">{revisionLabel(r.revision_number)}</p>
                       <div className="flex items-center gap-2 mt-0.5">

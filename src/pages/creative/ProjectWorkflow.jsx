@@ -12,6 +12,7 @@ import { supabase } from '../../lib/supabase'
 import { uploadToR2, fmtBytes, fmtSpeed, fmtEta, forceDownload, downloadAll } from '../../lib/r2'
 import { updateProject } from '../../hooks/useProjects'
 import Avatar from '../../components/ui/Avatar'
+import MediaThumb from '../../components/ui/MediaThumb'
 import { format, parseISO } from 'date-fns'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -2182,9 +2183,12 @@ function RevisionsCard({ project, revisions, commentCounts, navigate }) {
             return (
               <div key={r.id} className="border border-border rounded-xl p-3">
                 <div className="flex items-start justify-between gap-2 mb-2">
-                  <p className="text-sm font-bold text-text-primary">
-                    {revisionLabel(r.revision_number)}
-                  </p>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <MediaThumb videoUrl={r.video_url} photoUrl={r.photo_urls?.[0]} size="w-14 h-10" />
+                    <p className="text-sm font-bold text-text-primary">
+                      {revisionLabel(r.revision_number)}
+                    </p>
+                  </div>
                   <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
                     REVISION_STATUS_COLORS[r.status] || 'bg-surface-2 text-text-muted border-border'
                   }`}>
