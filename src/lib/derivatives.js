@@ -65,6 +65,23 @@ export function isGalleryImage(name = '') {
 }
 
 /**
+ * generatePreviewFromUrl(url) → Blob (~1600px WebP)
+ * Builds a compressed preview from an already-hosted image (R2 serves
+ * Access-Control-Allow-Origin: *, so the canvas isn't tainted). Used to
+ * backfill previews for photo revisions uploaded before previews existed.
+ */
+export async function generatePreviewFromUrl(url) {
+  const img = new Image()
+  img.crossOrigin = 'anonymous'
+  await new Promise((resolve, reject) => {
+    img.onload = resolve
+    img.onerror = () => reject(new Error('image load failed'))
+    img.src = url
+  })
+  return toBlob(scaleToCanvas(img, PREVIEW_MAX), PREVIEW_Q)
+}
+
+/**
  * sha256Hex(file) → lowercase hex SHA-256 of the raw file bytes.
  * Used for exact-duplicate detection only: two files are duplicates iff their
  * hashes are byte-for-byte identical. No perceptual/similarity matching.

@@ -155,7 +155,66 @@ export default function PhotoRevisionReview() {
   }, [loading])
 
   const photoUrls = revision?.photo_urls || []
-  const currentUrl = photoUrls[photoIndex]
+  // Prefer the compressed ~1600px preview for on-screen review (~10x smaller);
+  // pins are %-based so dimensions don't matter. Downloads use originals.
+  const previewUrls = revision?.preview_urls || []
+  const displayUrl = (i) => previewUrls[i] || photoUrls[i]
+  const currentUrl = displayUrl(photoIndex)
+
+  // Prefetch neighbors so Next/Prev is instant
+  useEffect(() => {
+    ;[photoIndex + 1, photoIndex - 1].forEach((i) => {
+      const url = displayUrl(i)
+      if (url) { const img = new window.Image(); img.src = url }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [photoIndex, revision?.id])
+
+  // Self-healing backfill: revisions uploaded before previews existed only
+  // have full-res originals. When a team member views one, quietly generate
+  // compressed previews in the background and save them — every later view
+  // (including the client's) gets the fast path. Runs once per revision.
+  const backfillRan = useRef(false)
+  useEffect(() => {
+    if (!revision?.id || backfillRan.current) return
+    if (myRole === 'client') return // keep the client's bandwidth for viewing
+    const urls = revision.photo_urls || []
+    const existing = revision.preview_urls || []
+    if (!urls.length || urls.every((_, i) => existing[i])) return
+    backfillRan.current = true
+    ;(async () => {
+      try {
+        const [{ generatePreviewFromUrl }, { uploadToR2 }] = await Promise.all([
+          import('../lib/derivatives'),
+          import('../lib/r2'),
+        ])
+        const previews = urls.map((_, i) => existing[i] || null)
+        for (let i = 0; i < urls.length; i++) {
+          if (previews[i]) continue
+          try {
+            const blob = await generatePreviewFromUrl(urls[i])
+            const file = new File([blob], `preview_${i + 1}.webp`, { type: 'image/webp' })
+            const { publicUrl } = await uploadToR2({
+              file,
+              category:    'previews',
+              clientName:  '',
+              projectName: revision.projects?.name || 'project',
+              folderType:  'shoots',
+              shootDate:   null,
+            })
+            previews[i] = publicUrl
+          } catch { /* this photo keeps using its original */ }
+        }
+        if (previews.some(Boolean)) {
+          await supabase.from('project_revisions')
+            .update({ preview_urls: previews })
+            .eq('id', revision.id)
+          setRevision((r) => (r && r.id === revision.id ? { ...r, preview_urls: previews } : r))
+        }
+      } catch { /* backfill is best-effort */ }
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revision?.id, myRole])
 
   const commentsOnCurrentPhoto = comments.filter((c) => c.photo_index === photoIndex)
 

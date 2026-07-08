@@ -1717,7 +1717,9 @@ function UploadPhotoRevisionSection({ project, revisions, onRefresh }) {
     setDoneCount(0)
     setCurrentPct(0)
     try {
+      const { generateDerivatives } = await import('../../lib/derivatives')
       const photoUrls = []
+      const previewUrls = []
       for (let i = 0; i < photos.length; i++) {
         const file = photos[i]
         setCurrentPct(0)
@@ -1731,13 +1733,32 @@ function UploadPhotoRevisionSection({ project, revisions, onRefresh }) {
           onProgress:  (p) => setCurrentPct(p),
         })
         photoUrls.push(publicUrl)
+
+        // Compressed ~1600px WebP preview — review pages load this (~10x
+        // smaller = ~10x faster) while downloads keep the untouched original.
+        let previewUrl = null
+        try {
+          const { preview } = await generateDerivatives(file)
+          const previewFile = new File([preview], `preview_${file.name}.webp`, { type: 'image/webp' })
+          const res = await uploadToR2({
+            file:        previewFile,
+            category:    'previews',
+            clientName:  project.clients?.name || '',
+            projectName: project.name,
+            folderType:  'shoots',
+            shootDate:   project.shoot_date || null,
+          })
+          previewUrl = res.publicUrl
+        } catch { /* no preview → review page falls back to the original */ }
+        previewUrls.push(previewUrl)
+
         setDoneCount(i + 1)
       }
 
       // Upload NEVER auto-sends — lands as a draft; explicit Send in DraftCutPanel.
       if (draftRev) {
         const { error: e } = await supabase.from('project_revisions')
-          .update({ photo_urls: photoUrls, uploaded_by: profile.id })
+          .update({ photo_urls: photoUrls, preview_urls: previewUrls, uploaded_by: profile.id })
           .eq('id', draftRev.id)
         if (e) throw new Error(e.message)
       } else {
@@ -1745,6 +1766,7 @@ function UploadPhotoRevisionSection({ project, revisions, onRefresh }) {
           project_id:      project.id,
           revision_number: nextRevNum,
           photo_urls:      photoUrls,
+          preview_urls:    previewUrls,
           video_url:       null,
           status:          'draft',
           uploaded_by:     profile.id,
