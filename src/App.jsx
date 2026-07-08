@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, Component } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { Loader2 } from 'lucide-react'
+import UpdatePrompt from './components/ui/UpdatePrompt'
 
 // Catches render/chunk-load failures so a broken page never shows an endless
 // spinner. A stale-deploy chunk error auto-reloads once; anything else shows a
@@ -330,6 +331,7 @@ export default function App() {
       <AuthProvider>
         <ErrorBoundary>
           <AppRoutes />
+          <UpdatePrompt />
         </ErrorBoundary>
       </AuthProvider>
     </BrowserRouter>
