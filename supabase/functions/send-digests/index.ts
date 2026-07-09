@@ -26,7 +26,7 @@ const json = (body: unknown, status = 200) =>
     status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   })
 
-const APP_URL = 'https://c4-lab.vercel.app'
+const APP_URL = Deno.env.get('APP_URL') ?? 'https://c4-lab.vercel.app'
 const SEND_HOUR_UTC = 15 // ~morning US
 
 webpush.setVapidDetails(
