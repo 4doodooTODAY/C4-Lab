@@ -64,6 +64,31 @@ const VIDEO_EXTS = ['mp4', 'mov', 'webm', 'm4v', 'avi', 'mkv']
 export function isGalleryImage(name = '') {
   return IMAGE_EXTS.includes(name.split('.').pop()?.toLowerCase() || '')
 }
+
+/**
+ * generatePlaceholder(fileName) → Blob (WebP tile)
+ * For files the browser can't decode (RAW, ZIP, PDF, etc.). Renders a neutral
+ * tile labelled with the file extension so the gallery always has a valid
+ * thumbnail and the item stays downloadable at full quality.
+ */
+export async function generatePlaceholder(fileName = '') {
+  const ext = (fileName.split('.').pop() || 'FILE').toUpperCase().slice(0, 5)
+  const size = 600
+  const canvas = document.createElement('canvas')
+  canvas.width = size; canvas.height = size
+  const ctx = canvas.getContext('2d')
+  ctx.fillStyle = '#1f2430'
+  ctx.fillRect(0, 0, size, size)
+  ctx.fillStyle = '#6C63FF'
+  ctx.font = 'bold 120px -apple-system, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(ext, size / 2, size / 2 - 30)
+  ctx.fillStyle = '#9ca3af'
+  ctx.font = '32px -apple-system, sans-serif'
+  ctx.fillText('Download to open', size / 2, size / 2 + 70)
+  return new Promise((resolve) => canvas.toBlob(resolve, TYPE, 0.9))
+}
 export function isGalleryVideo(name = '') {
   return VIDEO_EXTS.includes(name.split('.').pop()?.toLowerCase() || '')
 }

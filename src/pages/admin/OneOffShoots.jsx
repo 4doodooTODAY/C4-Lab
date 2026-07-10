@@ -7,7 +7,7 @@ import {
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { format } from 'date-fns'
-import { generateDerivatives, isGalleryMedia, isGalleryVideo, sha256Hex, runPool } from '../../lib/derivatives'
+import { generateDerivatives, generatePlaceholder, isGalleryImage, isGalleryVideo, sha256Hex, runPool } from '../../lib/derivatives'
 import { generateThumbnail } from '../../lib/thumbnail'
 
 function publicLink(slug) {
@@ -188,7 +188,10 @@ function GalleryDrawer({ shoot }) {
   // with ANY difference are never treated as duplicates. Duplicates become
   // soft-deleted rows (recoverable trash) sharing the canonical copy's storage.
   const uploadFiles = async (fileList) => {
-    const files = Array.from(fileList).filter((f) => isGalleryMedia(f.name))
+    // Accept any file type — photos, videos, RAW, ZIP, PDF, anything. Files the
+    // browser can't preview get a labelled placeholder tile but upload at full
+    // quality and stay downloadable.
+    const files = Array.from(fileList)
     if (!files.length) return
     setUploading(true)
     setSummary('')
@@ -259,17 +262,24 @@ function GalleryDrawer({ shoot }) {
       const thumbPath = `${shoot.id}/${id}_thumb.${posterExt}`
       const prevPath  = `${shoot.id}/${id}_prev.${posterExt}`
 
-      // Build the public thumb + preview. Video → one poster frame reused for
-      // both; photo → 400px thumb + 1600px preview. Fails fast on undecodable
-      // files before any upload.
+      // Build the public thumb + preview. Video → poster frame; photo → 400px
+      // thumb + 1600px preview; anything else (RAW/ZIP/PDF) → labelled tile.
       let thumbBlob, prevBlob, width = null, height = null
       if (isVid) {
         const poster = await generateThumbnail(job.file)
-        if (!poster) throw new Error('Could not read a frame from this video')
-        thumbBlob = poster; prevBlob = poster
+        // Video with an unreadable codec still uploads — falls back to a tile.
+        if (poster) { thumbBlob = poster; prevBlob = poster }
+        else { const ph = await generatePlaceholder(job.file.name); thumbBlob = ph; prevBlob = ph }
+      } else if (isGalleryImage(job.file.name)) {
+        try {
+          const d = await generateDerivatives(job.file)
+          thumbBlob = d.thumb; prevBlob = d.preview; width = d.width; height = d.height
+        } catch {
+          // e.g. a HEIC/odd image the browser can't decode → placeholder tile
+          const ph = await generatePlaceholder(job.file.name); thumbBlob = ph; prevBlob = ph
+        }
       } else {
-        const d = await generateDerivatives(job.file)
-        thumbBlob = d.thumb; prevBlob = d.preview; width = d.width; height = d.height
+        const ph = await generatePlaceholder(job.file.name); thumbBlob = ph; prevBlob = ph
       }
 
       // Original — raw bytes, no recompression, private bucket
@@ -370,7 +380,6 @@ function GalleryDrawer({ shoot }) {
           ref={fileInputRef}
           type="file"
           multiple
-          accept="image/*,video/*"
           className="hidden"
           onChange={(e) => { uploadFiles(e.target.files); e.target.value = '' }}
         />
@@ -383,7 +392,7 @@ function GalleryDrawer({ shoot }) {
         ) : (
           <p className="text-xs text-text-muted flex items-center justify-center gap-1.5">
             <Upload size={12} />
-            Drop photos or videos here or <span className="text-accent font-medium">browse</span>
+            Drop photos, videos, or any files here or <span className="text-accent font-medium">browse</span>
             — originals stay full quality
           </p>
         )}
@@ -400,7 +409,7 @@ function GalleryDrawer({ shoot }) {
       {images === null ? (
         <div className="flex justify-center py-4"><Loader2 size={14} className="animate-spin text-text-muted" /></div>
       ) : images.length === 0 ? (
-        <p className="text-xs text-text-muted text-center py-2">No photos yet — upload to fill the gallery.</p>
+        <p className="text-xs text-text-muted text-center py-2">Nothing uploaded yet — add photos, videos, or any files.</p>
       ) : (
         <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5">
           {images.map((img) => (
