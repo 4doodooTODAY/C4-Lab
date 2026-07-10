@@ -60,8 +60,15 @@ export async function generateDerivatives(file) {
 }
 
 const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'avif', 'tif', 'tiff', 'bmp']
+const VIDEO_EXTS = ['mp4', 'mov', 'webm', 'm4v', 'avi', 'mkv']
 export function isGalleryImage(name = '') {
   return IMAGE_EXTS.includes(name.split('.').pop()?.toLowerCase() || '')
+}
+export function isGalleryVideo(name = '') {
+  return VIDEO_EXTS.includes(name.split('.').pop()?.toLowerCase() || '')
+}
+export function isGalleryMedia(name = '') {
+  return isGalleryImage(name) || isGalleryVideo(name)
 }
 
 /**

@@ -2,12 +2,13 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Plus, X, Loader2, Check, Copy, ChevronDown, ChevronUp,
   Camera, Link as LinkIcon, Users, ToggleLeft, ToggleRight,
-  Upload, Image as ImageIcon, Trash2, Heart, MessageCircle,
+  Upload, Image as ImageIcon, Trash2, Heart, MessageCircle, Play,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { format } from 'date-fns'
-import { generateDerivatives, isGalleryImage, sha256Hex, runPool } from '../../lib/derivatives'
+import { generateDerivatives, isGalleryMedia, isGalleryVideo, sha256Hex, runPool } from '../../lib/derivatives'
+import { generateThumbnail } from '../../lib/thumbnail'
 
 function publicLink(slug) {
   return `${window.location.origin}/s/${slug}`
@@ -143,7 +144,7 @@ function GalleryDrawer({ shoot }) {
   const load = useCallback(async () => {
     const { data: allRows } = await supabase
       .from('one_off_shoot_images')
-      .select('id, file_name, file_size, thumb_path, preview_path, sort_order, created_at, deleted_at, deleted_reason')
+      .select('id, file_name, file_size, thumb_path, preview_path, sort_order, created_at, deleted_at, deleted_reason, is_video')
       .eq('shoot_id', shoot.id)
       .order('sort_order')
       .order('created_at')
@@ -187,7 +188,7 @@ function GalleryDrawer({ shoot }) {
   // with ANY difference are never treated as duplicates. Duplicates become
   // soft-deleted rows (recoverable trash) sharing the canonical copy's storage.
   const uploadFiles = async (fileList) => {
-    const files = Array.from(fileList).filter((f) => isGalleryImage(f.name))
+    const files = Array.from(fileList).filter((f) => isGalleryMedia(f.name))
     if (!files.length) return
     setUploading(true)
     setSummary('')
@@ -197,7 +198,7 @@ function GalleryDrawer({ shoot }) {
     const [hashes, { data: existingRows }] = await Promise.all([
       Promise.all(files.map((f) => sha256Hex(f))),
       supabase.from('one_off_shoot_images')
-        .select('id, content_hash, original_path, preview_path, thumb_path, width, height')
+        .select('id, content_hash, original_path, preview_path, thumb_path, width, height, is_video')
         .eq('shoot_id', shoot.id)
         .is('deleted_at', null)
         .not('content_hash', 'is', null),
@@ -237,6 +238,7 @@ function GalleryDrawer({ shoot }) {
           preview_path:   canonical.preview_path,
           thumb_path:     canonical.thumb_path,
           content_hash:   job.hash,
+          is_video:       canonical.is_video ?? false,
           uploaded_by:    user?.id,
           deleted_at:     new Date().toISOString(),
           deleted_reason: `exact duplicate (SHA-256 match) of ${canonical.id || 'batch upload'}`,
@@ -248,13 +250,27 @@ function GalleryDrawer({ shoot }) {
       }
 
       const id = crypto.randomUUID()
-      const ext = job.file.name.split('.').pop()?.toLowerCase() || 'jpg'
+      const isVid = isGalleryVideo(job.file.name)
+      const ext = job.file.name.split('.').pop()?.toLowerCase() || (isVid ? 'mp4' : 'jpg')
       const originalPath = `${shoot.id}/${id}.${ext}`
-      const thumbPath    = `${shoot.id}/${id}_thumb.webp`
-      const prevPath     = `${shoot.id}/${id}_prev.webp`
+      // Video posters are JPEG frames; photo derivatives are WebP.
+      const posterExt = isVid ? 'jpg' : 'webp'
+      const posterCT  = isVid ? 'image/jpeg' : 'image/webp'
+      const thumbPath = `${shoot.id}/${id}_thumb.${posterExt}`
+      const prevPath  = `${shoot.id}/${id}_prev.${posterExt}`
 
-      // Derivatives first (fails fast on undecodable files, before any upload)
-      const { thumb, preview, width, height } = await generateDerivatives(job.file)
+      // Build the public thumb + preview. Video → one poster frame reused for
+      // both; photo → 400px thumb + 1600px preview. Fails fast on undecodable
+      // files before any upload.
+      let thumbBlob, prevBlob, width = null, height = null
+      if (isVid) {
+        const poster = await generateThumbnail(job.file)
+        if (!poster) throw new Error('Could not read a frame from this video')
+        thumbBlob = poster; prevBlob = poster
+      } else {
+        const d = await generateDerivatives(job.file)
+        thumbBlob = d.thumb; prevBlob = d.preview; width = d.width; height = d.height
+      }
 
       // Original — raw bytes, no recompression, private bucket
       const { error: origErr } = await supabase.storage
@@ -263,8 +279,8 @@ function GalleryDrawer({ shoot }) {
       if (origErr) throw new Error(origErr.message)
 
       const [{ error: tErr }, { error: pErr }] = await Promise.all([
-        supabase.storage.from('shoot-previews').upload(thumbPath, thumb, { contentType: 'image/webp' }),
-        supabase.storage.from('shoot-previews').upload(prevPath, preview, { contentType: 'image/webp' }),
+        supabase.storage.from('shoot-previews').upload(thumbPath, thumbBlob, { contentType: posterCT }),
+        supabase.storage.from('shoot-previews').upload(prevPath, prevBlob, { contentType: posterCT }),
       ])
       if (tErr || pErr) throw new Error((tErr || pErr).message)
 
@@ -278,6 +294,7 @@ function GalleryDrawer({ shoot }) {
         preview_path:  prevPath,
         thumb_path:    thumbPath,
         content_hash:  job.hash,
+        is_video:      isVid,
         uploaded_by:   user?.id,
       }
       const { error: dbErr } = await supabase.from('one_off_shoot_images').insert(row)
@@ -353,7 +370,7 @@ function GalleryDrawer({ shoot }) {
           ref={fileInputRef}
           type="file"
           multiple
-          accept="image/*"
+          accept="image/*,video/*"
           className="hidden"
           onChange={(e) => { uploadFiles(e.target.files); e.target.value = '' }}
         />
@@ -366,7 +383,7 @@ function GalleryDrawer({ shoot }) {
         ) : (
           <p className="text-xs text-text-muted flex items-center justify-center gap-1.5">
             <Upload size={12} />
-            Drop photos here or <span className="text-accent font-medium">browse</span>
+            Drop photos or videos here or <span className="text-accent font-medium">browse</span>
             — originals stay full quality
           </p>
         )}
@@ -394,6 +411,13 @@ function GalleryDrawer({ shoot }) {
                 loading="lazy"
                 className="w-full h-full object-cover"
               />
+              {img.is_video && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="w-7 h-7 rounded-full bg-black/50 flex items-center justify-center">
+                    <Play size={12} className="text-white ml-0.5" fill="currentColor" />
+                  </div>
+                </div>
+              )}
               {/* Proofing badges */}
               <div className="absolute top-1 left-1 flex gap-1">
                 {favCounts[img.id] > 0 && (

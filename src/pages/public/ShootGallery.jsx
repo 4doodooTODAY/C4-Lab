@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   Loader2, Download, Heart, X, ChevronLeft, ChevronRight,
-  MessageCircle, Phone, Check, Camera,
+  MessageCircle, Phone, Check, Camera, Play,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { zip } from 'fflate'
@@ -121,14 +121,30 @@ function Lightbox({
   favorites, onToggleFavorite,
   comments, onAddComment,
   onDownload, downloading, requireClaim,
+  claim, fetchStreamUrl,
 }) {
   const img = images[index]
   const [pendingPin, setPendingPin] = useState(null) // { x_pct, y_pct }
   const [pinBody, setPinBody] = useState('')
   const [savingPin, setSavingPin] = useState(false)
+  const [streamUrl, setStreamUrl] = useState(null)
+  const [streamLoading, setStreamLoading] = useState(false)
+  const [pinMode, setPinMode] = useState(false)
   const imgWrapRef = useRef(null)
 
-  useEffect(() => { setPendingPin(null); setPinBody('') }, [index])
+  useEffect(() => { setPendingPin(null); setPinBody(''); setPinMode(false); setStreamUrl(null) }, [index])
+
+  // Video needs a signed streaming URL, which requires the name+phone claim.
+  useEffect(() => {
+    let cancelled = false
+    if (img?.is_video && claim) {
+      setStreamLoading(true)
+      fetchStreamUrl(img.image_id).then((url) => {
+        if (!cancelled) { setStreamUrl(url); setStreamLoading(false) }
+      })
+    }
+    return () => { cancelled = true }
+  }, [img?.image_id, img?.is_video, claim, fetchStreamUrl])
 
   useEffect(() => {
     const onKey = (e) => {
@@ -143,13 +159,16 @@ function Lightbox({
   const myComments = comments.filter((c) => c.image_id === img.image_id)
   const isFav = favorites.has(img.image_id)
 
-  const handleImageClick = (e) => {
+  const placePin = (e) => {
     if (!requireClaim()) return
     const rect = imgWrapRef.current.getBoundingClientRect()
     const x_pct = ((e.clientX - rect.left) / rect.width) * 100
     const y_pct = ((e.clientY - rect.top) / rect.height) * 100
     setPendingPin({ x_pct, y_pct })
+    setPinMode(false)
   }
+  // Photos: click anywhere to pin. Video: only in pin mode (so native controls work).
+  const handleImageClick = (e) => { if (!img.is_video) placePin(e) }
 
   const savePin = async () => {
     if (!pinBody.trim() || !pendingPin) return
@@ -166,6 +185,15 @@ function Lightbox({
       <div className="flex items-center justify-between px-4 py-3 shrink-0">
         <p className="text-white/60 text-xs">{index + 1} / {images.length}</p>
         <div className="flex items-center gap-2">
+          {img.is_video && (
+            <button
+              onClick={() => { if (requireClaim()) setPinMode((v) => !v) }}
+              className={`p-2 rounded-lg transition-colors ${pinMode ? 'text-accent bg-white/10' : 'text-white/60 hover:text-white'}`}
+              title="Leave a note on this frame"
+            >
+              <MessageCircle size={18} />
+            </button>
+          )}
           <button
             onClick={() => { if (requireClaim()) onToggleFavorite(img.image_id) }}
             className={`p-2 rounded-lg transition-colors ${isFav ? 'text-red-400' : 'text-white/60 hover:text-white'}`}
@@ -194,12 +222,47 @@ function Lightbox({
         </button>
 
         <div ref={imgWrapRef} className="relative inline-block max-h-full" onClick={handleImageClick}>
-          <img
-            src={previewUrl(img.preview_path)}
-            alt={img.file_name}
-            className="max-h-[78vh] max-w-full object-contain select-none"
-            draggable={false}
-          />
+          {img.is_video ? (
+            claim && streamUrl ? (
+              <video
+                src={streamUrl}
+                controls
+                playsInline
+                className="max-h-[78vh] max-w-full object-contain bg-black"
+              />
+            ) : (
+              <div className="relative">
+                <img
+                  src={previewUrl(img.preview_path)}
+                  alt={img.file_name}
+                  className="max-h-[78vh] max-w-full object-contain select-none opacity-80"
+                  draggable={false}
+                />
+                <button
+                  onClick={() => { if (requireClaim()) { /* claim triggers stream fetch */ } }}
+                  className="absolute inset-0 flex items-center justify-center"
+                >
+                  <span className="flex flex-col items-center gap-2">
+                    <span className="w-14 h-14 rounded-full bg-black/60 flex items-center justify-center">
+                      {streamLoading ? <Loader2 size={22} className="animate-spin text-white" /> : <Play size={26} className="text-white ml-1" fill="currentColor" />}
+                    </span>
+                    {!claim && <span className="text-white text-xs font-medium">Enter name & number to watch</span>}
+                  </span>
+                </button>
+              </div>
+            )
+          ) : (
+            <img
+              src={previewUrl(img.preview_path)}
+              alt={img.file_name}
+              className="max-h-[78vh] max-w-full object-contain select-none"
+              draggable={false}
+            />
+          )}
+          {/* Pin-placement overlay for video (captures the click without hitting controls) */}
+          {img.is_video && pinMode && (
+            <div className="absolute inset-x-0 top-0 bottom-12 cursor-crosshair z-10" onClick={placePin} />
+          )}
           {/* Saved pins */}
           {myComments.map((c, i) => (
             <div
@@ -247,8 +310,11 @@ function Lightbox({
           </div>
         ) : (
           <p className="text-center text-white/40 text-xs flex items-center justify-center gap-1.5">
-            <MessageCircle size={12} /> Click anywhere on the photo to leave a note
-            {myComments.length > 0 && ` · ${myComments.length} note${myComments.length !== 1 ? 's' : ''} on this photo`}
+            <MessageCircle size={12} />
+            {img.is_video
+              ? (pinMode ? 'Click the video to place your note' : 'Tap the comment icon, then click the frame to leave a note')
+              : 'Click anywhere on the photo to leave a note'}
+            {myComments.length > 0 && ` · ${myComments.length} note${myComments.length !== 1 ? 's' : ''} here`}
           </p>
         )}
       </div>
@@ -331,6 +397,17 @@ export default function ShootGallery() {
     pendingAction.current = null
     if (act) act(newClaim)
   }
+
+  // Signed streaming URL for a gallery video (requires a live claim).
+  const fetchStreamUrl = useCallback(async (imageId) => {
+    if (!claim) return null
+    try {
+      const { url } = await callDownload({ claim, imageId, mode: 'stream' })
+      return url
+    } catch {
+      return null
+    }
+  }, [claim])
 
   // ── Actions ────────────────────────────────────────────────────────────────
   const toggleFavorite = async (imageId, claimOverride) => {
@@ -521,6 +598,13 @@ export default function ShootGallery() {
                     decoding="async"
                     className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
                   />
+                  {img.is_video && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <span className="w-10 h-10 rounded-full bg-black/50 flex items-center justify-center">
+                        <Play size={18} className="text-white ml-0.5" fill="currentColor" />
+                      </span>
+                    </div>
+                  )}
                   {(isFav || noteCount > 0) && (
                     <div className="absolute top-2 right-2 flex gap-1">
                       {isFav && (
@@ -557,6 +641,8 @@ export default function ShootGallery() {
           onDownload={downloadOne}
           downloading={downloading}
           requireClaim={() => requireClaim()}
+          claim={claim}
+          fetchStreamUrl={fetchStreamUrl}
         />
       )}
 

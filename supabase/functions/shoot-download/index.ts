@@ -25,14 +25,16 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (req.method !== 'POST') return json({ error: 'method not allowed' }, 405)
 
-  let body: { claim?: string; imageId?: string; all?: boolean }
+  let body: { claim?: string; imageId?: string; all?: boolean; mode?: string }
   try {
     body = await req.json()
   } catch {
     return json({ error: 'invalid body' }, 400)
   }
 
-  const { claim, imageId, all } = body
+  const { claim, imageId, all, mode } = body
+  // mode 'stream' → inline playback URL (no attachment disposition), for video
+  const stream = mode === 'stream'
   if (!claim || (!imageId && !all)) return json({ error: 'claim and imageId (or all) required' }, 400)
 
   const supabase = createClient(
@@ -63,12 +65,13 @@ Deno.serve(async (req) => {
   if (imgErr) return json({ error: 'image lookup failed' }, 500)
   if (!images?.length) return json({ error: 'image not found' }, 404)
 
-  // 3. Sign URLs to the untouched originals (10 min, download disposition).
+  // 3. Sign URLs to the untouched originals (10 min). Download disposition by
+  //    default; stream mode omits it so the browser can play video inline.
   const signed: { url: string; fileName: string }[] = []
   for (const img of images) {
     const { data, error } = await supabase.storage
       .from('shoot-originals')
-      .createSignedUrl(img.original_path, 600, { download: img.file_name })
+      .createSignedUrl(img.original_path, 600, stream ? undefined : { download: img.file_name })
     if (error || !data?.signedUrl) continue
     signed.push({ url: data.signedUrl, fileName: img.file_name })
   }
