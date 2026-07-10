@@ -16,7 +16,7 @@ const NAV = {
     { to: '/admin/clients', icon: Building2,        label: 'Clients' },
     { to: '/projects',      icon: FolderKanban,     label: 'Projects' },
     { to: '/admin/inbox',   icon: Inbox,            label: 'Inbox' },
-    { to: '/admin/shoots',  icon: Camera,           label: 'Shoots' },
+    { to: '/admin/shoots',  icon: Camera,           label: 'Gallery Links' },
     { to: '/videos',        icon: Film,             label: 'Review' },
     { to: '/admin/files',   icon: HardDrive,        label: 'Files' },
     { to: '/calendar',      icon: CalendarDays,     label: 'Calendar' },

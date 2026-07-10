@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Users2, Inbox, Building2, Loader2, Upload, MessageSquare, FileText, Camera, Film, CalendarDays, FolderKanban, Clock } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
+import Avatar from '../../components/ui/Avatar'
 import { format, formatDistanceToNow, startOfWeek, endOfWeek, addWeeks, isWithinInterval, isToday, isTomorrow, differenceInDays } from 'date-fns'
 
 // ─── Weekly bar chart (pure SVG, no deps) ─────────────────────────────────────
@@ -299,154 +300,107 @@ function UpcomingList() {
   )
 }
 
-// ─── Weekly rings tracker ─────────────────────────────────────────────────────
-function Ring({ value, peak, color, track = '#f1f0fe', size = 88, stroke = 10 }) {
-  const R = (size - stroke) / 2
-  const circumference = 2 * Math.PI * R
-  const fill = peak > 0 ? Math.min(value / peak, 1) : 0
-  const offset = circumference * (1 - fill)
-  const cx = size / 2, cy = size / 2
+// ─── Team workload ────────────────────────────────────────────────────────────
+// Shoots per creative (photographers) and projects per editor — a live
+// workload snapshot so admins can see who's carrying what at a glance.
+function WorkloadList({ title, subtitle, rows, color, emptyLabel }) {
+  const peak = Math.max(...rows.map((r) => r.count), 1)
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      <circle cx={cx} cy={cy} r={R} fill="none" stroke={track} strokeWidth={stroke} />
-      {value > 0 && (
-        <circle cx={cx} cy={cy} r={R} fill="none" stroke={color} strokeWidth={stroke}
-          strokeDasharray={circumference} strokeDashoffset={offset}
-          strokeLinecap="round" transform={`rotate(-90 ${cx} ${cy})`}
-          style={{ transition: 'stroke-dashoffset 0.4s ease' }} />
+    <div className="flex-1 min-w-0">
+      <div className="mb-3">
+        <p className="text-xs font-semibold text-text-primary">{title}</p>
+        <p className="text-[10px] text-text-muted">{subtitle}</p>
+      </div>
+      {rows.length === 0 ? (
+        <p className="text-xs text-text-muted py-3">{emptyLabel}</p>
+      ) : (
+        <div className="space-y-2.5">
+          {rows.map((r) => (
+            <div key={r.id} className="flex items-center gap-2.5">
+              <Avatar name={r.full_name} url={r.avatar_url} size={7} />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-text-primary truncate">{r.full_name || '—'}</p>
+                <div className="mt-1 h-1.5 bg-surface-2 rounded-full overflow-hidden">
+                  <div className="h-full rounded-full transition-all"
+                    style={{ width: `${(r.count / peak) * 100}%`, backgroundColor: color }} />
+                </div>
+              </div>
+              <span className="text-sm font-bold text-text-primary tabular-nums shrink-0 w-6 text-right">{r.count}</span>
+            </div>
+          ))}
+        </div>
       )}
-    </svg>
+    </div>
   )
 }
 
-function WeeklyRings() {
-  const [offset, setOffset] = useState(0)
-  const [data, setData]     = useState({ shoots: 0, uploads: 0 })
-  const [peak, setPeak]     = useState({ shoots: 1, uploads: 1 })
-  const [loading, setLoading] = useState(true)
+function TeamWorkload() {
+  const [creatives, setCreatives] = useState([])
+  const [editors, setEditors]     = useState([])
+  const [loading, setLoading]     = useState(true)
 
   useEffect(() => {
     let cancelled = false
     async function load() {
-      setLoading(true)
-      const base = startOfWeek(new Date(), { weekStartsOn: 1 })
-      const wkStart = addWeeks(base, offset)
-      const wkEnd   = endOfWeek(wkStart, { weekStartsOn: 1 })
-
-      // Current week counts
-      const [{ count: shoots }, { count: uploads }] = await Promise.all([
-        supabase.from('shoots').select('*', { count: 'exact', head: true })
-          .gte('shoot_date', format(wkStart, 'yyyy-MM-dd'))
-          .lte('shoot_date', format(wkEnd,   'yyyy-MM-dd')),
-        supabase.from('shoot_uploads').select('*', { count: 'exact', head: true })
-          .gte('created_at', wkStart.toISOString())
-          .lte('created_at', wkEnd.toISOString()),
+      const [{ data: people }, { data: shoots }, { data: projects }] = await Promise.all([
+        supabase.from('profiles').select('id, full_name, avatar_url, role')
+          .in('role', ['creative', 'editor']).order('full_name'),
+        // Active (not cancelled) shoots → count per photographer
+        supabase.from('shoots').select('photographer_id')
+          .not('photographer_id', 'is', null).neq('status', 'cancelled'),
+        // Active projects (not delivered/archived) → count per editor
+        supabase.from('projects').select('editor_id')
+          .not('editor_id', 'is', null).neq('stage', 'delivered').neq('status', 'archived'),
       ])
+      if (cancelled) return
 
-      // Peak from last 12 weeks (for ring scale)
-      const peakStart = addWeeks(base, -11)
-      const [{ data: shootRows }, { data: uploadRows }] = await Promise.all([
-        supabase.from('shoots').select('shoot_date')
-          .gte('shoot_date', format(peakStart, 'yyyy-MM-dd'))
-          .lte('shoot_date', format(endOfWeek(base, { weekStartsOn: 1 }), 'yyyy-MM-dd')),
-        supabase.from('shoot_uploads').select('created_at')
-          .gte('created_at', peakStart.toISOString())
-          .lte('created_at', endOfWeek(base, { weekStartsOn: 1 }).toISOString()),
-      ])
+      const shootBy = {}
+      ;(shoots || []).forEach((s) => { shootBy[s.photographer_id] = (shootBy[s.photographer_id] || 0) + 1 })
+      const projBy = {}
+      ;(projects || []).forEach((p) => { projBy[p.editor_id] = (projBy[p.editor_id] || 0) + 1 })
 
-      // Bucket into weeks to find max
-      const bucketMax = (rows, field, isDate) => {
-        const counts = {}
-        ;(rows || []).forEach((r) => {
-          const d = isDate ? new Date(r[field] + 'T00:00:00') : new Date(r[field])
-          const key = format(startOfWeek(d, { weekStartsOn: 1 }), 'yyyy-MM-dd')
-          counts[key] = (counts[key] || 0) + 1
-        })
-        return Math.max(...Object.values(counts), 1)
-      }
+      const creativeRows = (people || [])
+        .filter((p) => p.role === 'creative')
+        .map((p) => ({ ...p, count: shootBy[p.id] || 0 }))
+        .sort((a, b) => b.count - a.count)
+      const editorRows = (people || [])
+        .filter((p) => p.role === 'editor')
+        .map((p) => ({ ...p, count: projBy[p.id] || 0 }))
+        .sort((a, b) => b.count - a.count)
 
-      if (!cancelled) {
-        setData({ shoots: shoots || 0, uploads: uploads || 0 })
-        setPeak({
-          shoots:  bucketMax(shootRows,  'shoot_date', true),
-          uploads: bucketMax(uploadRows, 'created_at', false),
-        })
-        setLoading(false)
-      }
+      setCreatives(creativeRows)
+      setEditors(editorRows)
+      setLoading(false)
     }
     load()
     return () => { cancelled = true }
-  }, [offset])
-
-  const base     = startOfWeek(new Date(), { weekStartsOn: 1 })
-  const wkStart  = addWeeks(base, offset)
-  const wkEnd    = endOfWeek(wkStart, { weekStartsOn: 1 })
-  const isCurrent = offset === 0
-  const weekLabel = isCurrent
-    ? 'This Week'
-    : `${format(wkStart, 'MMM d')} – ${format(wkEnd, 'MMM d')}`
+  }, [])
 
   return (
     <div className="card p-6">
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h2 className="text-sm font-semibold text-text-primary">Weekly Tracker</h2>
-          <p className="text-xs text-text-muted mt-0.5">Shoots scheduled · Files uploaded</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setOffset((o) => o - 1)}
-            className="w-7 h-7 rounded-lg bg-surface-2 hover:bg-surface-3 flex items-center justify-center text-text-muted hover:text-text-primary transition-colors"
-          >
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M8 2L4 6l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          </button>
-          <span className="text-xs font-medium text-text-secondary w-36 text-center">{weekLabel}</span>
-          <button
-            onClick={() => setOffset((o) => Math.min(0, o + 1))}
-            disabled={isCurrent}
-            className="w-7 h-7 rounded-lg bg-surface-2 hover:bg-surface-3 flex items-center justify-center text-text-muted hover:text-text-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          </button>
-        </div>
+      <div className="mb-5">
+        <h2 className="text-sm font-semibold text-text-primary">Team Workload</h2>
+        <p className="text-xs text-text-muted mt-0.5">Who's carrying what right now</p>
       </div>
-
       {loading ? (
-        <div className="flex justify-center py-8">
-          <Loader2 size={16} className="animate-spin text-text-muted" />
-        </div>
+        <div className="flex justify-center py-8"><Loader2 size={16} className="animate-spin text-text-muted" /></div>
       ) : (
-        <div className="flex justify-around items-center">
-          {/* Shoots ring */}
-          <div className="flex flex-col items-center gap-3">
-            <div className="relative">
-              <Ring value={data.shoots} peak={peak.shoots} color="#6C63FF" />
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-2xl font-bold text-text-primary leading-none">{data.shoots}</span>
-              </div>
-            </div>
-            <div className="text-center">
-              <p className="text-xs font-semibold text-text-primary">Shoots</p>
-              <p className="text-[10px] text-text-muted">scheduled</p>
-            </div>
-          </div>
-
-          {/* Divider */}
-          <div className="h-16 w-px bg-border" />
-
-          {/* Uploads ring */}
-          <div className="flex flex-col items-center gap-3">
-            <div className="relative">
-              <Ring value={data.uploads} peak={peak.uploads} color="#10b981" />
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-2xl font-bold text-text-primary leading-none">{data.uploads}</span>
-              </div>
-            </div>
-            <div className="text-center">
-              <p className="text-xs font-semibold text-text-primary">Files</p>
-              <p className="text-[10px] text-text-muted">uploaded</p>
-            </div>
-          </div>
+        <div className="flex flex-col sm:flex-row gap-8">
+          <WorkloadList
+            title="Shoots per creative"
+            subtitle="Active shoots assigned"
+            rows={creatives}
+            color="#6C63FF"
+            emptyLabel="No creatives yet."
+          />
+          <div className="hidden sm:block w-px bg-border" />
+          <WorkloadList
+            title="Projects per editor"
+            subtitle="Active projects assigned"
+            rows={editors}
+            color="#10b981"
+            emptyLabel="No editors yet."
+          />
         </div>
       )}
     </div>
@@ -607,8 +561,8 @@ export default function AdminDashboard() {
             ))}
           </div>
 
-          {/* Weekly rings */}
-          <WeeklyRings />
+          {/* Team workload */}
+          <TeamWorkload />
 
           {/* Upcoming */}
           <div className="card p-6">

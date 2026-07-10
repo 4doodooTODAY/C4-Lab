@@ -42,17 +42,22 @@ function triggerBrowserDownload(url) {
 
 // ── Phone gate modal ──────────────────────────────────────────────────────────
 function PhoneGate({ slug, onClaim, onClose }) {
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName]   = useState('')
   const [phone, setPhone] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
   const submit = async (e) => {
     e.preventDefault()
+    if (!firstName.trim() || !lastName.trim()) { setError('Enter your first and last name'); return }
     if (phone.trim().length < 7) { setError('Enter a valid phone number'); return }
     setSaving(true)
     setError('')
     const { data, error: err } = await supabase.rpc('claim_shoot_downloads', {
-      p_slug: slug, p_phone: phone.trim(),
+      p_slug: slug,
+      p_name: `${firstName.trim()} ${lastName.trim()}`,
+      p_phone: phone.trim(),
     })
     setSaving(false)
     if (err || !data) { setError(err?.message || 'Something went wrong'); return }
@@ -67,25 +72,42 @@ function PhoneGate({ slug, onClaim, onClose }) {
         <div className="w-11 h-11 rounded-full bg-accent/10 flex items-center justify-center mb-4">
           <Phone size={18} className="text-accent" />
         </div>
-        <h2 className="text-base font-bold text-text-primary">Get your photos</h2>
+        <h2 className="text-base font-bold text-text-primary">Unlock this gallery</h2>
         <p className="text-sm text-text-secondary mt-1 mb-4">
-          Enter your phone number to unlock full-resolution downloads, favorites, and comments. No account needed.
+          Just your name and number — then you can download full-resolution files,
+          mark favorites, and leave comments. No account or email needed.
         </p>
         <form onSubmit={submit} className="space-y-3">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              className="input"
+              placeholder="First name"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              autoFocus
+            />
+            <input
+              type="text"
+              className="input"
+              placeholder="Last name"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+            />
+          </div>
           <input
             type="tel"
             className="input"
-            placeholder="(555) 123-4567"
+            placeholder="Phone number"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            autoFocus
           />
           {error && (
             <p className="text-xs text-red-500 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p>
           )}
           <button type="submit" disabled={saving} className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50">
             {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-            Unlock Downloads
+            Continue
           </button>
         </form>
       </div>

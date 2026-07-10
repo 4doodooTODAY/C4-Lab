@@ -69,7 +69,7 @@ function CreateShootModal({ onClose, onCreated }) {
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={!saving ? onClose : undefined} />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md z-10">
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-border">
-          <h2 className="text-base font-bold text-text-primary">New One-Off Shoot</h2>
+          <h2 className="text-base font-bold text-text-primary">New Gallery Link</h2>
           {!saving && (
             <button onClick={onClose} className="btn-ghost p-1.5 -mr-1"><X size={16} /></button>
           )}
@@ -94,7 +94,7 @@ function CreateShootModal({ onClose, onCreated }) {
         ) : (
           <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
             <div>
-              <label className="label">Shoot title</label>
+              <label className="label">Gallery name</label>
               <input
                 className="input"
                 placeholder="e.g. Smith Family Session"
@@ -105,8 +105,9 @@ function CreateShootModal({ onClose, onCreated }) {
               />
             </div>
             <p className="text-xs text-text-muted bg-surface-2 rounded-lg px-3 py-2">
-              The link is the gallery — upload photos after creating and clients
-              view, favorite, comment, and download right on the page.
+              Create the gallery, upload photos, then share the link. Clients open it
+              with just their name and number — no account — to view, favorite,
+              comment, and download full-quality files.
             </p>
             {error && (
               <p className="text-xs text-red-500 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p>
@@ -632,11 +633,11 @@ export default function OneOffShoots() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-text-primary">One-Off Shoots</h1>
-          <p className="text-sm text-text-muted mt-0.5">Client delivery galleries — upload, share the link, capture leads</p>
+          <h1 className="font-display text-xl font-bold text-text-primary">Gallery Links</h1>
+          <p className="text-sm text-text-muted mt-0.5">Shareable delivery galleries — upload, send the link, capture leads</p>
         </div>
         <button onClick={() => setShowCreate(true)} className="btn-primary flex items-center gap-2">
-          <Plus size={14} /> New Shoot
+          <Plus size={14} /> New Gallery
         </button>
       </div>
 
@@ -650,10 +651,10 @@ export default function OneOffShoots() {
           <div className="w-14 h-14 rounded-2xl bg-surface-2 flex items-center justify-center mx-auto mb-3">
             <Camera size={24} className="text-text-muted" />
           </div>
-          <p className="text-sm font-semibold text-text-primary mb-1">No shoots yet</p>
-          <p className="text-xs text-text-muted mb-4">Create a shoot, upload photos, and share the gallery link</p>
+          <p className="text-sm font-semibold text-text-primary mb-1">No gallery links yet</p>
+          <p className="text-xs text-text-muted mb-4">Create a gallery, upload photos, and share the link</p>
           <button onClick={() => setShowCreate(true)} className="btn-primary flex items-center gap-2 mx-auto">
-            <Plus size={14} /> New Shoot
+            <Plus size={14} /> New Gallery
           </button>
         </div>
       ) : (
