@@ -234,7 +234,7 @@ function AppRoutes() {
             <ProtectedRoute roles={['admin']}><AdminInbox /></ProtectedRoute>
           } />
           <Route path="/admin/shoots" element={
-            <ProtectedRoute roles={['admin']}><AdminOneOffShoots /></ProtectedRoute>
+            <ProtectedRoute roles={['admin', 'creative', 'editor']}><AdminOneOffShoots /></ProtectedRoute>
           } />
           <Route path="/admin/files" element={
             <ProtectedRoute roles={['admin']}><AdminFileSystem /></ProtectedRoute>

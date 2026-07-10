@@ -61,8 +61,49 @@ export async function generateDerivatives(file) {
 
 const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'avif', 'tif', 'tiff', 'bmp']
 const VIDEO_EXTS = ['mp4', 'mov', 'webm', 'm4v', 'avi', 'mkv']
+const RAW_EXTS   = ['cr2', 'cr3', 'nef', 'arw', 'dng', 'raf', 'orf', 'rw2', 'raw', 'srw', 'pef']
 export function isGalleryImage(name = '') {
   return IMAGE_EXTS.includes(name.split('.').pop()?.toLowerCase() || '')
+}
+export function isRawImage(name = '') {
+  return RAW_EXTS.includes(name.split('.').pop()?.toLowerCase() || '')
+}
+
+/**
+ * extractEmbeddedJpeg(blob) → Blob | null
+ * RAW files (CR2/NEF/ARW/DNG/…) embed one or more full JPEG previews. Scan the
+ * bytes for JPEG start/end markers and return the largest segment — this is
+ * how most raw-preview tools work, no decoder needed.
+ */
+export async function extractEmbeddedJpeg(blob) {
+  const buf = new Uint8Array(await blob.arrayBuffer())
+  let best = null
+  for (let i = 0; i < buf.length - 1; i++) {
+    // SOI marker FF D8 FF
+    if (buf[i] === 0xFF && buf[i + 1] === 0xD8 && buf[i + 2] === 0xFF) {
+      // find matching EOI FF D9 after it
+      for (let j = i + 2; j < buf.length - 1; j++) {
+        if (buf[j] === 0xFF && buf[j + 1] === 0xD9) {
+          const len = j + 2 - i
+          if (!best || len > best.len) best = { start: i, len }
+          i = j // continue scanning after this segment
+          break
+        }
+      }
+    }
+  }
+  // Embedded previews under ~20KB are usually tiny 160px thumbs — still usable,
+  // but require at least a plausible JPEG.
+  if (!best || best.len < 4096) return null
+  return new Blob([buf.slice(best.start, best.start + best.len)], { type: 'image/jpeg' })
+}
+
+/**
+ * generateDerivativesFromBlob(blob) — same as generateDerivatives but for a
+ * Blob that isn't a File (e.g. an extracted embedded JPEG).
+ */
+export async function generateDerivativesFromBlob(blob) {
+  return generateDerivatives(blob)
 }
 
 /**

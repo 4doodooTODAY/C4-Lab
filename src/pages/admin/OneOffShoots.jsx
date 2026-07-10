@@ -7,8 +7,10 @@ import {
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { format } from 'date-fns'
-import { generateDerivatives, generatePlaceholder, isGalleryImage, isGalleryVideo, sha256Hex, runPool } from '../../lib/derivatives'
+import { generateDerivatives, generatePlaceholder, extractEmbeddedJpeg, isGalleryImage, isGalleryVideo, isRawImage, sha256Hex, runPool } from '../../lib/derivatives'
 import { generateThumbnail } from '../../lib/thumbnail'
+import { uploadToBucketWithProgress, SpeedEstimator } from '../../lib/storageUpload'
+import { fmtBytes, fmtSpeed, fmtEta } from '../../lib/r2'
 
 function publicLink(slug) {
   return `${window.location.origin}/s/${slug}`
@@ -140,11 +142,14 @@ function GalleryDrawer({ shoot }) {
   const [progress, setProgress]   = useState(null)   // { done, total, failed }
   const [dragOver, setDragOver]   = useState(false)
   const [summary, setSummary]     = useState('')     // post-upload dedup summary
+  const [selected, setSelected]   = useState(new Set()) // multi-select for delete
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+  const backfillRan = useRef(false)
 
   const load = useCallback(async () => {
     const { data: allRows } = await supabase
       .from('one_off_shoot_images')
-      .select('id, file_name, file_size, thumb_path, preview_path, sort_order, created_at, deleted_at, deleted_reason, is_video')
+      .select('id, file_name, file_size, thumb_path, preview_path, sort_order, created_at, deleted_at, deleted_reason, is_video, width')
       .eq('shoot_id', shoot.id)
       .order('sort_order')
       .order('created_at')
@@ -171,6 +176,44 @@ function GalleryDrawer({ shoot }) {
 
   useEffect(() => { load() }, [load])
 
+  // Self-healing RAW thumbnails: items uploaded before embedded-JPEG
+  // extraction existed show a placeholder tile (width is null). Download the
+  // original, pull its embedded JPEG, write real derivatives, update the row.
+  useEffect(() => {
+    if (!images?.length || backfillRan.current) return
+    const needs = images.filter((i) => !i.is_video && !i.width && isRawImage(i.file_name))
+    if (!needs.length) return
+    backfillRan.current = true
+    ;(async () => {
+      for (const item of needs) {
+        try {
+          const { data: row } = await supabase.from('one_off_shoot_images')
+            .select('original_path').eq('id', item.id).single()
+          if (!row?.original_path) continue
+          const { data: blob, error: dlErr } = await supabase.storage
+            .from('shoot-originals').download(row.original_path)
+          if (dlErr || !blob) continue
+          const jpeg = await extractEmbeddedJpeg(blob)
+          if (!jpeg) continue
+          const d = await generateDerivatives(jpeg)
+          // New paths (not overwrite) so CDN/browser caches can't serve the old tile
+          const base = row.original_path.replace(/\.[^.]+$/, '')
+          const thumbPath = `${base}_rthumb.webp`
+          const prevPath  = `${base}_rprev.webp`
+          const [{ error: e1 }, { error: e2 }] = await Promise.all([
+            supabase.storage.from('shoot-previews').upload(thumbPath, d.thumb, { contentType: 'image/webp', upsert: true }),
+            supabase.storage.from('shoot-previews').upload(prevPath, d.preview, { contentType: 'image/webp', upsert: true }),
+          ])
+          if (e1 || e2) continue
+          await supabase.from('one_off_shoot_images')
+            .update({ thumb_path: thumbPath, preview_path: prevPath, width: d.width, height: d.height })
+            .eq('id', item.id)
+        } catch { /* best-effort — next open retries */ }
+      }
+      load()
+    })()
+  }, [images, load])
+
   // Prevent the browser from navigating to a dropped file when the drop lands
   // outside the dropzone — the #1 cause of "drag-and-drop doesn't work".
   useEffect(() => {
@@ -195,7 +238,19 @@ function GalleryDrawer({ shoot }) {
     if (!files.length) return
     setUploading(true)
     setSummary('')
-    setProgress({ done: 0, total: files.length, failed: 0 })
+    const totalBytes = files.reduce((s, f) => s + f.size, 0)
+    const bytesByJob = new Array(files.length).fill(0)
+    const est = new SpeedEstimator()
+    const reportBytes = () => {
+      const loaded = bytesByJob.reduce((a, b) => a + b, 0)
+      est.record(loaded)
+      const speed = est.speed()
+      setProgress((p) => ({
+        ...p, loaded, totalBytes, speed,
+        eta: speed > 0 ? (totalBytes - loaded) / speed : null,
+      }))
+    }
+    setProgress({ done: 0, total: files.length, failed: 0, loaded: 0, totalBytes, speed: 0, eta: null })
 
     // 1. Hash every file (exact-byte identity) + existing hashes in this shoot
     const [hashes, { data: existingRows }] = await Promise.all([
@@ -223,8 +278,8 @@ function GalleryDrawer({ shoot }) {
 
     let dupCount = 0
 
-    // 3. Canonical files: parallel upload, capped at 3 lanes
-    const results = await runPool(jobs, async (job) => {
+    // 3. Canonical files: parallel upload, capped at 4 lanes
+    const results = await runPool(jobs, async (job, jobIdx) => {
       if (job.dupOf) {
         // Exact duplicate → recoverable trash row pointing at canonical files.
         // Canonical may be a just-uploaded job (has .row after upload) or an
@@ -248,6 +303,8 @@ function GalleryDrawer({ shoot }) {
         })
         if (error) throw new Error(error.message)
         dupCount++
+        bytesByJob[jobIdx] = job.file.size
+        reportBytes()
         setProgress((p) => ({ ...p, done: p.done + 1 }))
         return
       }
@@ -263,30 +320,42 @@ function GalleryDrawer({ shoot }) {
       const prevPath  = `${shoot.id}/${id}_prev.${posterExt}`
 
       // Build the public thumb + preview. Video → poster frame; photo → 400px
-      // thumb + 1600px preview; anything else (RAW/ZIP/PDF) → labelled tile.
+      // thumb + 1600px preview; RAW → the JPEG preview embedded in the raw
+      // file; only truly un-previewable files (ZIP/PDF) get a labelled tile.
       let thumbBlob, prevBlob, width = null, height = null
       if (isVid) {
         const poster = await generateThumbnail(job.file)
         // Video with an unreadable codec still uploads — falls back to a tile.
         if (poster) { thumbBlob = poster; prevBlob = poster }
         else { const ph = await generatePlaceholder(job.file.name); thumbBlob = ph; prevBlob = ph }
-      } else if (isGalleryImage(job.file.name)) {
+      } else if (isGalleryImage(job.file.name) || isRawImage(job.file.name)) {
         try {
-          const d = await generateDerivatives(job.file)
+          // RAW: extract the embedded JPEG preview and derive from that.
+          const source = isRawImage(job.file.name)
+            ? await extractEmbeddedJpeg(job.file)
+            : job.file
+          if (!source) throw new Error('no embedded preview')
+          const d = await generateDerivatives(source)
           thumbBlob = d.thumb; prevBlob = d.preview; width = d.width; height = d.height
         } catch {
-          // e.g. a HEIC/odd image the browser can't decode → placeholder tile
+          // odd image the browser can't decode → placeholder tile
           const ph = await generatePlaceholder(job.file.name); thumbBlob = ph; prevBlob = ph
         }
       } else {
         const ph = await generatePlaceholder(job.file.name); thumbBlob = ph; prevBlob = ph
       }
 
-      // Original — raw bytes, no recompression, private bucket
-      const { error: origErr } = await supabase.storage
-        .from('shoot-originals')
-        .upload(originalPath, job.file, { contentType: job.file.type || 'application/octet-stream' })
-      if (origErr) throw new Error(origErr.message)
+      // Original — raw bytes, no recompression, private bucket. XHR with
+      // progress so the batch speed/ETA stays live.
+      await uploadToBucketWithProgress({
+        bucket: 'shoot-originals',
+        path: originalPath,
+        blob: job.file,
+        contentType: job.file.type || 'application/octet-stream',
+        onLoaded: (loaded) => { bytesByJob[jobIdx] = loaded; reportBytes() },
+      })
+      bytesByJob[jobIdx] = job.file.size
+      reportBytes()
 
       const [{ error: tErr }, { error: pErr }] = await Promise.all([
         supabase.storage.from('shoot-previews').upload(thumbPath, thumbBlob, { contentType: posterCT }),
@@ -311,7 +380,7 @@ function GalleryDrawer({ shoot }) {
       if (dbErr) throw new Error(dbErr.message)
       job.row = row // duplicates later in the batch reference these paths
       setProgress((p) => ({ ...p, done: p.done + 1 }))
-    }, 3)
+    }, 4)
 
     const failed = results.filter((r) => !r.ok).length
     results.filter((r) => !r.ok).forEach((r) => console.error('Upload failed:', r.error))
@@ -362,6 +431,41 @@ function GalleryDrawer({ shoot }) {
     load()
   }
 
+  // ── Multi-select delete ─────────────────────────────────────────────────────
+  const toggleSelected = (id) => setSelected((prev) => {
+    const next = new Set(prev)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
+
+  const deleteSelected = async () => {
+    const items = (images || []).filter((i) => selected.has(i.id))
+    if (!items.length) return
+    if (!window.confirm(`Remove ${items.length} item${items.length !== 1 ? 's' : ''} from the gallery?`)) return
+    setBulkDeleting(true)
+    for (const img of items) {
+      try {
+        const { data: row } = await supabase.from('one_off_shoot_images')
+          .select('original_path').eq('id', img.id).single()
+        if (row?.original_path) {
+          const { count } = await supabase.from('one_off_shoot_images')
+            .select('id', { count: 'exact', head: true })
+            .eq('original_path', row.original_path).neq('id', img.id)
+          if (!count) {
+            await Promise.all([
+              supabase.storage.from('shoot-originals').remove([row.original_path]),
+              supabase.storage.from('shoot-previews').remove([img.thumb_path, img.preview_path]),
+            ])
+          }
+        }
+        await supabase.from('one_off_shoot_images').delete().eq('id', img.id)
+      } catch (err) { console.error('bulk delete failed for', img.file_name, err) }
+    }
+    setSelected(new Set())
+    setBulkDeleting(false)
+    load()
+  }
+
   return (
     <div className="px-4 py-3 space-y-3">
       {/* Drop zone */}
@@ -384,11 +488,26 @@ function GalleryDrawer({ shoot }) {
           onChange={(e) => { uploadFiles(e.target.files); e.target.value = '' }}
         />
         {uploading && progress ? (
-          <p className="text-xs text-accent font-medium flex items-center justify-center gap-2">
-            <Loader2 size={12} className="animate-spin" />
-            Uploading {progress.done}/{progress.total}
-            {progress.failed > 0 && <span className="text-red-500">· {progress.failed} failed</span>}
-          </p>
+          <div className="space-y-1.5">
+            <p className="text-xs text-accent font-medium flex items-center justify-center gap-2 flex-wrap">
+              <Loader2 size={12} className="animate-spin" />
+              Uploading {progress.done}/{progress.total}
+              <span className="text-text-muted font-normal">
+                {fmtBytes(progress.loaded || 0)} / {fmtBytes(progress.totalBytes || 0)}
+              </span>
+              {progress.speed > 0 && (
+                <span className="text-text-secondary font-semibold">{fmtSpeed(progress.speed)}</span>
+              )}
+              {progress.eta != null && progress.eta > 1 && (
+                <span className="text-accent font-semibold">{fmtEta(progress.eta)}</span>
+              )}
+              {progress.failed > 0 && <span className="text-red-500">· {progress.failed} failed</span>}
+            </p>
+            <div className="h-1 max-w-xs mx-auto bg-surface-3 rounded-full overflow-hidden">
+              <div className="h-full bg-accent rounded-full transition-all duration-200"
+                style={{ width: `${progress.totalBytes ? Math.min(100, (progress.loaded / progress.totalBytes) * 100) : 0}%` }} />
+            </div>
+          </div>
         ) : (
           <p className="text-xs text-text-muted flex items-center justify-center gap-1.5">
             <Upload size={12} />
@@ -411,15 +530,47 @@ function GalleryDrawer({ shoot }) {
       ) : images.length === 0 ? (
         <p className="text-xs text-text-muted text-center py-2">Nothing uploaded yet — add photos, videos, or any files.</p>
       ) : (
+        <>
+        {/* Bulk actions bar */}
+        {selected.size > 0 && (
+          <div className="flex items-center justify-between bg-surface-2 border border-border rounded-lg px-3 py-2">
+            <span className="text-xs font-medium text-text-primary">{selected.size} selected</span>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setSelected(new Set())} className="text-xs text-text-muted hover:text-text-primary">
+                Clear
+              </button>
+              <button
+                onClick={deleteSelected}
+                disabled={bulkDeleting}
+                className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 transition-colors"
+              >
+                {bulkDeleting ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
+                Delete {selected.size}
+              </button>
+            </div>
+          </div>
+        )}
         <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5">
           {images.map((img) => (
-            <div key={img.id} className="relative group aspect-square rounded-lg overflow-hidden bg-surface-2">
+            <div key={img.id} className={`relative group aspect-square rounded-lg overflow-hidden bg-surface-2 ${selected.has(img.id) ? 'ring-2 ring-accent' : ''}`}>
               <img
                 src={previewUrl(img.thumb_path)}
                 alt={img.file_name}
                 loading="lazy"
-                className="w-full h-full object-cover"
+                className={`w-full h-full object-cover ${selected.has(img.id) ? 'opacity-75' : ''}`}
               />
+              {/* Select checkbox — visible on hover or when anything is selected */}
+              <button
+                onClick={() => toggleSelected(img.id)}
+                className={`absolute bottom-1 left-1 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-opacity ${
+                  selected.has(img.id)
+                    ? 'bg-accent border-accent opacity-100'
+                    : `bg-black/40 border-white/70 ${selected.size > 0 ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`
+                }`}
+                title={selected.has(img.id) ? 'Deselect' : 'Select'}
+              >
+                {selected.has(img.id) && <Check size={12} className="text-white" strokeWidth={3} />}
+              </button>
               {img.is_video && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <div className="w-7 h-7 rounded-full bg-black/50 flex items-center justify-center">
@@ -450,6 +601,7 @@ function GalleryDrawer({ shoot }) {
             </div>
           ))}
         </div>
+        </>
       )}
 
       {/* Trash — recoverable duplicates / removals */}
@@ -555,10 +707,11 @@ function LeadsDrawer({ shoot }) {
 }
 
 // ── Shoot row ──────────────────────────────────────────────────────────────────
-function ShootRow({ shoot, onToggleActive }) {
+function ShootRow({ shoot, onToggleActive, isAdmin, team, onAssign }) {
   const [expanded, setExpanded] = useState(false)
   const [toggling, setToggling] = useState(false)
   const link = publicLink(shoot.slug)
+  const assignee = team.find((t) => t.id === shoot.assigned_profile_id)
 
   const handleToggle = async (e) => {
     e.stopPropagation()
@@ -569,6 +722,16 @@ function ShootRow({ shoot, onToggleActive }) {
       .eq('id', shoot.id)
     onToggleActive(shoot.id, !shoot.active)
     setToggling(false)
+  }
+
+  const handleAssign = async (e) => {
+    const profileId = e.target.value || null
+    const { error } = await supabase
+      .from('one_off_shoots')
+      .update({ assigned_profile_id: profileId })
+      .eq('id', shoot.id)
+    if (error) { window.alert(error.message); return }
+    onAssign(shoot.id, profileId)
   }
 
   return (
@@ -592,26 +755,47 @@ function ShootRow({ shoot, onToggleActive }) {
           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
             <span className="text-[10px] text-text-muted font-mono truncate max-w-[260px]">{link}</span>
             <CopyButton text={link} />
+            {assignee && (
+              <span className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-accent/10 text-accent">
+                <Users size={9} /> {assignee.full_name}
+              </span>
+            )}
           </div>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          {isAdmin && (
+            <select
+              value={shoot.assigned_profile_id || ''}
+              onChange={handleAssign}
+              onClick={(e) => e.stopPropagation()}
+              className="text-[11px] border border-border rounded-lg px-1.5 py-1 bg-white text-text-secondary max-w-[130px] hidden sm:block"
+              title="Assign to a creative or editor"
+            >
+              <option value="">Unassigned</option>
+              {team.map((t) => (
+                <option key={t.id} value={t.id}>{t.full_name}</option>
+              ))}
+            </select>
+          )}
           <p className="text-[10px] text-text-muted hidden sm:block">
             {format(new Date(shoot.created_at), 'MMM d, yyyy')}
           </p>
-          <button
-            onClick={handleToggle}
-            disabled={toggling}
-            className="p-1 text-text-muted hover:text-text-primary transition-colors disabled:opacity-40"
-            title={shoot.active ? 'Deactivate' : 'Activate'}
-          >
-            {toggling
-              ? <Loader2 size={16} className="animate-spin" />
-              : shoot.active
-                ? <ToggleRight size={20} className="text-green-500" />
-                : <ToggleLeft size={20} />
-            }
-          </button>
+          {isAdmin && (
+            <button
+              onClick={handleToggle}
+              disabled={toggling}
+              className="p-1 text-text-muted hover:text-text-primary transition-colors disabled:opacity-40"
+              title={shoot.active ? 'Deactivate' : 'Activate'}
+            >
+              {toggling
+                ? <Loader2 size={16} className="animate-spin" />
+                : shoot.active
+                  ? <ToggleRight size={20} className="text-green-500" />
+                  : <ToggleLeft size={20} />
+              }
+            </button>
+          )}
           {expanded
             ? <ChevronUp size={14} className="text-text-muted" />
             : <ChevronDown size={14} className="text-text-muted" />
@@ -641,17 +825,28 @@ function ShootRow({ shoot, onToggleActive }) {
 
 // ── Main page ──────────────────────────────────────────────────────────────────
 export default function OneOffShoots() {
+  const { profile } = useAuth()
+  // Role, not viewMode: admins keep full control even in Creative View
+  const isAdmin = profile?.role === 'admin'
   const [shoots,      setShoots]      = useState([])
+  const [team,        setTeam]        = useState([])   // creatives + editors for assignment
   const [loading,     setLoading]     = useState(true)
   const [showCreate,  setShowCreate]  = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase
-      .from('one_off_shoots')
-      .select('id, slug, title, active, created_at')
-      .order('created_at', { ascending: false })
+    // RLS scopes this automatically: admins see all, team members see only
+    // galleries assigned to them.
+    const [{ data }, { data: people }] = await Promise.all([
+      supabase
+        .from('one_off_shoots')
+        .select('id, slug, title, active, created_at, assigned_profile_id')
+        .order('created_at', { ascending: false }),
+      supabase.from('profiles').select('id, full_name, role')
+        .in('role', ['creative', 'editor']).order('full_name'),
+    ])
     setShoots(data || [])
+    setTeam(people || [])
     setLoading(false)
   }, [])
 
@@ -661,17 +856,27 @@ export default function OneOffShoots() {
     setShoots((prev) => prev.map((s) => s.id === id ? { ...s, active: newActive } : s))
   }
 
+  const handleAssign = (id, profileId) => {
+    setShoots((prev) => prev.map((s) => s.id === id ? { ...s, assigned_profile_id: profileId } : s))
+  }
+
   return (
     <div className="p-6 max-w-3xl mx-auto w-full">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="font-display text-xl font-bold text-text-primary">Gallery Links</h1>
-          <p className="text-sm text-text-muted mt-0.5">Shareable delivery galleries — upload, send the link, capture leads</p>
+          <p className="text-sm text-text-muted mt-0.5">
+            {isAdmin
+              ? 'Shareable delivery galleries — upload, send the link, capture leads'
+              : 'Galleries assigned to you — upload the files, then the link goes to the client'}
+          </p>
         </div>
-        <button onClick={() => setShowCreate(true)} className="btn-primary flex items-center gap-2">
-          <Plus size={14} /> New Gallery
-        </button>
+        {isAdmin && (
+          <button onClick={() => setShowCreate(true)} className="btn-primary flex items-center gap-2">
+            <Plus size={14} /> New Gallery
+          </button>
+        )}
       </div>
 
       {/* List */}
@@ -684,16 +889,29 @@ export default function OneOffShoots() {
           <div className="w-14 h-14 rounded-2xl bg-surface-2 flex items-center justify-center mx-auto mb-3">
             <Camera size={24} className="text-text-muted" />
           </div>
-          <p className="text-sm font-semibold text-text-primary mb-1">No gallery links yet</p>
-          <p className="text-xs text-text-muted mb-4">Create a gallery, upload photos, and share the link</p>
-          <button onClick={() => setShowCreate(true)} className="btn-primary flex items-center gap-2 mx-auto">
-            <Plus size={14} /> New Gallery
-          </button>
+          <p className="text-sm font-semibold text-text-primary mb-1">
+            {isAdmin ? 'No gallery links yet' : 'Nothing assigned to you yet'}
+          </p>
+          <p className="text-xs text-text-muted mb-4">
+            {isAdmin ? 'Create a gallery, upload photos, and share the link' : 'When an admin assigns you a gallery, it shows up here.'}
+          </p>
+          {isAdmin && (
+            <button onClick={() => setShowCreate(true)} className="btn-primary flex items-center gap-2 mx-auto">
+              <Plus size={14} /> New Gallery
+            </button>
+          )}
         </div>
       ) : (
         <div className="space-y-3">
           {shoots.map((shoot) => (
-            <ShootRow key={shoot.id} shoot={shoot} onToggleActive={handleToggleActive} />
+            <ShootRow
+              key={shoot.id}
+              shoot={shoot}
+              onToggleActive={handleToggleActive}
+              isAdmin={isAdmin}
+              team={team}
+              onAssign={handleAssign}
+            />
           ))}
         </div>
       )}
