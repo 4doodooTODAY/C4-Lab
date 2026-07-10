@@ -557,7 +557,7 @@ export default function ShootGallery() {
             <span className="text-white/40 text-xs">Connect Four Creative</span>
           </div>
           <h1 className="font-display text-white text-2xl sm:text-3xl font-bold">{title}</h1>
-          <p className="text-white/40 text-sm mt-1">{images.length} photo{images.length !== 1 ? 's' : ''}</p>
+          <p className="text-white/40 text-sm mt-1">{images.length} item{images.length !== 1 ? 's' : ''}</p>
         </div>
         {images.length > 0 && (
           <button
@@ -575,7 +575,7 @@ export default function ShootGallery() {
       <main className="px-5 sm:px-8 pb-16 max-w-6xl mx-auto">
         {images.length === 0 ? (
           <div className="text-center py-20">
-            <p className="text-white/40 text-sm">Photos are on the way — check back soon.</p>
+            <p className="text-white/40 text-sm">Your gallery is on the way — check back soon.</p>
           </div>
         ) : (
           <div
