@@ -18,6 +18,8 @@ export default function Login() {
   const [resetError, setResetError] = useState('')
 
   const [waitlistEmail, setWaitlistEmail] = useState('')
+  const [waitlistName, setWaitlistName] = useState('')
+  const [waitlistNotes, setWaitlistNotes] = useState('')
   const [waitlistLoading, setWaitlistLoading] = useState(false)
   const [waitlistStatus, setWaitlistStatus] = useState(null) // 'success' | 'error' | null
 
@@ -59,12 +61,31 @@ export default function Login() {
     e.preventDefault()
     setWaitlistLoading(true)
     setWaitlistStatus(null)
-    const { error } = await supabase.from('waitlist').insert([{ email: waitlistEmail.trim() }])
-    if (error) {
-      setWaitlistStatus(error.code === '23505' ? 'already' : 'error')
-    } else {
-      setWaitlistStatus('success')
-      setWaitlistEmail('')
+    try {
+      // Edge function stores the signup AND emails the team — one email per signup
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/join-waitlist`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({
+          name: waitlistName.trim(),
+          email: waitlistEmail.trim(),
+          notes: waitlistNotes.trim(),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'failed')
+      if (data.status === 'already') {
+        setWaitlistStatus('already')
+      } else {
+        setWaitlistStatus('success')
+        setWaitlistEmail(''); setWaitlistName(''); setWaitlistNotes('')
+      }
+    } catch {
+      setWaitlistStatus('error')
     }
     setWaitlistLoading(false)
   }
@@ -231,19 +252,36 @@ export default function Login() {
               ✓ You're on the list — we'll be in touch.
             </p>
           ) : (
-            <form onSubmit={handleWaitlist} className="flex gap-2">
-              <input
-                type="email"
-                value={waitlistEmail}
-                onChange={(e) => setWaitlistEmail(e.target.value)}
-                placeholder="your@email.com"
-                className="flex-1 bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                required
+            <form onSubmit={handleWaitlist} className="space-y-2">
+              <div className="flex gap-2 flex-col sm:flex-row">
+                <input
+                  type="text"
+                  value={waitlistName}
+                  onChange={(e) => setWaitlistName(e.target.value)}
+                  placeholder="Your name"
+                  className="flex-1 bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                  required
+                />
+                <input
+                  type="email"
+                  value={waitlistEmail}
+                  onChange={(e) => setWaitlistEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  className="flex-1 bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                  required
+                />
+              </div>
+              <textarea
+                value={waitlistNotes}
+                onChange={(e) => setWaitlistNotes(e.target.value)}
+                placeholder="Optional — tell us what area you work in (photography, video, agency…)"
+                rows={2}
+                className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent resize-none"
               />
               <button
                 type="submit"
                 disabled={waitlistLoading}
-                className="btn-primary shrink-0 flex items-center gap-1.5 disabled:opacity-50"
+                className="btn-primary w-full flex items-center justify-center gap-1.5 disabled:opacity-50"
               >
                 {waitlistLoading ? <Loader2 size={13} className="animate-spin" /> : null}
                 Join the Waitlist
