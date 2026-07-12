@@ -2,7 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Film, CalendarDays, Settings,
   LogOut, Users, Building2, Inbox, Home, MessageSquare, Bell, FolderKanban, HardDrive,
-  ShieldCheck, Scissors, Clapperboard, Camera
+  ShieldCheck, Scissors, Clapperboard, Camera, Megaphone
 } from 'lucide-react'
 
 import { useAuth } from '../../contexts/AuthContext'
@@ -17,6 +17,7 @@ const NAV = {
     { to: '/projects',      icon: FolderKanban,     label: 'Projects' },
     { to: '/admin/inbox',   icon: Inbox,            label: 'Inbox' },
     { to: '/admin/shoots',  icon: Camera,           label: 'Gallery Links' },
+    { to: '/referrals',     icon: Megaphone,        label: 'Referrals' },
     { to: '/videos',        icon: Film,             label: 'Review' },
     { to: '/admin/files',   icon: HardDrive,        label: 'Files' },
     { to: '/calendar',      icon: CalendarDays,     label: 'Calendar' },
@@ -27,6 +28,7 @@ const NAV = {
     { to: '/calendar',     icon: CalendarDays,     label: 'Calendar' },
     { to: '/clients',      icon: Building2,        label: 'Clients' },
     { to: '/projects',     icon: FolderKanban,     label: 'Projects' },
+    { to: '/referrals',    icon: Megaphone,        label: 'Referrals' },
     { to: '/admin/shoots', icon: Camera,           label: 'Gallery Links' },
     { to: '/files',        icon: Clapperboard,     label: 'Media' },
     { to: '/messages',     icon: MessageSquare,    label: 'Messages' },
@@ -36,6 +38,7 @@ const NAV = {
     { to: '/calendar',     icon: CalendarDays,     label: 'Calendar' },
     { to: '/clients',      icon: Building2,        label: 'Clients' },
     { to: '/projects',     icon: FolderKanban,     label: 'Projects' },
+    { to: '/referrals',    icon: Megaphone,        label: 'Referrals' },
     { to: '/admin/shoots', icon: Camera,           label: 'Gallery Links' },
     { to: '/files',        icon: Clapperboard,     label: 'Media' },
     { to: '/messages',     icon: MessageSquare,    label: 'Messages' },

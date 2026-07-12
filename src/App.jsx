@@ -100,6 +100,7 @@ const PhotoRevisionReview    = lazyWithRetry(() => import('./pages/PhotoRevision
 const AdminFileSystem        = lazyWithRetry(() => import('./pages/admin/FileSystem'))
 const AdminOneOffShoots      = lazyWithRetry(() => import('./pages/admin/OneOffShoots'))
 const ShootGallery           = lazyWithRetry(() => import('./pages/public/ShootGallery'))
+const Referrals              = lazyWithRetry(() => import('./pages/creative/Referrals'))
 const DraftsPage             = lazyWithRetry(() => import('./pages/DraftsPage'))
 const DraftVideoReview       = lazyWithRetry(() => import('./pages/DraftVideoReview'))
 const DraftPhotoReview       = lazyWithRetry(() => import('./pages/DraftPhotoReview'))
@@ -241,6 +242,10 @@ function AppRoutes() {
           } />
           <Route path="/files" element={
             <ProtectedRoute roles={['admin', 'creative', 'editor']}><AdminFileSystem /></ProtectedRoute>
+          } />
+          {/* Referral pool — team only, never clients */}
+          <Route path="/referrals" element={
+            <ProtectedRoute roles={['admin', 'creative', 'editor']}><Referrals /></ProtectedRoute>
           } />
           <Route path="/projects" element={
             <ProtectedRoute roles={['admin', 'creative', 'editor']}>

@@ -40,8 +40,9 @@ function CopyButton({ text }) {
 }
 
 // ── Create modal (title only — the page IS the gallery now) ────────────────────
-function CreateShootModal({ onClose, onCreated }) {
+function CreateShootModal({ onClose, onCreated, team }) {
   const [title,   setTitle]   = useState('')
+  const [assignee, setAssignee] = useState('')
   const [saving,  setSaving]  = useState(false)
   const [error,   setError]   = useState('')
   const [created, setCreated] = useState(null)
@@ -55,7 +56,11 @@ function CreateShootModal({ onClose, onCreated }) {
     try {
       const { data, error: err } = await supabase
         .from('one_off_shoots')
-        .insert({ title: title.trim(), gallery_type: 'gallery' })
+        .insert({
+          title: title.trim(),
+          gallery_type: 'gallery',
+          assigned_profile_id: assignee || null,
+        })
         .select('id, slug, title, active, created_at')
         .single()
       if (err) throw new Error(err.message)
@@ -107,6 +112,18 @@ function CreateShootModal({ onClose, onCreated }) {
                 autoFocus
               />
             </div>
+            {team?.length > 0 && (
+              <div>
+                <label className="label">Assign to <span className="text-text-muted font-normal">(optional)</span></label>
+                <select className="input" value={assignee} onChange={(e) => setAssignee(e.target.value)} disabled={saving}>
+                  <option value="">— No one yet —</option>
+                  {team.map((t) => (
+                    <option key={t.id} value={t.id}>{t.full_name}</option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-text-muted mt-1">They'll see this gallery and can upload the files.</p>
+              </div>
+            )}
             <p className="text-xs text-text-muted bg-surface-2 rounded-lg px-3 py-2">
               Create the gallery, upload photos, then share the link. Clients open it
               with just their name and number — no account — to view, favorite,
@@ -918,8 +935,9 @@ export default function OneOffShoots() {
 
       {showCreate && (
         <CreateShootModal
+          team={team}
           onClose={() => setShowCreate(false)}
-          onCreated={() => { setShowCreate(false); load() }}
+          onCreated={() => load()}
         />
       )}
     </div>
