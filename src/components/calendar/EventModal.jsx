@@ -55,7 +55,7 @@ export default function EventModal({ date, event, onSave, onDelete, onClose }) {
     supabase
       .from('profiles')
       .select('id, full_name, avatar_url, role')
-      .in('role', ['creative', 'editor'])
+      .in('role', ['creative', 'editor', 'admin'])
       .order('full_name')
       .then(({ data }) => setTeam(data || []))
   }, [])

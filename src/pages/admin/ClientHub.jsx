@@ -63,14 +63,24 @@ function NewShootModal({ clientId, onClose, onCreated }) {
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
 
-  // Load team members assigned to this client
+  // Load team members assigned to this client — plus all admins, who can
+  // always be assigned as the shooter themselves
   useEffect(() => {
     if (!clientId) return
-    supabase
-      .from('client_creatives')
-      .select('profile_id, role, profiles(id, full_name, role)')
-      .eq('client_id', clientId)
-      .then(({ data }) => setClientTeam((data || []).map((a) => ({ ...a.profiles, assignedRole: a.role }))))
+    Promise.all([
+      supabase
+        .from('client_creatives')
+        .select('profile_id, role, profiles(id, full_name, role)')
+        .eq('client_id', clientId),
+      supabase.from('profiles').select('id, full_name, role').eq('role', 'admin'),
+    ]).then(([{ data: ccData }, { data: admins }]) => {
+      const members = (ccData || []).map((a) => ({ ...a.profiles, assignedRole: a.role }))
+      const ids = new Set(members.map((m) => m.id))
+      ;(admins || []).forEach((a) => {
+        if (!ids.has(a.id)) members.push({ ...a, assignedRole: 'admin' })
+      })
+      setClientTeam(members)
+    })
   }, [clientId])
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
@@ -1071,11 +1081,19 @@ function ProjectsTab({ clientId, projects, onRefetch }) {
 
   useEffect(() => {
     if (!clientId) return
-    supabase
-      .from('client_creatives')
-      .select('profile_id, profiles(id, full_name, role)')
-      .eq('client_id', clientId)
-      .then(({ data }) => setTeamMembers((data || []).map((d) => d.profiles).filter(Boolean)))
+    // Client's assigned team + all admins (admins can take the editor seat too)
+    Promise.all([
+      supabase
+        .from('client_creatives')
+        .select('profile_id, profiles(id, full_name, role)')
+        .eq('client_id', clientId),
+      supabase.from('profiles').select('id, full_name, role').eq('role', 'admin'),
+    ]).then(([{ data: ccData }, { data: admins }]) => {
+      const members = (ccData || []).map((d) => d.profiles).filter(Boolean)
+      const ids = new Set(members.map((m) => m.id))
+      ;(admins || []).forEach((a) => { if (!ids.has(a.id)) members.push(a) })
+      setTeamMembers(members)
+    })
   }, [clientId])
 
   const handleAssign = async (projectId) => {

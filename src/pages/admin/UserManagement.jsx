@@ -46,7 +46,7 @@ function WeeklyUserStats() {
 
       const [profilesRes, shootsRes, revisionsRes] = await Promise.all([
         supabase.from('profiles').select('id, full_name, avatar_url, role')
-          .in('role', ['creative', 'editor'])
+          .in('role', ['creative', 'editor', 'admin'])
           .order('full_name'),
         // Shoots done by photographer this week
         supabase.from('shoots').select('photographer_id')
@@ -76,12 +76,13 @@ function WeeklyUserStats() {
         revCounts[uploaded_by] = (revCounts[uploaded_by] || 0) + 1
       })
 
+      // Admins show in a list only for weeks they actually did that work
       const creativeList = profiles
-        .filter((p) => p.role === 'creative')
+        .filter((p) => p.role === 'creative' || (p.role === 'admin' && shootCounts[p.id]))
         .map((p) => ({ ...p, count: shootCounts[p.id] || 0 }))
 
       const editorList = profiles
-        .filter((p) => p.role === 'editor')
+        .filter((p) => p.role === 'editor' || (p.role === 'admin' && revCounts[p.id]))
         .map((p) => ({ ...p, count: revCounts[p.id] || 0 }))
 
       const peakC = Math.max(...creativeList.map((p) => p.count), 1)

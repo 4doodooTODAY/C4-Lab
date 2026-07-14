@@ -859,8 +859,9 @@ export default function OneOffShoots() {
         .from('one_off_shoots')
         .select('id, slug, title, active, created_at, assigned_profile_id')
         .order('created_at', { ascending: false }),
+      // Admins can be assigned too — they wear the creative hat as needed
       supabase.from('profiles').select('id, full_name, role')
-        .in('role', ['creative', 'editor']).order('full_name'),
+        .in('role', ['creative', 'editor', 'admin']).order('full_name'),
     ])
     setShoots(data || [])
     setTeam(people || [])

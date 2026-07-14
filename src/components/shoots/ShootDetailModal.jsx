@@ -443,14 +443,22 @@ export default function ShootDetailModal({ shoot: initialShoot, clientId, client
   const canSeeCreativeNotes = profile?.role === 'admin' || profile?.role === 'creative' || profile?.role === 'editor'
   const canEdit            = profile?.role === 'admin'
 
-  // Load team members for the assignment dropdown when edit opens
+  // Load team members for the assignment dropdown when edit opens — the
+  // client's team plus all admins (admins can shoot too)
   useEffect(() => {
     if (!editMode || !clientId) return
-    supabase
-      .from('client_creatives')
-      .select('profile_id, profiles(id, full_name, role)')
-      .eq('client_id', clientId)
-      .then(({ data }) => setTeamMembers((data || []).map((m) => m.profiles).filter(Boolean)))
+    Promise.all([
+      supabase
+        .from('client_creatives')
+        .select('profile_id, profiles(id, full_name, role)')
+        .eq('client_id', clientId),
+      supabase.from('profiles').select('id, full_name, role').eq('role', 'admin'),
+    ]).then(([{ data: ccData }, { data: admins }]) => {
+      const members = (ccData || []).map((m) => m.profiles).filter(Boolean)
+      const ids = new Set(members.map((m) => m.id))
+      ;(admins || []).forEach((a) => { if (!ids.has(a.id)) members.push(a) })
+      setTeamMembers(members)
+    })
 
     supabase
       .from('projects')

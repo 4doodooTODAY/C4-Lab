@@ -343,8 +343,9 @@ function TeamWorkload() {
     let cancelled = false
     async function load() {
       const [{ data: people }, { data: shoots }, { data: projects }] = await Promise.all([
+        // Admins included: they can be assigned shoots/projects like anyone
         supabase.from('profiles').select('id, full_name, avatar_url, role')
-          .in('role', ['creative', 'editor']).order('full_name'),
+          .in('role', ['creative', 'editor', 'admin']).order('full_name'),
         // Active (not cancelled) shoots → count per photographer
         supabase.from('shoots').select('photographer_id')
           .not('photographer_id', 'is', null).neq('status', 'cancelled'),
@@ -359,12 +360,14 @@ function TeamWorkload() {
       const projBy = {}
       ;(projects || []).forEach((p) => { projBy[p.editor_id] = (projBy[p.editor_id] || 0) + 1 })
 
+      // Admins appear in a list only when they actually carry work there —
+      // keeps the lists clean while still counting admin assignments.
       const creativeRows = (people || [])
-        .filter((p) => p.role === 'creative')
+        .filter((p) => p.role === 'creative' || (p.role === 'admin' && shootBy[p.id]))
         .map((p) => ({ ...p, count: shootBy[p.id] || 0 }))
         .sort((a, b) => b.count - a.count)
       const editorRows = (people || [])
-        .filter((p) => p.role === 'editor')
+        .filter((p) => p.role === 'editor' || (p.role === 'admin' && projBy[p.id]))
         .map((p) => ({ ...p, count: projBy[p.id] || 0 }))
         .sort((a, b) => b.count - a.count)
 
