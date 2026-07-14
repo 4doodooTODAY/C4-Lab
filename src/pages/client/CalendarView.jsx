@@ -6,6 +6,7 @@ import {
   isWithinInterval, startOfDay, endOfDay, parseISO,
 } from 'date-fns'
 import { supabase } from '../../lib/supabase'
+import { getMyClient } from '../../lib/myClient'
 import { useAuth } from '../../contexts/AuthContext'
 
 const TYPE_COLORS = {
@@ -58,12 +59,8 @@ export default function ClientCalendarView() {
         .lte('calendar_events.start_at', rangeEnd),
 
       // Shoots for this client — query client row first, then their shoots
-      supabase
-        .from('clients')
-        .select('id')
-        .eq('profile_id', user.id)
-        .maybeSingle()
-        .then(({ data: clientRow }) => {
+      getMyClient(user.id, 'id')
+        .then((clientRow) => {
           if (!clientRow?.id) return Promise.resolve({ data: [] })
           const monthStart = startOfMonth(month).toISOString().split('T')[0]
           const monthEnd   = addDays(endOfMonth(month), 1).toISOString().split('T')[0]

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
+import { getMyClient } from '../../lib/myClient'
 import { format, parseISO, isToday } from 'date-fns'
 import { fmtTime } from '../../lib/time'
 
@@ -33,12 +34,8 @@ export default function ClientDashboard() {
 
   useEffect(() => {
     if (!user?.id) return
-    supabase
-      .from('clients')
-      .select('id')
-      .eq('profile_id', user.id)
-      .maybeSingle()
-      .then(async ({ data: client }) => {
+    getMyClient(user.id, 'id')
+      .then(async (client) => {
         if (!client) { setLoading(false); return }
         setClientId(client.id)
 

@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
+import { getMyClient } from '../../lib/myClient'
 import { uploadToR2, fmtSpeed, fmtEta } from '../../lib/r2'
 import DownloadButton from '../../components/ui/DownloadButton'
 import { notify, notifyAdmins } from '../../lib/notify'
@@ -658,11 +659,9 @@ export default function MyProjects() {
     setLoading(true)
     setFetchError(null)
 
-    // Try finding client by profile_id first, then fall back to client_creatives
-    let { data: client, error: clientErr } = await supabase
-      .from('clients').select('id, name').eq('profile_id', user.id).maybeSingle()
-
-    if (clientErr) console.error('MyProjects: client lookup error', clientErr)
+    // Membership-aware lookup (covers both accounts of a client), then fall
+    // back to client_creatives for team members viewing as a client
+    let client = await getMyClient(user.id, 'id, name')
 
     if (!client) {
       // Fallback: find via client_creatives (team member assigned to a client)

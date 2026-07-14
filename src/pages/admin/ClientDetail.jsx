@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   ArrowLeft, Loader2, Check, Trash2, Lock, Unlock, Mail, Phone,
@@ -117,6 +117,131 @@ function AssignTeamModal({ clientId, creatives, assignedIds, onClose, onSave }) 
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ── Login Accounts — a client can have up to 2 sign-ins ──────────────────────
+function LoginAccounts({ client }) {
+  const { createUser } = useAuth()
+  const [members, setMembers]   = useState(null)   // [{ profile_id, profiles }]
+  const [showAdd, setShowAdd]   = useState(false)
+  const [name, setName]         = useState('')
+  const [email, setEmail]       = useState('')
+  const [saving, setSaving]     = useState(false)
+  const [error, setError]       = useState('')
+  const [removing, setRemoving] = useState(null)
+
+  const load = useCallback(async () => {
+    const { data } = await supabase
+      .from('client_members')
+      .select('profile_id, created_at, profiles(id, full_name, must_change_password)')
+      .eq('client_id', client.id)
+      .order('created_at')
+    setMembers(data || [])
+  }, [client.id])
+
+  useEffect(() => { load() }, [load])
+
+  const handleAdd = async (e) => {
+    e.preventDefault()
+    if (!name.trim() || !email.trim()) return
+    setSaving(true)
+    setError('')
+    try {
+      // Invite the new login (client role) — they get the usual set-password email
+      const { user: newUser } = await createUser({
+        email: email.trim(), full_name: name.trim(), role: 'client',
+      })
+      const { error: memberErr } = await supabase
+        .from('client_members')
+        .insert({ client_id: client.id, profile_id: newUser.id })
+      if (memberErr) throw new Error(memberErr.message)
+      setShowAdd(false)
+      setName(''); setEmail('')
+      load()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleRemove = async (profileId) => {
+    if (!window.confirm('Remove this login? They will lose access to this client. (Their user account itself is not deleted.)')) return
+    setRemoving(profileId)
+    await supabase.from('client_members').delete()
+      .eq('client_id', client.id).eq('profile_id', profileId)
+    setRemoving(null)
+    load()
+  }
+
+  const isPrimary = (pid) => pid === client.profile_id
+
+  return (
+    <div className="card p-6">
+      <div className="flex items-center justify-between mb-1">
+        <h2 className="text-sm font-semibold text-text-primary">Login Accounts</h2>
+        {members !== null && members.length < 2 && (
+          <button onClick={() => setShowAdd((v) => !v)} className="text-xs text-accent hover:text-accent/80 font-medium flex items-center gap-1">
+            <Plus size={12} /> Add second login
+          </button>
+        )}
+      </div>
+      <p className="text-xs text-text-muted mb-4">Up to 2 people can sign in and see this client's projects.</p>
+
+      {members === null ? (
+        <Loader2 size={14} className="animate-spin text-text-muted" />
+      ) : members.length === 0 ? (
+        <p className="text-xs text-text-muted">No login accounts yet — invite the client from Contact Info above.</p>
+      ) : (
+        <div className="space-y-2">
+          {members.map((m) => (
+            <div key={m.profile_id} className="flex items-center gap-3 p-2.5 rounded-xl border border-border">
+              <Avatar name={m.profiles?.full_name} size={8} />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-text-primary truncate">{m.profiles?.full_name || '—'}</p>
+                <div className="flex items-center gap-1.5">
+                  {isPrimary(m.profile_id) && (
+                    <span className="text-[10px] font-medium text-accent">Primary</span>
+                  )}
+                  {m.profiles?.must_change_password && (
+                    <span className="text-[10px] font-medium text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full">Invite pending</span>
+                  )}
+                </div>
+              </div>
+              {!isPrimary(m.profile_id) && (
+                <button
+                  onClick={() => handleRemove(m.profile_id)}
+                  disabled={removing === m.profile_id}
+                  className="p-1.5 rounded-lg text-text-muted hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-40"
+                  title="Remove this login"
+                >
+                  {removing === m.profile_id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showAdd && (
+        <form onSubmit={handleAdd} className="mt-3 p-3 rounded-xl bg-surface-2/50 border border-border space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <input className="input" placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
+            <input type="email" className="input" placeholder="their@email.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          </div>
+          {error && <p className="text-xs text-red-500">{error}</p>}
+          <div className="flex gap-2 justify-end">
+            <button type="button" onClick={() => setShowAdd(false)} className="btn-secondary text-xs" disabled={saving}>Cancel</button>
+            <button type="submit" disabled={saving} className="btn-primary text-xs flex items-center gap-1.5 disabled:opacity-50">
+              {saving ? <Loader2 size={12} className="animate-spin" /> : <Mail size={12} />}
+              Send Invite
+            </button>
+          </div>
+          <p className="text-[11px] text-text-muted">They'll get an email to set their password, then see everything this client sees.</p>
+        </form>
+      )}
     </div>
   )
 }
@@ -435,6 +560,9 @@ export default function ClientDetail() {
             </div>
           </form>
         </div>
+
+        {/* Login Accounts — up to 2 people can sign in for this client */}
+        <LoginAccounts client={client} />
 
         {/* Assigned Team */}
         <div className="card p-6">

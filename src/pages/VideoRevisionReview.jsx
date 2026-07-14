@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import { clientProfileIds } from '../lib/myClient'
 import { notify, notifyMany, notifyAdmins } from '../lib/notify'
 import Avatar from '../components/ui/Avatar'
 import DownloadButton from '../components/ui/DownloadButton'
@@ -355,17 +356,15 @@ export default function VideoRevisionReview() {
       // Notify the client
       const projectLink = `/projects/${project.id}`
       if (project.client_id) {
-        const { data: clientRow } = await supabase
-          .from('clients').select('profile_id').eq('id', project.client_id).maybeSingle()
-        if (clientRow?.profile_id) {
-          await notify({
-            profileId: clientRow.profile_id, actorId: myId,
-            type: 'photographer_reviewed',
-            title: `Your ${revisionLabel(revNum)} is ready to review`,
-            body: `The photographer has left their notes on "${project.name}". Watch the video and send your feedback.`,
-            link: `/projects/${project.id}/revision/${revisionId}`,
-          })
-        }
+        // Notify every login account on this client (up to 2)
+        const ids = await clientProfileIds(project.client_id)
+        await Promise.all(ids.map((pid) => notify({
+          profileId: pid, actorId: myId,
+          type: 'photographer_reviewed',
+          title: `Your ${revisionLabel(revNum)} is ready to review`,
+          body: `The photographer has left their notes on "${project.name}". Watch the video and send your feedback.`,
+          link: `/projects/${project.id}/revision/${revisionId}`,
+        })))
       }
       await notifyAdmins({
         actorId: myId, type: 'photographer_reviewed',

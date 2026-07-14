@@ -4,6 +4,7 @@ import { CheckCircle, Loader2, ChevronDown } from 'lucide-react'
 import { useClientRequests } from '../../hooks/useContentRequests'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
+import { getMyClient } from '../../lib/myClient'
 
 const PLATFORMS = [
   { value: 'instagram', label: 'Instagram' },
@@ -44,12 +45,8 @@ export default function RequestPost() {
   // Resolve the client_id for this user
   useEffect(() => {
     if (!user) return
-    supabase
-      .from('clients')
-      .select('id')
-      .eq('profile_id', user.id)
-      .maybeSingle()
-      .then(({ data }) => {
+    getMyClient(user.id, 'id')
+      .then((data) => {
         if (data?.id) setClientId(data.id)
       })
   }, [user])

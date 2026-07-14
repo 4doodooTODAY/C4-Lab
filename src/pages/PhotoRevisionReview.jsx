@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, Loader2, Send, Check, X, Plus, Image, ChevronLeft, ChevronRight, MessageSquare } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import { clientProfileIds } from '../lib/myClient'
 import Avatar from '../components/ui/Avatar'
 import DownloadButton from '../components/ui/DownloadButton'
 import { formatDistanceToNow } from 'date-fns'
@@ -343,17 +344,15 @@ export default function PhotoRevisionReview() {
 
       const { notify, notifyAdmins } = await import('../lib/notify')
       if (project?.client_id) {
-        const { data: clientRow } = await supabase
-          .from('clients').select('profile_id').eq('id', project.client_id).maybeSingle()
-        if (clientRow?.profile_id) {
-          await notify({
-            profileId: clientRow.profile_id, actorId: myId,
-            type: 'photographer_reviewed',
-            title: `Your photos for "${project.name}" are ready to review`,
-            body: 'The team reviewed the set and sent it over for your review.',
-            link: `/projects/${project.id}/photo-revision/${revisionId}`,
-          })
-        }
+        // Notify every login account on this client (up to 2)
+        const ids = await clientProfileIds(project.client_id)
+        await Promise.all(ids.map((pid) => notify({
+          profileId: pid, actorId: myId,
+          type: 'photographer_reviewed',
+          title: `Your photos for "${project.name}" are ready to review`,
+          body: 'The team reviewed the set and sent it over for your review.',
+          link: `/projects/${project.id}/photo-revision/${revisionId}`,
+        })))
       }
       await notifyAdmins({
         actorId: myId, type: 'photographer_reviewed',

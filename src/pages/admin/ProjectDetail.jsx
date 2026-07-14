@@ -10,6 +10,7 @@ import {
 import { useProject, updateProject } from '../../hooks/useProjects'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
+import { clientProfileIds } from '../../lib/myClient'
 import { notify, notifyAdmins } from '../../lib/notify'
 import Avatar from '../../components/ui/Avatar'
 import MediaThumb from '../../components/ui/MediaThumb'
@@ -211,15 +212,14 @@ function PitchApprovalPanel({ project, profile, onApproved }) {
       await updateProject(project.id, { stage: 'pre_production' })
       // Notify client
       if (project.client_id) {
-        const { data: c } = await supabase.from('clients').select('profile_id').eq('id', project.client_id).maybeSingle()
-        if (c?.profile_id) {
-          await notify({
-            profileId: c.profile_id, actorId: profile.id, type: 'pitch_approved',
-            title: `"${project.name}" is underway!`,
-            body:  'Your project has been kicked off and work is beginning.',
-            link:  `/my-projects`,
-          })
-        }
+        // Notify every login account on this client (up to 2)
+        const ids = await clientProfileIds(project.client_id)
+        await Promise.all(ids.map((pid) => notify({
+          profileId: pid, actorId: profile.id, type: 'pitch_approved',
+          title: `"${project.name}" is underway!`,
+          body:  'Your project has been kicked off and work is beginning.',
+          link:  `/my-projects`,
+        })))
       }
       onApproved()
     } catch (err) {

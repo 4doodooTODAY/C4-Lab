@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
+import { getMyClient } from '../../lib/myClient'
 import { format, parseISO } from 'date-fns'
 
 const TYPE_LABELS = {
@@ -362,12 +363,8 @@ export default function MyConcepts() {
 
   useEffect(() => {
     if (!user?.id) return
-    supabase
-      .from('clients')
-      .select('id')
-      .eq('profile_id', user.id)
-      .maybeSingle()
-      .then(async ({ data: client }) => {
+    getMyClient(user.id, 'id')
+      .then(async (client) => {
         if (!client) { setLoading(false); return }
         const { data } = await supabase
           .from('content_drafts')

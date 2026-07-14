@@ -4,6 +4,7 @@ import { Upload, CheckCircle, Loader2, X, FileVideo, AlertCircle } from 'lucide-
 import { useClientRequests } from '../../hooks/useContentRequests'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
+import { getMyClient } from '../../lib/myClient'
 import { uploadToR2, fmtSpeed, fmtEta } from '../../lib/r2'
 
 function formatBytes(bytes) {
@@ -32,12 +33,8 @@ export default function UploadFootage() {
 
   useEffect(() => {
     if (!user) return
-    supabase
-      .from('clients')
-      .select('id, name')
-      .eq('profile_id', user.id)
-      .maybeSingle()
-      .then(({ data }) => {
+    getMyClient(user.id, 'id, name')
+      .then((data) => {
         if (data?.id) {
           setClientId(data.id)
           setClientName(data.name || '')

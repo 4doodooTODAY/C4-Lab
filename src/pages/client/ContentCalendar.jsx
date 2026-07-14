@@ -13,6 +13,7 @@ import {
   parseISO, startOfDay, isBefore, isAfter,
 } from 'date-fns'
 import { supabase } from '../../lib/supabase'
+import { getMyClient } from '../../lib/myClient'
 import { useAuth } from '../../contexts/AuthContext'
 import { updateDraft } from '../../hooks/useContentDrafts'
 import { fmtTime } from '../../lib/time'
@@ -295,18 +296,9 @@ export default function ContentCalendar() {
 
     async function bootstrap() {
       // ── 1. Find the clients row ────────────────────────────────────────────
-      const { data: clientRow, error: clientErr } = await supabase
-        .from('clients')
-        .select('id')
-        .eq('profile_id', user.id)
-        .maybeSingle()
+      const clientRow = await getMyClient(user.id, 'id')
 
       if (cancelled) return
-
-      if (clientErr) {
-        setLoading(false)
-        return
-      }
 
       const cid = clientRow?.id || null
 

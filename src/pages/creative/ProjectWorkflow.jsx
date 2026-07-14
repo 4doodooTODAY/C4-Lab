@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
+import { clientProfileIds } from '../../lib/myClient'
 import { uploadToR2, fmtBytes, fmtSpeed, fmtEta, forceDownload, downloadAll } from '../../lib/r2'
 import { updateProject } from '../../hooks/useProjects'
 import Avatar from '../../components/ui/Avatar'
@@ -1603,18 +1604,16 @@ function DraftCutPanel({ project, draftRev, onReplace, onRefresh }) {
         link:    `/projects/${project.id}`,
       })
       if (toClient) {
-        const { data: clientRow } = await supabase
-          .from('clients').select('profile_id').eq('id', project.client_id).maybeSingle()
-        if (clientRow?.profile_id) {
-          await notifyFn({
-            profileId: clientRow.profile_id,
-            actorId:   profile.id,
-            type:      'revision_ready',
-            title:     `${revLabel} ${isPhoto ? 'are' : 'is'} ready for your review!`,
-            body:      `"${project.name}" is ready. Tap to review and leave feedback.`,
-            link:      `/my-projects`,
-          })
-        }
+        // Notify every login account on this client (up to 2)
+        const ids = await clientProfileIds(project.client_id)
+        await Promise.all(ids.map((pid) => notifyFn({
+          profileId: pid,
+          actorId:   profile.id,
+          type:      'revision_ready',
+          title:     `${revLabel} ${isPhoto ? 'are' : 'is'} ready for your review!`,
+          body:      `"${project.name}" is ready. Tap to review and leave feedback.`,
+          link:      `/my-projects`,
+        })))
       } else if (project.creative_id) {
         await notifyFn({
           profileId: project.creative_id,
