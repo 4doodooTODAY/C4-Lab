@@ -76,13 +76,14 @@ function WeeklyUserStats() {
         revCounts[uploaded_by] = (revCounts[uploaded_by] || 0) + 1
       })
 
-      // Admins show in a list only for weeks they actually did that work
+      // Admins are creatives too — always shown in both sections, ring at 0
+      // like everyone else when they had a quiet week
       const creativeList = profiles
-        .filter((p) => p.role === 'creative' || (p.role === 'admin' && shootCounts[p.id]))
+        .filter((p) => p.role === 'creative' || p.role === 'admin')
         .map((p) => ({ ...p, count: shootCounts[p.id] || 0 }))
 
       const editorList = profiles
-        .filter((p) => p.role === 'editor' || (p.role === 'admin' && revCounts[p.id]))
+        .filter((p) => p.role === 'editor' || p.role === 'admin')
         .map((p) => ({ ...p, count: revCounts[p.id] || 0 }))
 
       const peakC = Math.max(...creativeList.map((p) => p.count), 1)

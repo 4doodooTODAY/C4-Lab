@@ -360,14 +360,13 @@ function TeamWorkload() {
       const projBy = {}
       ;(projects || []).forEach((p) => { projBy[p.editor_id] = (projBy[p.editor_id] || 0) + 1 })
 
-      // Admins appear in a list only when they actually carry work there —
-      // keeps the lists clean while still counting admin assignments.
+      // Admins are creatives too — always in both lists, zero bar and all
       const creativeRows = (people || [])
-        .filter((p) => p.role === 'creative' || (p.role === 'admin' && shootBy[p.id]))
+        .filter((p) => p.role === 'creative' || p.role === 'admin')
         .map((p) => ({ ...p, count: shootBy[p.id] || 0 }))
         .sort((a, b) => b.count - a.count)
       const editorRows = (people || [])
-        .filter((p) => p.role === 'editor' || (p.role === 'admin' && projBy[p.id]))
+        .filter((p) => p.role === 'editor' || p.role === 'admin')
         .map((p) => ({ ...p, count: projBy[p.id] || 0 }))
         .sort((a, b) => b.count - a.count)
 
