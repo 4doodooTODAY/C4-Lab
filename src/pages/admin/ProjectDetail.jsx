@@ -691,10 +691,15 @@ export default function ProjectDetail() {
     setDownloading(true)
     setDlProgress({ done: 0, total: list.length })
     // Concurrent pool instead of one-at-a-time with sleep gaps — much faster.
-    await downloadAll(list, {
-      concurrency: 4,
-      onProgress: (done, total) => setDlProgress({ done, total }),
-    })
+    try {
+      await downloadAll(list, {
+        concurrency: 4,
+        zipName: (project?.name || 'project').replace(/[^\w\- ]+/g, '').trim() || 'project',
+        onProgress: (done, total) => setDlProgress({ done, total }),
+      })
+    } catch (err) {
+      window.alert(err.message)
+    }
     setDownloading(false)
   }
 

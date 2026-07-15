@@ -945,9 +945,13 @@ async function deleteShootUpload(f) {
 
 async function downloadFiles(files, setDownloading) {
   setDownloading(true)
-  // Concurrent pool — keeps several transfers in flight for max throughput
-  // instead of one-at-a-time with sleep gaps between files.
-  await downloadAll(files, { concurrency: 4 })
+  try {
+    // Files are fetched via the CDN and delivered as one zip — a single
+    // browser download, so nothing gets silently blocked.
+    await downloadAll(files, { concurrency: 4, zipName: 'footage' })
+  } catch (err) {
+    window.alert(err.message)
+  }
   setDownloading(false)
 }
 

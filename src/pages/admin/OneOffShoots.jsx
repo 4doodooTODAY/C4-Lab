@@ -295,7 +295,7 @@ function GalleryDrawer({ shoot }) {
 
     let dupCount = 0
 
-    // 3. Canonical files: parallel upload, capped at 4 lanes
+    // 3. Canonical files: parallel upload, capped at 6 lanes
     const results = await runPool(jobs, async (job, jobIdx) => {
       if (job.dupOf) {
         // Exact duplicate → recoverable trash row pointing at canonical files.
@@ -397,7 +397,7 @@ function GalleryDrawer({ shoot }) {
       if (dbErr) throw new Error(dbErr.message)
       job.row = row // duplicates later in the batch reference these paths
       setProgress((p) => ({ ...p, done: p.done + 1 }))
-    }, 4)
+    }, 6)
 
     const failed = results.filter((r) => !r.ok).length
     results.filter((r) => !r.ok).forEach((r) => console.error('Upload failed:', r.error))

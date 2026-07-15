@@ -242,16 +242,42 @@ export function fmtEta(seconds) {
   return `~${Math.floor(s / 60)}m ${s % 60}s left`
 }
 
+// Files under this size download via a CDN blob fetch (cached = fast); larger
+// files stream to disk via a presigned attachment URL (no memory pressure).
+const CDN_BLOB_MAX = 300 * 1024 * 1024
+
 export async function forceDownload(url, filename) {
-  // Cross-origin R2 files can't be force-downloaded with a blob fetch unless the
-  // bucket has GET CORS, and <a download> is ignored cross-origin. So ask the
-  // edge function for a presigned URL that carries Content-Disposition:
-  // attachment — clicking it downloads reliably, no bucket CORS required.
+  const name = filename || decodeURIComponent(url.split('/').pop() || 'download')
+
+  // Fast path: CDN-cached blob fetch for reasonably sized files. The CDN
+  // serves Access-Control-Allow-Origin: *, so the blob isn't tainted, and a
+  // blob URL honors the download attribute.
+  try {
+    const head = await fetch(url, { method: 'HEAD' })
+    const size = Number(head.headers.get('content-length') || 0)
+    if (head.ok && size > 0 && size <= CDN_BLOB_MAX) {
+      const res = await fetch(url)
+      if (res.ok) {
+        const blob = await res.blob()
+        const a = document.createElement('a')
+        a.href = URL.createObjectURL(blob)
+        a.download = name
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        setTimeout(() => URL.revokeObjectURL(a.href), 30000)
+        return
+      }
+    }
+  } catch { /* fall through to the presigned path */ }
+
+  // Big files (or CDN hiccup): presigned URL with Content-Disposition:
+  // attachment — the browser streams straight to disk, any size.
   try {
     const { url: dl } = await callEdge({ action: 'presign-download', url, filename })
     const a = document.createElement('a')
     a.href = dl
-    a.download = filename || url.split('/').pop() || 'download'
+    a.download = name
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
@@ -275,28 +301,94 @@ export async function forceDownload(url, filename) {
 }
 
 /**
- * downloadAll — download many files at once instead of one-at-a-time.
+ * downloadAll — bundle many files into zip(s) and download.
  *
- * Sequential downloads (with sleep gaps between them) leave the network
- * mostly idle and make "Download All" feel slow. A bounded worker pool keeps
- * several transfers in flight simultaneously, maximising aggregate MB/s while
- * staying under the browser's rapid-download throttle. onProgress(done, total)
- * fires after each file so callers can show a progress bar.
+ * The old approach fired one browser download per file; browsers block
+ * every programmatic download after the first (until the user grants
+ * "multiple downloads"), so Download All silently downloaded one file.
+ * Instead: fetch each file through the CDN (cached = fast) with a 4-lane
+ * pool, zip client-side (store mode — media is already compressed), and
+ * trigger ONE download. Sets over ~600MB are split into numbered .zip
+ * parts to keep memory sane, spaced out so the browser accepts them.
+ * onProgress(done, total) fires per file fetched.
  */
-export async function downloadAll(files, { concurrency = 4, onProgress } = {}) {
+export async function downloadAll(files, { concurrency = 4, onProgress, zipName = 'files' } = {}) {
   const list = (files || []).filter((f) => f.file_url)
   if (!list.length) return
-  let idx = 0
+  const { zip } = await import('fflate')
+
+  const PART_LIMIT = 600 * 1024 * 1024 // per-zip memory cap
   let done = 0
-  const worker = async () => {
-    while (idx < list.length) {
-      const f = list[idx++]
-      await forceDownload(f.file_url, f.file_name)
-      done++
-      onProgress?.(done, list.length)
+  const total = list.length
+
+  // 1. Group into parts under the memory cap using known sizes (file_size),
+  //    falling back to a HEAD request. Grouping first means we only ever hold
+  //    one part's bytes in memory at a time — a 10GB shoot can't blow up the tab.
+  const sized = await Promise.all(list.map(async (f) => {
+    let size = Number(f.file_size) || 0
+    if (!size) {
+      try {
+        const head = await fetch(f.file_url, { method: 'HEAD' })
+        size = Number(head.headers.get('content-length') || 0)
+      } catch { size = 0 }
     }
+    return { ...f, _size: size }
+  }))
+  const parts = [[]]
+  let partBytes = 0
+  for (const f of sized) {
+    if (partBytes + f._size > PART_LIMIT && parts[parts.length - 1].length > 0) {
+      parts.push([]); partBytes = 0
+    }
+    parts[parts.length - 1].push(f)
+    partBytes += f._size
   }
-  await Promise.all(
-    Array.from({ length: Math.min(concurrency, list.length) }, () => worker())
-  )
+
+  // 2. Per part: parallel CDN fetch → zip (store mode) → download → release
+  let anyDownloaded = false
+  for (let p = 0; p < parts.length; p++) {
+    const part = parts[p]
+    const buffers = new Array(part.length).fill(null)
+    let next = 0
+    const lane = async () => {
+      while (next < part.length) {
+        const i = next++
+        try {
+          const res = await fetch(part[i].file_url)
+          if (!res.ok) throw new Error(`HTTP ${res.status}`)
+          buffers[i] = new Uint8Array(await res.arrayBuffer())
+        } catch (err) {
+          console.error('downloadAll: fetch failed for', part[i].file_name, err)
+        }
+        done++
+        onProgress?.(done, total)
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(concurrency, part.length) }, lane))
+
+    const entries = {}
+    part.forEach((f, i) => {
+      if (!buffers[i]) return
+      let n = f.file_name || `file-${i + 1}`, k = 1
+      while (entries[n]) n = (f.file_name || `file-${i + 1}`).replace(/(\.[^.]*)?$/, `-${k++}$1`)
+      entries[n] = [buffers[i], { level: 0 }]
+    })
+    if (!Object.keys(entries).length) continue
+
+    const zipped = await new Promise((resolve, reject) =>
+      zip(entries, (err, data) => (err ? reject(err) : resolve(data)))
+    )
+    const suffix = parts.length > 1 ? `-part${p + 1}` : ''
+    const blobUrl = URL.createObjectURL(new Blob([zipped], { type: 'application/zip' }))
+    const a = document.createElement('a')
+    a.href = blobUrl
+    a.download = `${zipName}${suffix}.zip`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 30000)
+    anyDownloaded = true
+    if (p < parts.length - 1) await new Promise((r) => setTimeout(r, 1500))
+  }
+  if (!anyDownloaded) throw new Error('No files could be downloaded — try again.')
 }
