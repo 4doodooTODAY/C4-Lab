@@ -1,6 +1,6 @@
-import { useState, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Loader2, Lock, Camera, ArrowRight, Check, Eye, EyeOff } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Loader2, Lock, Camera, ArrowRight, Check, Eye, EyeOff, KeyRound, AlertTriangle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -35,8 +35,44 @@ export default function ChangePassword() {
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef(null)
 
-  const { profile, user, patchProfile } = useAuth()
+  const { profile, user, patchProfile, loading: authLoading } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+
+  // ── Invite / recovery link handling (token_hash flow) ──────────────────────
+  // Emails link here with ?token_hash=…&type=invite|recovery. The token is
+  // single-use, so we DON'T redeem it automatically — email security scanners
+  // load pages, and auto-redeeming would burn the link before the human
+  // arrives. The person clicks the button; only then do we verify.
+  const tokenHash = searchParams.get('token_hash')
+  const tokenType = searchParams.get('type') === 'recovery' ? 'recovery' : 'invite'
+  const [redeeming, setRedeeming] = useState(false)
+  const [redeemError, setRedeemError] = useState('')
+
+  const redeemToken = async () => {
+    setRedeeming(true)
+    setRedeemError('')
+    const { error: otpErr } = await supabase.auth.verifyOtp({
+      type: tokenType, token_hash: tokenHash,
+    })
+    if (otpErr) {
+      setRedeemError(
+        /expired|invalid/i.test(otpErr.message)
+          ? 'This link has expired or was already used. Ask your admin to send a new one.'
+          : otpErr.message
+      )
+      setRedeeming(false)
+      return
+    }
+    // Session is live — drop the token from the URL and continue to password setup
+    window.history.replaceState({}, '', '/change-password')
+    setRedeeming(false)
+  }
+
+  // No token and no session → nothing to do here
+  useEffect(() => {
+    if (!tokenHash && !authLoading && !user) navigate('/login', { replace: true })
+  }, [tokenHash, authLoading, user, navigate])
 
   // ── Step 1: Set password ───────────────────────────────────────────────────
   const handleSubmit = async (e) => {
@@ -128,6 +164,56 @@ export default function ChangePassword() {
   const finish = () => navigate(roleHome(profile?.role), { replace: true })
 
   // ── Render ─────────────────────────────────────────────────────────────────
+  // Arrived from an email link but not signed in yet → redeem gate first
+  if (tokenHash && !user) {
+    return (
+      <div className="min-h-screen bg-sidebar flex items-center justify-center p-4">
+        <div className="w-full max-w-sm">
+          <div className="flex items-center justify-center gap-3 mb-8">
+            <div className="w-10 h-10 rounded-xl bg-accent flex items-center justify-center shrink-0">
+              <span className="text-white font-bold text-base leading-none">C4</span>
+            </div>
+            <div>
+              <p className="text-white font-semibold leading-tight">C4 Lab</p>
+              <p className="text-white/40 text-xs leading-tight">Connect Four Creative</p>
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl shadow-2xl px-6 py-8 text-center">
+            <div className="w-12 h-12 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-4">
+              <KeyRound size={20} className="text-accent" />
+            </div>
+            <h1 className="text-base font-bold text-text-primary mb-1">
+              {tokenType === 'invite' ? 'Welcome to C4 Lab' : 'Reset your password'}
+            </h1>
+            <p className="text-sm text-text-secondary mb-5">
+              {tokenType === 'invite'
+                ? "You're one click away — continue to create your password."
+                : 'Continue to choose a new password.'}
+            </p>
+            {redeemError ? (
+              <div className="text-left text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2.5 flex items-start gap-2 mb-4">
+                <AlertTriangle size={13} className="shrink-0 mt-0.5" /> {redeemError}
+              </div>
+            ) : null}
+            <button
+              onClick={redeemToken}
+              disabled={redeeming || !!redeemError}
+              className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {redeeming ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} />}
+              {tokenType === 'invite' ? 'Set Up My Account' : 'Continue'}
+            </button>
+            {redeemError && (
+              <button onClick={() => navigate('/login')} className="text-xs text-accent hover:underline mt-3">
+                Back to sign in
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-sidebar flex items-center justify-center p-4">
       <div className="w-full max-w-sm">

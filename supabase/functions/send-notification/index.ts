@@ -9,7 +9,7 @@ const corsHeaders = {
 const VAPID_PUBLIC_KEY  = Deno.env.get('VAPID_PUBLIC_KEY')  ?? ''
 const VAPID_PRIVATE_KEY = Deno.env.get('VAPID_PRIVATE_KEY') ?? ''
 const RESEND_API_KEY    = Deno.env.get('RESEND_API_KEY')    ?? ''
-const FROM_EMAIL        = 'yourmove@connectfourcreative.com'
+const FROM_EMAIL        = 'hello@c4clab.com'  // verified sender; replies via reply_to
 const APP_URL           = Deno.env.get('APP_URL') ?? 'https://c4-lab.vercel.app'
 
 if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {

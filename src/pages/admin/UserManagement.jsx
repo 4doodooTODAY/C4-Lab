@@ -200,13 +200,15 @@ function InviteModal({ onClose, onCreated }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [sent, setSent] = useState(false)
+  const [inviteInfo, setInviteInfo] = useState(null) // { invite_link, emailed }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setSaving(true)
     setError('')
     try {
-      await createUser({ email: email.trim(), full_name: fullName.trim(), role })
+      const data = await createUser({ email: email.trim(), full_name: fullName.trim(), role })
+      setInviteInfo({ invite_link: data?.invite_link, emailed: data?.emailed !== false })
       setSent(true)
       onCreated()
     } catch (err) {
@@ -222,10 +224,23 @@ function InviteModal({ onClose, onCreated }) {
         <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
           <Check size={22} className="text-green-600" />
         </div>
-        <h2 className="text-base font-semibold text-text-primary mb-1">Invite sent!</h2>
-        <p className="text-sm text-text-secondary mb-5">
-          {email} will receive an email with a link to set their password.
+        <h2 className="text-base font-semibold text-text-primary mb-1">
+          {inviteInfo?.emailed ? 'Invite sent!' : 'Account created'}
+        </h2>
+        <p className="text-sm text-text-secondary mb-4">
+          {inviteInfo?.emailed
+            ? `${email} will receive an email with a link to set their password.`
+            : `The email couldn't send yet — copy the setup link below and send it to ${email} yourself.`}
         </p>
+        {inviteInfo?.invite_link && (
+          <button
+            onClick={() => navigator.clipboard.writeText(inviteInfo.invite_link)}
+            className="w-full mb-4 text-left bg-surface-2 border border-border rounded-xl px-3 py-2 text-[11px] font-mono text-text-secondary truncate hover:border-accent transition-colors"
+            title="Click to copy"
+          >
+            {inviteInfo.invite_link}
+          </button>
+        )}
         <button onClick={onClose} className="btn-primary w-full">Done</button>
       </div>
     </div>

@@ -88,6 +88,10 @@ function InviteClientModal({ onClose, onCreated }) {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Request failed')
+      if (data?.emailed === false && data?.invite_link) {
+        try { await navigator.clipboard.writeText(data.invite_link) } catch { /* ignore */ }
+        window.alert('Client created — the invite email could not send yet, so the setup link was copied to your clipboard. Send it to them directly.')
+      }
       setSent(true)
       onCreated()
     } catch (err) {

@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${RESEND_API_KEY}` },
         body: JSON.stringify({
-          from: `C4 Lab <${NOTIFY_EMAIL}>`,
+          from: 'C4C Lab <hello@c4clab.com>',
           to: [NOTIFY_EMAIL],
           reply_to: email,
           subject: `Waitlist signup: ${name}`,

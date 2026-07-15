@@ -150,13 +150,17 @@ function LoginAccounts({ client }) {
     setError('')
     try {
       // Invite the new login (client role) — they get the usual set-password email
-      const { user: newUser } = await createUser({
+      const created = await createUser({
         email: email.trim(), full_name: name.trim(), role: 'client',
       })
       const { error: memberErr } = await supabase
         .from('client_members')
-        .insert({ client_id: client.id, profile_id: newUser.id })
+        .insert({ client_id: client.id, profile_id: created.user.id })
       if (memberErr) throw new Error(memberErr.message)
+      if (created?.emailed === false && created?.invite_link) {
+        await navigator.clipboard.writeText(created.invite_link)
+        window.alert('Email could not send yet — the setup link was copied to your clipboard. Send it to them directly.')
+      }
       setShowAdd(false)
       setName(''); setEmail('')
       load()
@@ -422,8 +426,13 @@ export default function ClientDetail() {
   const handleResendInvite = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      await callAction({ action: 'resend_invite', email: client.email, full_name: client.contact_name, role: 'client' }, session)
-      alert(`Invite resent to ${client.email}`)
+      const res = await callAction({ action: 'resend_invite', email: client.email, full_name: client.contact_name, role: 'client' }, session)
+      if (res?.emailed === false && res?.invite_link) {
+        await navigator.clipboard.writeText(res.invite_link)
+        alert(`Email couldn't send yet — the setup link was copied to your clipboard. Send it to ${client.email} directly.`)
+      } else {
+        alert(`Invite resent to ${client.email}`)
+      }
     } catch (err) {
       setError(err.message)
     }

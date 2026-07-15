@@ -202,9 +202,9 @@ function AppRoutes() {
         <Route path="/login" element={<Login />} />
         {/* Public one-off shoot gallery — no auth, viewable by anyone with the link */}
         <Route path="/s/:slug" element={<ShootGallery />} />
-        <Route path="/change-password" element={
-          <ProtectedRoute><ChangePassword /></ProtectedRoute>
-        } />
+        {/* Public: invite/recovery links land here with a token_hash and no
+            session yet — the page redeems the token itself. */}
+        <Route path="/change-password" element={<ChangePassword />} />
 
         <Route element={
           <ProtectedRoute>

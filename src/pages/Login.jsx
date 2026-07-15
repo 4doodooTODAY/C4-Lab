@@ -45,10 +45,18 @@ export default function Login() {
     setResetLoading(true)
     setResetError('')
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail.trim(), {
-        redirectTo: `${window.location.origin}/change-password`,
+      // Branded reset email (from C4C Lab) with a scanner-proof token link —
+      // avoids Supabase's default sender and redirect-allowlist pitfalls.
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-user`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({ action: 'forgot_password', email: resetEmail.trim() }),
       })
-      if (error) throw error
+      if (!res.ok) throw new Error('Could not send the reset email — try again.')
       setResetSent(true)
     } catch (err) {
       setResetError(err.message)
