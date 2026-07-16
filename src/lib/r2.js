@@ -242,20 +242,18 @@ export function fmtEta(seconds) {
   return `~${Math.floor(s / 60)}m ${s % 60}s left`
 }
 
-// Files under this size download via a CDN blob fetch (cached = fast); larger
-// files stream to disk via a presigned attachment URL (no memory pressure).
-const CDN_BLOB_MAX = 300 * 1024 * 1024
+// Small media downloads via a CDN blob fetch (usually cache-HIT = fast).
+// Videos and anything unknown go straight to a presigned URL that streams to
+// disk immediately — no probing: a HEAD on an uncached large file makes the
+// CDN pull the whole object from storage first (measured 17s on a 131MB
+// video), which made the Download button look dead.
+const IMAGE_RE = /\.(jpe?g|png|gif|webp|avif|heic)$/i
 
 export async function forceDownload(url, filename) {
   const name = filename || decodeURIComponent(url.split('/').pop() || 'download')
 
-  // Fast path: CDN-cached blob fetch for reasonably sized files. The CDN
-  // serves Access-Control-Allow-Origin: *, so the blob isn't tainted, and a
-  // blob URL honors the download attribute.
-  try {
-    const head = await fetch(url, { method: 'HEAD' })
-    const size = Number(head.headers.get('content-length') || 0)
-    if (head.ok && size > 0 && size <= CDN_BLOB_MAX) {
+  if (IMAGE_RE.test(name) || IMAGE_RE.test(url.split('?')[0])) {
+    try {
       const res = await fetch(url)
       if (res.ok) {
         const blob = await res.blob()
@@ -268,8 +266,8 @@ export async function forceDownload(url, filename) {
         setTimeout(() => URL.revokeObjectURL(a.href), 30000)
         return
       }
-    }
-  } catch { /* fall through to the presigned path */ }
+    } catch { /* fall through to the presigned path */ }
+  }
 
   // Big files (or CDN hiccup): presigned URL with Content-Disposition:
   // attachment — the browser streams straight to disk, any size.
