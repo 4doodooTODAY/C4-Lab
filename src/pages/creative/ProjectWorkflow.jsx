@@ -14,6 +14,7 @@ import { uploadToR2, fmtBytes, fmtSpeed, fmtEta, forceDownload, downloadAll } fr
 import { updateProject } from '../../hooks/useProjects'
 import Avatar from '../../components/ui/Avatar'
 import MediaThumb from '../../components/ui/MediaThumb'
+import CaptionConcept from '../../components/projects/CaptionConcept'
 import { format, parseISO } from 'date-fns'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -2256,6 +2257,9 @@ function RevisionsCard({ project, revisions, commentCounts, navigate }) {
         </div>
       )}
 
+      {/* Caption concept — the copy that ships with this content */}
+      <CaptionConcept projectId={project.id} initialValue={project.caption_concept} canEdit plain />
+
       <p className="text-xs text-text-muted mt-4 pt-3 border-t border-border">
         Client gets up to 3 revisions total.
       </p>
@@ -2361,7 +2365,7 @@ export default function ProjectWorkflow() {
       // 1. Fetch project base data
       const { data: projData, error: projErr } = await supabase
         .from('projects')
-        .select('id, name, stage, media_type, shoot_date, shoot_id, location, creative_id, editor_id, revision_count, notes, inspiration_links, clients(id, name, contact_name)')
+        .select('id, name, stage, media_type, shoot_date, shoot_id, location, creative_id, editor_id, revision_count, notes, inspiration_links, caption_concept, clients(id, name, contact_name)')
         .eq('id', id)
         .single()
       if (projErr) throw projErr

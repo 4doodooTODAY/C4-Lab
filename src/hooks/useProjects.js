@@ -6,7 +6,7 @@ const PROJECT_SELECT = `
   start_date, due_date, first_revision_date, shoot_date, location,
   notes, created_by, created_at,
   creative_id, editor_id, revision_count,
-  admin_review_required,
+  admin_review_required, caption_concept,
   draft_id, shoot_id, concept, target_date, client_id,
   inspiration_links,
   clients(id, name, contact_name),

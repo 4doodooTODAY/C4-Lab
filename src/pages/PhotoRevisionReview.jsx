@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase'
 import { clientProfileIds } from '../lib/myClient'
 import Avatar from '../components/ui/Avatar'
 import DownloadButton from '../components/ui/DownloadButton'
+import CaptionConcept from '../components/projects/CaptionConcept'
 import { formatDistanceToNow } from 'date-fns'
 
 // ── Pin dot on the photo ───────────────────────────────────────────────────────
@@ -109,7 +110,7 @@ export default function PhotoRevisionReview() {
       const [{ data: rev }, { data: cmts }] = await Promise.all([
         supabase
           .from('project_revisions')
-          .select('*, projects(id, name, client_id, editor_id, creative_id)')
+          .select('*, projects(id, name, client_id, editor_id, creative_id, caption_concept)')
           .eq('id', revisionId)
           .single(),
         supabase
@@ -617,6 +618,15 @@ export default function PhotoRevisionReview() {
                   className="w-full py-2 px-3 rounded-lg bg-accent text-white text-xs hover:bg-accent/90"
                 />
               ))}
+              {project && (
+                <div className="pt-2">
+                  <CaptionConcept
+                    projectId={project.id}
+                    initialValue={project.caption_concept}
+                    canEdit={myRole !== 'client'}
+                  />
+                </div>
+              )}
               <p className="text-[9px] text-text-muted text-center pt-1">Original quality — no compression</p>
             </div>
           )}

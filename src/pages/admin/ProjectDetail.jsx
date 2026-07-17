@@ -14,6 +14,7 @@ import { clientProfileIds } from '../../lib/myClient'
 import { notify, notifyAdmins } from '../../lib/notify'
 import Avatar from '../../components/ui/Avatar'
 import MediaThumb from '../../components/ui/MediaThumb'
+import CaptionConcept from '../../components/projects/CaptionConcept'
 import { format, parseISO } from 'date-fns'
 import { fmtTime } from '../../lib/time'
 import { forceDownload, downloadAll, uploadToR2, fmtBytes, fmtSpeed, fmtEta } from '../../lib/r2'
@@ -1536,6 +1537,9 @@ export default function ProjectDetail() {
                 ))}
               </div>
             )}
+
+            {/* Caption concept — the copy that ships with this content */}
+            <CaptionConcept projectId={id} initialValue={project?.caption_concept} canEdit plain />
 
             {/* Admin-only: add an extra revision once the 3 client revisions are used up */}
             {(() => {

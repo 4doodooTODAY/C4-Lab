@@ -10,6 +10,7 @@ import { clientProfileIds } from '../lib/myClient'
 import { notify, notifyMany, notifyAdmins } from '../lib/notify'
 import Avatar from '../components/ui/Avatar'
 import DownloadButton from '../components/ui/DownloadButton'
+import CaptionConcept from '../components/projects/CaptionConcept'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -197,7 +198,7 @@ export default function VideoRevisionReview() {
       const [revRes, commRes] = await Promise.all([
         supabase
           .from('project_revisions')
-          .select('*, projects(id, name, creative_id, editor_id, client_id, revision_count)')
+          .select('*, projects(id, name, creative_id, editor_id, client_id, revision_count, caption_concept)')
           .eq('id', revisionId)
           .single(),
         supabase
@@ -825,6 +826,16 @@ export default function VideoRevisionReview() {
                   />
                 )}
               </div>
+            )}
+
+            {/* Caption concept — directly under the download */}
+            {project && (
+              <CaptionConcept
+                projectId={project.id}
+                initialValue={project.caption_concept}
+                canEdit={myRole !== 'client'}
+                dark
+              />
             )}
           </div>
         </div>
