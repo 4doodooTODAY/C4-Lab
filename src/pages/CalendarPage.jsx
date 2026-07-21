@@ -18,14 +18,14 @@ function ShootDraftPanel({ item, onClose }) {
   const isDraft = item._isDraft
 
   return (
-    <div className="fixed bottom-6 right-6 z-40 w-80 bg-white rounded-2xl border border-border shadow-2xl overflow-hidden">
-      <div className={`h-1 ${isShoot ? 'bg-violet-500' : 'bg-amber-500'}`} />
+    <div className="fixed bottom-6 right-6 z-40 w-80 card border border-border shadow-2xl overflow-hidden">
+      <div className={`h-1 ${isShoot ? 'bg-accent' : 'bg-status-due-soon'}`} />
       <div className="p-4">
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="flex items-center gap-2">
-            {isShoot ? <Camera size={14} className="text-violet-600 shrink-0" /> : item._isProject ? <FolderKanban size={14} className="text-blue-600 shrink-0" /> : <FileText size={14} className="text-amber-600 shrink-0" />}
-            <span className={`text-xs font-semibold uppercase tracking-wide ${isShoot ? 'text-violet-600' : item._isProject ? 'text-blue-600' : 'text-amber-600'}`}>
-              {isShoot ? 'Shoot' : item._isProject ? 'Project' : `Content Draft — ${item._type || 'Post'}`}
+            {isShoot ? <Camera size={14} className="text-status-review-text shrink-0" /> : item._isProject ? <FolderKanban size={14} className="text-status-review-text shrink-0" /> : <FileText size={14} className="text-status-due-soon-text shrink-0" />}
+            <span className={`text-xs font-semibold uppercase tracking-wide ${isShoot ? 'text-status-review-text' : item._isProject ? 'text-status-review-text' : 'text-status-due-soon-text'}`}>
+              {isShoot ? 'Shoot' : item._isProject ? 'Project' : `Content Draft · ${item._type || 'Post'}`}
             </span>
           </div>
           <button onClick={onClose} className="text-text-muted hover:text-text-primary p-0.5">
@@ -59,10 +59,10 @@ function ShootDraftPanel({ item, onClose }) {
 // ── Read-only panel for real calendar events (non-admin users) ─────────────────
 function ReadOnlyEventPanel({ event, onClose }) {
   if (!event) return null
-  const typeColor = event.event_type === 'meeting' ? 'bg-blue-500' : event.event_type === 'deadline' ? 'bg-red-500' : 'bg-accent'
+  const typeColor = event.event_type === 'deadline' ? 'bg-status-overdue' : 'bg-accent'
   const typeLabel = event.event_type ? event.event_type.charAt(0).toUpperCase() + event.event_type.slice(1) : 'Event'
   return (
-    <div className="fixed bottom-6 right-6 z-40 w-80 bg-white rounded-2xl border border-border shadow-2xl overflow-hidden">
+    <div className="fixed bottom-6 right-6 z-40 w-80 card border border-border shadow-2xl overflow-hidden">
       <div className={`h-1 ${typeColor}`} />
       <div className="p-4">
         <div className="flex items-start justify-between gap-2 mb-2">
@@ -79,7 +79,7 @@ function ReadOnlyEventPanel({ event, onClose }) {
         {!event.all_day && event.start_at && (
           <p className="text-xs text-text-muted mt-1 flex items-center gap-1">
             <Clock size={10} /> {format(new Date(event.start_at), 'h:mm a')}
-            {event.end_at && ` – ${format(new Date(event.end_at), 'h:mm a')}`}
+            {event.end_at && ` to ${format(new Date(event.end_at), 'h:mm a')}`}
           </p>
         )}
         {event.description && <p className="text-xs text-text-secondary mt-2 line-clamp-4">{event.description}</p>}
@@ -110,10 +110,10 @@ export default function CalendarPage() {
 
   const { events: allEvents, loading, addEvent, updateEvent, deleteEvent } = useCalendarEvents(year, month)
 
-  // ── Load shoots — fetch all, filter in JS ───────────────────────────────
+  // ── Load shoots. Fetch all, filter in JS ───────────────────────────────
   // We intentionally skip server-side date filtering. Doing date range
   // comparison in PostgREST has caused edge-case misses. Instead we fetch
-  // all accessible shoots and filter by month in JS — simple, bulletproof.
+  // all accessible shoots and filter by month in JS. Simple, bulletproof.
   useEffect(() => {
     if (!user) return
 
@@ -131,7 +131,7 @@ export default function CalendarPage() {
       const shootEvents = (data || [])
         .filter((s) =>
           s.status !== 'cancelled' &&           // exclude cancelled (null passes safely in JS)
-          s.shoot_date?.startsWith(monthStr)    // only this month — plain string prefix match
+          s.shoot_date?.startsWith(monthStr)    // only this month. Plain string prefix match
         )
         .map((s) => {
           const timeStr = s.shoot_time ? s.shoot_time.slice(0, 5) : '09:00'
@@ -232,16 +232,17 @@ export default function CalendarPage() {
   }, [user, currentDate])
 
   // Filter real events by role, and strip out shoot-linked calendar events.
-  // Shoots are already shown as synthetic events from the shoots table —
+  // Shoots are already shown as synthetic events from the shoots table.
   // showing the auto-generated calendar event too creates duplicates.
   // We detect shoot-linked events two ways:
-  //   1. shoot_id column is set (requires SQL column to exist — see setup notes)
+  //   1. shoot_id column is set (requires SQL column to exist. See setup notes)
   //   2. Fallback: event_type === 'shoot' (NewShootModal always uses this type)
   // Using both ensures zero duplicates regardless of DB schema state.
   const pureCalendarEvents = allEvents.filter((e) => !e.shoot_id && e.event_type !== 'shoot')
   const roleEvents = isAdmin
     ? pureCalendarEvents
     : pureCalendarEvents.filter((e) =>
+        e.created_by === user?.id ||
         (e.calendar_event_members || []).some((m) => m.profile_id === user?.id)
       )
 
@@ -256,7 +257,7 @@ export default function CalendarPage() {
     setSelectedAux(null)
     setSelectedRealEvent(null)
     if (isAdmin) {
-      // Admins get choice: event modal or project — for simplicity open project modal
+      // Admins get choice: event modal or project. For simplicity open project modal
       // (they can still use "Add Event" button for calendar events)
       setNewProjectDate(format(date, 'yyyy-MM-dd'))
     } else if (isCreative) {
@@ -290,14 +291,14 @@ export default function CalendarPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-white">
-      {/* Header row 1 — nav + actions */}
+    <div className="flex flex-col h-screen overflow-hidden bg-surface">
+      {/* Header row 1. Nav + actions */}
       <div className="flex items-center gap-2 px-6 py-3.5 border-b border-border shrink-0">
         <div className="flex items-center gap-1">
           <button onClick={prevMonth} className="btn-ghost p-1.5">
             <ChevronLeft size={16} />
           </button>
-          <h1 className="text-lg font-bold text-text-primary min-w-[160px] text-center">
+          <h1 className="font-display text-lg text-text-primary min-w-[160px] text-center">
             {format(currentDate, 'MMMM yyyy')}
           </h1>
           <button onClick={nextMonth} className="btn-ghost p-1.5">
@@ -311,25 +312,25 @@ export default function CalendarPage() {
 
         {(loading || auxLoading) && <Loader2 size={13} className="animate-spin text-text-muted ml-1" />}
 
-        {isAdmin && (
+        {(isAdmin || isCreative) && (
           <div className="ml-auto flex items-center gap-2">
             <button
-              onClick={() => setModalState({ date: new Date(), event: { event_type: 'meeting' } })}
+              onClick={() => setModalState({ date: new Date(), event: { event_type: 'virtual' } })}
               className="btn-secondary flex items-center gap-1.5 text-xs"
             >
-              <CalendarDays size={13} /> Schedule Meeting
+              <CalendarDays size={13} /> Schedule meeting
             </button>
             <button
               onClick={() => setModalState({ date: new Date(), event: null })}
               className="btn-primary flex items-center gap-1.5 text-xs"
             >
-              <Plus size={13} /> Add Event
+              <Plus size={13} /> Add event
             </button>
           </div>
         )}
       </div>
 
-      {/* Header row 2 — color legend */}
+      {/* Header row 2. Color legend */}
       <div className="flex items-center gap-5 px-6 py-2.5 border-b border-border bg-surface-2/40 shrink-0 flex-wrap">
         {Object.entries(EVENT_TYPES).map(([key, { label, color }]) => (
           <div key={key} className="flex items-center gap-2">
@@ -368,7 +369,7 @@ export default function CalendarPage() {
         />
       )}
 
-      {/* New project modal — triggered by day click for all roles */}
+      {/* New project modal. Triggered by day click for all roles */}
       {newProjectDate && (
         <NewProjectModal
           prefillDate={newProjectDate}

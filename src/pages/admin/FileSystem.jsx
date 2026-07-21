@@ -12,7 +12,7 @@ import { forceDownload } from '../../lib/r2'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function fmtBytes(b) {
-  if (!b) return '—'
+  if (!b) return 'Not set'
   if (b >= 1_073_741_824) return (b / 1_073_741_824).toFixed(2) + ' GB'
   if (b >= 1_048_576)     return (b / 1_048_576).toFixed(1) + ' MB'
   return (b / 1024).toFixed(1) + ' KB'
@@ -55,7 +55,7 @@ function StorageBar({ trackedBytes, r2Bytes }) {
   return (
     <div className="card p-5 mb-6">
       <div className="flex items-start justify-between mb-4">
-        {/* Left — total usage */}
+        {/* Left. Total usage */}
         <div>
           <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-0.5">Cloudflare R2 Storage</p>
           <div className="flex items-baseline gap-2">
@@ -69,12 +69,12 @@ function StorageBar({ trackedBytes, r2Bytes }) {
           )}
         </div>
 
-        {/* Right — cost badge */}
-        <div className={`text-right px-4 py-2.5 rounded-xl ${overFree ? 'bg-red-50' : 'bg-emerald-50'}`}>
-          <p className={`text-xs font-semibold uppercase tracking-wider mb-0.5 ${overFree ? 'text-red-500' : 'text-emerald-600'}`}>
+        {/* Right. Cost badge */}
+        <div className={`text-right px-4 py-2.5 rounded-xl ${overFree ? 'bg-status-overdue-bg' : 'bg-status-approved-bg'}`}>
+          <p className={`text-xs font-semibold uppercase tracking-wider mb-0.5 ${overFree ? 'text-status-overdue-text' : 'text-status-approved-text'}`}>
             Est. monthly
           </p>
-          <p className={`text-xl font-bold ${overFree ? 'text-red-500' : 'text-emerald-600'}`}>
+          <p className={`text-xl font-bold ${overFree ? 'text-status-overdue-text' : 'text-status-approved-text'}`}>
             {overFree ? `$${monthlyCost.toFixed(2)}` : '$0.00'}
           </p>
           {overFree
@@ -84,7 +84,7 @@ function StorageBar({ trackedBytes, r2Bytes }) {
         </div>
       </div>
 
-      {/* Progress bar — tracks against 10 GB free tier */}
+      {/* Progress bar. Tracks against 10 GB free tier */}
       <div className="h-2.5 bg-surface-2 rounded-full overflow-hidden">
         <div
           className={`h-full bg-gradient-to-r ${barColor} rounded-full transition-all duration-700`}
@@ -104,17 +104,17 @@ function DeleteModal({ file, onConfirm, onCancel, deleting, error }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onCancel} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 z-10">
-        <div className="w-11 h-11 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
-          <Trash2 size={20} className="text-red-500" />
+      <div className="relative card shadow-2xl w-full max-w-sm p-6 z-10">
+        <div className="w-11 h-11 rounded-2xl bg-status-overdue-bg flex items-center justify-center mx-auto mb-4">
+          <Trash2 size={20} className="text-status-overdue-text" />
         </div>
         <h2 className="text-base font-bold text-text-primary text-center mb-1">Delete file?</h2>
         <p className="text-xs text-text-muted text-center mb-1 break-all px-2">{file.file_name}</p>
-        <p className="text-xs text-red-500 text-center mb-5">
+        <p className="text-xs text-status-overdue-text text-center mb-5">
           Permanently deletes from Cloudflare R2 and this database. Cannot be undone.
         </p>
         {error && (
-          <p className="text-xs text-red-500 text-center mb-3 bg-red-50 rounded-lg px-3 py-2">{error}</p>
+          <p className="text-xs text-status-overdue-text text-center mb-3 bg-status-overdue-bg rounded-lg px-3 py-2">{error}</p>
         )}
         <div className="flex gap-3">
           <button onClick={onCancel} disabled={deleting} className="flex-1 btn-secondary">Cancel</button>
@@ -135,9 +135,9 @@ function DeleteModal({ file, onConfirm, onCancel, deleting, error }) {
 // ── File row ──────────────────────────────────────────────────────────────────
 function FileRow({ file, onDelete, canDelete }) {
   const t = fileType(file.file_name)
-  const iconBg = t === 'video' ? 'bg-blue-50' : t === 'image' ? 'bg-purple-50' : 'bg-gray-100'
+  const iconBg = t === 'video' ? 'bg-accent/10' : t === 'image' ? 'bg-accent/10' : 'bg-surface-2'
   const Icon   = t === 'video' ? Film : t === 'image' ? Image : FileIcon
-  const iconCl = t === 'video' ? 'text-blue-500' : t === 'image' ? 'text-purple-500' : 'text-gray-400'
+  const iconCl = t === 'video' ? 'text-blue-500' : t === 'image' ? 'text-purple-500' : 'text-text-muted'
 
   return (
     <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-surface-2/30 transition-colors group border-b border-border/40 last:border-0">
@@ -167,7 +167,7 @@ function FileRow({ file, onDelete, canDelete }) {
         )}
         {canDelete && (
           <button onClick={() => onDelete(file)}
-            className="p-1.5 text-text-muted hover:text-red-500 transition-colors rounded-lg hover:bg-red-50" title="Delete file">
+            className="p-1.5 text-text-muted hover:text-status-overdue-text transition-colors rounded-lg hover:bg-status-overdue-bg" title="Delete file">
             <Trash2 size={12} />
           </button>
         )}
@@ -255,8 +255,8 @@ function ClientFolder({ clientName, subtitle, shootGroups, shoots, onDelete, can
 function FinishedRow({ video }) {
   return (
     <div className="flex items-center gap-3 px-4 py-3 hover:bg-surface-2/30 transition-colors group border-b border-border/40 last:border-0">
-      <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center shrink-0">
-        <Film size={13} className="text-green-600" />
+      <div className="w-8 h-8 rounded-lg bg-status-approved-bg flex items-center justify-center shrink-0">
+        <Film size={13} className="text-status-approved-text" />
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-text-primary truncate">{video.project_name}</p>
@@ -370,12 +370,12 @@ export default function FileSystem() {
       client_name:     r.projects?.clients?.name || r.projects?.clients?.contact_name || 'Unknown Client',
       revision_number: r.revision_number,
       created_at:      r.created_at,
-      file_name:       `${r.projects?.name || 'project'} — Final v${r.revision_number}.mp4`,
+      file_name:       `${r.projects?.name || 'project'}. Final v${r.revision_number}.mp4`,
     })))
 
     setLoading(false)
 
-    // Fetch live R2 total in the background — don't block page render on this
+    // Fetch live R2 total in the background. Don't block page render on this
     if (isAdmin) {
       supabase.auth.getSession().then(({ data: { session } }) => {
         fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/r2-list`, {
@@ -429,7 +429,7 @@ export default function FileSystem() {
   const tree = useMemo(() => {
     const t = {}
     // For creatives/editors, seed every assigned shoot so the page shows a full
-    // list of their shoots — even ones with no uploads yet. Skipped while a
+    // list of their shoots. Even ones with no uploads yet. Skipped while a
     // search/type filter is active so results stay scoped to matches.
     if (isCreative && !search.trim() && typeFilter === 'All types') {
       Object.values(shootMap).forEach(s => {
@@ -502,7 +502,7 @@ export default function FileSystem() {
       const res = await fetch(base, { method: 'POST', headers, body: JSON.stringify({ action: 'reorganize' }) })
       const data = await res.json()
       setOrganizeResult(data)
-      setToast(`Done — moved ${data.moved} files, deleted ${data.deletedOrphans} orphaned files.`)
+      setToast(`Done. Moved ${data.moved} files, deleted ${data.deletedOrphans} orphaned files.`)
       setTimeout(() => setToast(null), 6000)
       load()
     } catch (err) {
@@ -517,9 +517,9 @@ export default function FileSystem() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">{isCreative ? 'Media' : 'File System'}</h1>
+          <h1 className="display">{isCreative ? 'Media' : 'File System'}</h1>
           <p className="text-sm text-text-muted mt-0.5">
-            {isCreative ? 'Shoots for your assigned clients' : 'All uploaded footage — organised by client and shoot'}
+            {isCreative ? 'Shoots for your assigned clients' : 'All uploaded footage. Organised by client and shoot'}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -546,7 +546,7 @@ export default function FileSystem() {
         </div>
       ) : (
         <>
-          {/* Storage bar — admin only */}
+          {/* Storage bar. Admin only */}
           {isAdmin && r2Total !== null && (
             <StorageBar trackedBytes={totalSize} r2Bytes={r2Total} />
           )}
@@ -577,7 +577,7 @@ export default function FileSystem() {
                 onClick={() => setTab(t.id)}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                   tab === t.id
-                    ? 'bg-white text-text-primary shadow-sm'
+                    ? 'bg-surface text-text-primary shadow-sm'
                     : 'text-text-muted hover:text-text-primary'
                 }`}
               >
@@ -672,7 +672,7 @@ export default function FileSystem() {
               <div className="card overflow-hidden">
                 <div className="px-4 py-3 border-b border-border bg-surface-2/30">
                   <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">
-                    Client-approved final videos — {finishedVideos.length} total
+                    Client-approved final videos. {finishedVideos.length} total
                   </p>
                 </div>
                 {finishedVideos.map(v => <FinishedRow key={v.id} video={v} />)}

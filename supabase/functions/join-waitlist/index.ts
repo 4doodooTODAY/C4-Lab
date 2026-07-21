@@ -1,4 +1,4 @@
-// join-waitlist — public endpoint for the sign-in-page waitlist form.
+// join-waitlist. Public endpoint for the sign-in-page waitlist form.
 // Stores { name, email, notes } and emails yourmove@connectfourcreative.com
 // once per signup via Resend. Deduplicates by email (returns 'already').
 //

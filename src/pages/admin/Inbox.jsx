@@ -5,15 +5,15 @@ import { format } from 'date-fns'
 
 const PRIORITY_CONFIG = {
   low:    { label: 'Low',    color: 'text-text-muted bg-surface-3' },
-  normal: { label: 'Normal', color: 'text-blue-600 bg-blue-50' },
-  high:   { label: 'High',   color: 'text-amber-600 bg-amber-50' },
-  urgent: { label: 'Urgent', color: 'text-red-600 bg-red-50' },
+  normal: { label: 'Normal', color: 'text-status-review-text bg-accent/10' },
+  high:   { label: 'High',   color: 'text-status-due-soon-text bg-status-due-soon-bg' },
+  urgent: { label: 'Urgent', color: 'text-status-overdue-text bg-status-overdue-bg' },
 }
 
 const STATUS_CONFIG = {
   new:         { label: 'New',         icon: Clock,         color: 'text-text-muted bg-surface-3' },
-  in_progress: { label: 'In Progress', icon: AlertCircle,   color: 'text-blue-600 bg-blue-50' },
-  done:        { label: 'Done',        icon: CheckCircle,   color: 'text-green-600 bg-green-50' },
+  in_progress: { label: 'In Progress', icon: AlertCircle,   color: 'text-status-review-text bg-accent/10' },
+  done:        { label: 'Done',        icon: CheckCircle,   color: 'text-status-approved-text bg-status-approved-bg' },
 }
 
 const PLATFORM_LABELS = {
@@ -165,7 +165,7 @@ export default function AdminInbox() {
   return (
     <div className="p-8 max-w-3xl">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-text-primary">Inbox</h1>
+        <h1 className="display">Inbox</h1>
         <p className="text-text-secondary mt-1">Client post requests and footage uploads.</p>
       </div>
 

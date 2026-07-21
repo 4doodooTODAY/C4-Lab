@@ -1,11 +1,11 @@
-// send-digests — cadence-aware digest push notifications for all roles.
+// send-digests. Cadence-aware digest push notifications for all roles.
 //
 // Called hourly by pg_cron ({ cron: true }). Idempotent: digest_log's PK
 // (user_id, period_key) guarantees at most one digest per user per period,
 // so extra invocations (or an outsider poking the endpoint) can never
 // double-notify anyone.
 //
-// Also handles { test: true } with the caller's JWT — sends an immediate
+// Also handles { test: true } with the caller's JWT. Sends an immediate
 // "notifications are working" push to that user only (used by Settings).
 //
 // Windows (UTC): daily → every day 15:00; weekly → Monday 15:00;
@@ -74,7 +74,7 @@ async function pushToUser(supabase: any, userId: string, payload: object): Promi
       )
       sent++
     } catch (err) {
-      // 404/410 = gone; 403 = VAPID mismatch (stale key) — prune either way
+      // 404/410 = gone; 403 = VAPID mismatch (stale key). Prune either way
       const code = (err as { statusCode?: number }).statusCode
       if (code === 404 || code === 410 || code === 403) {
         await supabase.from('push_subscriptions').delete().eq('id', sub.id)
@@ -104,7 +104,7 @@ async function buildTeamDigest(supabase: any, userId: string, role: string) {
   if (overdue) bits.push(`${overdue} overdue`)
   if (inReview) bits.push(`${inReview} in review`)
   return {
-    title: role === 'admin' ? 'C4 Lab — studio digest' : 'C4 Lab — your projects',
+    title: role === 'admin' ? 'C4C Lab. Studio digest' : 'C4C Lab. Your projects',
     body: bits.join(' · '),
     url: `${APP_URL}/projects`,
   }
@@ -141,7 +141,7 @@ async function buildClientDigest(supabase: any, userId: string) {
   if (awaiting) bits.push(`${awaiting} project${awaiting !== 1 ? 's' : ''} awaiting your review`)
   if (reviewed) bits.push(`${reviewed} you've reviewed`)
   return {
-    title: 'C4 Lab — your review digest',
+    title: 'C4C Lab. Your review digest',
     body: bits.join(' · '),
     url: `${APP_URL}/my-projects`,
   }
@@ -168,7 +168,7 @@ Deno.serve(async (req) => {
     const { data: { user }, error } = await supabase.auth.getUser(jwt)
     if (error || !user) return json({ error: 'invalid token' }, 401)
     const sent = await pushToUser(supabase, user.id, {
-      title: 'C4 Lab notifications are on',
+      title: 'C4C Lab notifications are on',
       body: 'This is how your digests will arrive.',
       url: APP_URL,
     })
@@ -186,7 +186,7 @@ Deno.serve(async (req) => {
     const periodKey = duePeriodKey(pref.cadence, now)
     if (!periodKey) continue
 
-    // Idempotency claim FIRST — a PK conflict means already sent this period.
+    // Idempotency claim FIRST. A PK conflict means already sent this period.
     const { error: logErr } = await supabase
       .from('digest_log')
       .insert({ user_id: pref.user_id, period_key: periodKey })
@@ -198,7 +198,7 @@ Deno.serve(async (req) => {
       ? await buildClientDigest(supabase, pref.user_id)
       : await buildTeamDigest(supabase, pref.user_id, role)
 
-    if (!digest) continue // nothing to report — stay silent, no spam
+    if (!digest) continue // nothing to report. Stay silent, no spam
     sentCount += await pushToUser(supabase, pref.user_id, digest)
   }
 

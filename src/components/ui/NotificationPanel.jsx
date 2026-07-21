@@ -5,10 +5,10 @@ import { useNotifications } from '../../contexts/NotificationContext'
 
 const TYPE = {
   message:         { icon: MessageSquare, color: 'text-accent',       bg: 'bg-accent/10'    },
-  video_review:    { icon: Film,          color: 'text-blue-600',     bg: 'bg-blue-50'      },
-  content_request: { icon: FileText,      color: 'text-orange-600',   bg: 'bg-orange-50'    },
-  footage_upload:  { icon: Upload,        color: 'text-green-600',    bg: 'bg-green-50'     },
-  pin_request:     { icon: Pin,           color: 'text-amber-600',    bg: 'bg-amber-50'     },
+  video_review:    { icon: Film,          color: 'text-status-review-text',     bg: 'bg-accent/10'      },
+  content_request: { icon: FileText,      color: 'text-status-due-soon-text',   bg: 'bg-status-due-soon-bg'    },
+  footage_upload:  { icon: Upload,        color: 'text-status-approved-text',    bg: 'bg-status-approved-bg'     },
+  pin_request:     { icon: Pin,           color: 'text-status-due-soon-text',    bg: 'bg-status-due-soon-bg'     },
   info:            { icon: Info,          color: 'text-text-muted',   bg: 'bg-surface-3'    },
 }
 
@@ -34,7 +34,7 @@ export default function NotificationPanel() {
       <div className="fixed inset-0 z-40" onClick={() => setPanelOpen(false)} />
 
       {/* Panel */}
-      <div className="fixed left-[220px] top-0 bottom-0 z-50 w-80 bg-white border-r border-border flex flex-col shadow-xl">
+      <div className="fixed left-[220px] top-0 bottom-0 z-50 w-80 bg-surface border-r border-border flex flex-col shadow-xl">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
           <div>

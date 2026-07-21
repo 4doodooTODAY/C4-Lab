@@ -1,4 +1,4 @@
-// shoot-download — validates a phone-gate claim token and returns a signed
+// shoot-download. Validates a phone-gate claim token and returns a signed
 // URL to the ORIGINAL file in the private shoot-originals bucket.
 // Anon never sees original paths; this function is the only download door.
 //
@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
   if (!claimRow) return json({ error: 'invalid claim' }, 403)
   if (new Date(claimRow.expires_at) <= new Date()) return json({ error: 'claim expired' }, 403)
 
-  // 2. Resolve image(s) — must belong to the claimed shoot.
+  // 2. Resolve image(s). Must belong to the claimed shoot.
   let imgQuery = supabase
     .from('one_off_shoot_images')
     .select('id, original_path, file_name')

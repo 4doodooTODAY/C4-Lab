@@ -89,7 +89,7 @@ export default function NewProjectModal({ onClose, onCreated }) {
         due_date:              form.due_date || null,
       }
       const row = await createProject(payload)
-      // Also register the editor in the project_editors junction table — the
+      // Also register the editor in the project_editors junction table. The
       // project page's team list reads from there, so without this the admin
       // had to assign the same editor a second time after creating.
       if (selectedEditor) {
@@ -106,11 +106,11 @@ export default function NewProjectModal({ onClose, onCreated }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 z-10 max-h-[90vh] overflow-y-auto">
+      <div className="relative card shadow-2xl w-full max-w-lg p-6 z-10 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-5">
           <div>
             <h2 className="text-base font-semibold text-text-primary">New Project</h2>
-            <p className="text-xs text-text-muted mt-0.5">Choose a client first — team members will filter automatically.</p>
+            <p className="text-xs text-text-muted mt-0.5">Choose a client first. Team members will filter automatically.</p>
           </div>
           <button onClick={onClose} className="btn-ghost p-1.5"><X size={16} /></button>
         </div>
@@ -120,7 +120,7 @@ export default function NewProjectModal({ onClose, onCreated }) {
           <div>
             <label className="label">Client *</label>
             <select className="input" value={form.client_id} onChange={set('client_id')} required>
-              <option value="">— Select a client —</option>
+              <option value="">Select a client</option>
               {clients.map((c) => (
                 <option key={c.id} value={c.id}>{c.contact_name || c.name}</option>
               ))}
@@ -192,7 +192,7 @@ export default function NewProjectModal({ onClose, onCreated }) {
             </div>
           </div>
 
-          {/* Team — only after client selected */}
+          {/* Team. Only after client selected */}
           {form.client_id && (
             <div className="p-3 bg-surface-2/40 rounded-xl border border-border space-y-3">
               <p className="text-xs font-semibold text-text-primary flex items-center gap-1.5">
@@ -203,7 +203,7 @@ export default function NewProjectModal({ onClose, onCreated }) {
                 <div>
                   <label className="label">Editor</label>
                   <select className="input" value={selectedEditor} onChange={(e) => setSelectedEditor(e.target.value)}>
-                    <option value="">— None —</option>
+                    <option value="">None</option>
                     {clientTeam.map((m) => (
                       <option key={m.id} value={m.id}>{m.full_name}{m.role === 'admin' ? ' (admin)' : ''}</option>
                     ))}
@@ -217,7 +217,7 @@ export default function NewProjectModal({ onClose, onCreated }) {
                 ) : (
                   <>
                     <select className="input" value={selectedShoot} onChange={(e) => setSelectedShoot(e.target.value)}>
-                      <option value="">— Not linked to a shoot —</option>
+                      <option value="">Not linked to a shoot</option>
                       {shoots.map((s) => (
                         <option key={s.id} value={s.id}>
                           {s.title}{s.shoot_date ? ` · ${format(parseISO(s.shoot_date), 'MMM d, yyyy')}` : ''}
@@ -231,7 +231,7 @@ export default function NewProjectModal({ onClose, onCreated }) {
             </div>
           )}
 
-          {/* Admin review gate — only for admins */}
+          {/* Admin review gate. Only for admins */}
           {isAdmin && (
             <label className="flex items-start gap-3 p-3 rounded-xl border border-border hover:border-accent/40 cursor-pointer transition-colors bg-surface-2/40">
               <input
@@ -248,7 +248,7 @@ export default function NewProjectModal({ onClose, onCreated }) {
           )}
 
           {error && (
-            <p className="text-xs text-red-500 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p>
+            <p className="text-xs text-status-overdue-text bg-status-overdue-bg border border-status-overdue/30 rounded-lg px-3 py-2">{error}</p>
           )}
 
           <div className="flex gap-2 justify-end pt-1">

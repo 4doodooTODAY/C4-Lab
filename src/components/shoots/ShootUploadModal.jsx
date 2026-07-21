@@ -31,12 +31,12 @@ function FileRow({ item, onRemove }) {
 
   return (
     <div className={`flex items-center gap-3 p-3 rounded-xl border transition-colors ${
-      item.status === 'done'     ? 'border-green-200 bg-green-50/40' :
-      item.status === 'error'    ? 'border-red-200 bg-red-50/40' :
+      item.status === 'done'     ? 'border-status-approved/30 bg-status-approved-bg/40' :
+      item.status === 'error'    ? 'border-status-overdue/30 bg-status-overdue-bg/40' :
       item.status === 'uploading'? 'border-accent/30 bg-accent/5' :
       'border-border bg-surface-2/40'
     }`}>
-      <div className={`w-8 h-8 rounded-lg bg-white border border-border flex items-center justify-center shrink-0`}>
+      <div className={`w-8 h-8 rounded-lg bg-surface border border-border flex items-center justify-center shrink-0`}>
         <Icon size={14} className={color} />
       </div>
 
@@ -55,10 +55,10 @@ function FileRow({ item, onRemove }) {
             </>
           )}
           {item.status === 'done' && (
-            <span className="text-[10px] text-green-600 font-medium">Uploaded</span>
+            <span className="text-[10px] text-status-approved-text font-medium">Uploaded</span>
           )}
           {item.status === 'error' && (
-            <span className="text-[10px] text-red-500 font-medium truncate">{item.error}</span>
+            <span className="text-[10px] text-status-overdue-text font-medium truncate">{item.error}</span>
           )}
         </div>
 
@@ -76,13 +76,13 @@ function FileRow({ item, onRemove }) {
       {/* Status icon / remove button */}
       <div className="shrink-0">
         {item.status === 'pending' && (
-          <button onClick={() => onRemove(item.id)} className="p-1 text-text-muted hover:text-red-500 transition-colors">
+          <button onClick={() => onRemove(item.id)} className="p-1 text-text-muted hover:text-status-overdue-text transition-colors">
             <Trash2 size={13} />
           </button>
         )}
         {item.status === 'uploading' && <Loader2 size={14} className="animate-spin text-accent" />}
         {item.status === 'done'      && <Check size={14} className="text-green-500" />}
-        {item.status === 'error'     && <AlertCircle size={14} className="text-red-500" />}
+        {item.status === 'error'     && <AlertCircle size={14} className="text-status-overdue-text" />}
       </div>
     </div>
   )
@@ -200,7 +200,7 @@ export default function ShootUploadModal({ shoot, clientId, clientName, onClose,
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={!running ? onClose : undefined} />
 
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg z-10 flex flex-col max-h-[90vh]">
+      <div className="relative card shadow-2xl w-full max-w-lg z-10 flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="flex items-start justify-between px-6 pt-5 pb-4 border-b border-border shrink-0">
           <div>
@@ -221,8 +221,8 @@ export default function ShootUploadModal({ shoot, clientId, clientName, onClose,
           {/* Success state */}
           {allDone && (
             <div className="text-center py-6">
-              <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-3">
-                <Check size={24} className="text-green-600" />
+              <div className="w-14 h-14 rounded-full bg-status-approved-bg flex items-center justify-center mx-auto mb-3">
+                <Check size={24} className="text-status-approved-text" />
               </div>
               <p className="text-sm font-semibold text-text-primary">{doneCount} file{doneCount !== 1 ? 's' : ''} uploaded</p>
               <p className="text-xs text-text-muted mt-1">Files are now in the client filesystem.</p>
@@ -271,12 +271,12 @@ export default function ShootUploadModal({ shoot, clientId, clientName, onClose,
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-semibold text-text-primary">
                       {items.length} file{items.length !== 1 ? 's' : ''}
-                      {doneCount > 0 && <span className="text-green-600 ml-1">· {doneCount} done</span>}
+                      {doneCount > 0 && <span className="text-status-approved-text ml-1">· {doneCount} done</span>}
                     </p>
                     {!running && pendingCount > 0 && (
                       <button
                         onClick={() => setItems((prev) => prev.filter((i) => i.status !== 'pending'))}
-                        className="text-[10px] text-text-muted hover:text-red-500 transition-colors"
+                        className="text-[10px] text-text-muted hover:text-status-overdue-text transition-colors"
                       >
                         Clear pending
                       </button>

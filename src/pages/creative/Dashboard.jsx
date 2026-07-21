@@ -53,8 +53,8 @@ function needsAction(project, revisions, userId, isAdmin) {
 function shootLabel(dateStr) {
   if (!dateStr) return null
   const d = parseISO(dateStr)
-  if (isToday(d))    return { text: 'Today',    cls: 'text-red-600 font-bold' }
-  if (isTomorrow(d)) return { text: 'Tomorrow', cls: 'text-amber-600 font-semibold' }
+  if (isToday(d))    return { text: 'Today',    cls: 'text-status-overdue-text font-bold' }
+  if (isTomorrow(d)) return { text: 'Tomorrow', cls: 'text-status-due-soon-text font-semibold' }
   return { text: format(d, 'EEE, MMM d'), cls: 'text-text-secondary' }
 }
 
@@ -74,31 +74,31 @@ const EVENT_LABEL = {
   personal:    'Personal',
 }
 
-// ── Who's Up — whose court is the ball in for a given project ─────────────────
+// ── Who's Up. Whose court is the ball in for a given project ─────────────────
 function whosUp(project, revisions) {
   const stage = project.stage
   const latestRev = [...revisions]
     .filter((r) => r.project_id === project.id)
     .sort((a, b) => b.revision_number - a.revision_number)[0]
 
-  if (stage === 'delivered') return { name: 'Done', detail: 'Project delivered ✓', color: 'text-green-600' }
+  if (stage === 'delivered') return { name: 'Done', detail: 'Project delivered ✓', color: 'text-status-approved-text' }
   if (stage === 'briefing' || stage === 'pre_production')
     return { name: 'Admin', detail: 'Setting up the project', color: 'text-slate-500' }
   if (stage === 'production')
-    return { name: project.creative?.full_name || 'Photographer', detail: 'Out on the shoot', color: 'text-amber-600' }
+    return { name: project.creative?.full_name || 'Photographer', detail: 'Out on the shoot', color: 'text-status-due-soon-text' }
   if (stage === 'post_production')
-    return { name: project.editor?.full_name || project.creative?.full_name || 'Editor', detail: 'Working on the edit', color: 'text-purple-600' }
+    return { name: project.editor?.full_name || project.creative?.full_name || 'Editor', detail: 'Working on the edit', color: 'text-status-review-text' }
   if (stage === 'review') {
     if (!latestRev || latestRev.status === 'pending_creative_review')
-      return { name: project.creative?.full_name || 'Creative', detail: 'Reviewing before client sees it', color: 'text-orange-600' }
+      return { name: project.creative?.full_name || 'Creative', detail: 'Reviewing before client sees it', color: 'text-status-due-soon-text' }
     if (latestRev.status === 'pending_client_review')
-      return { name: 'Client', detail: 'Watching and giving feedback', color: 'text-blue-600' }
+      return { name: 'Client', detail: 'Watching and giving feedback', color: 'text-status-review-text' }
     if (latestRev.status === 'pending_editor')
-      return { name: project.editor?.full_name || 'Editor', detail: 'Addressing revision feedback', color: 'text-purple-600' }
+      return { name: project.editor?.full_name || 'Editor', detail: 'Addressing revision feedback', color: 'text-status-review-text' }
     if (latestRev.status === 'approved')
-      return { name: 'Done', detail: 'Approved by client ✓', color: 'text-green-600' }
+      return { name: 'Done', detail: 'Approved by client ✓', color: 'text-status-approved-text' }
   }
-  return { name: '—', detail: '', color: 'text-text-muted' }
+  return { name: 'Not set', detail: '', color: 'text-text-muted' }
 }
 
 // ── Stat chip ──────────────────────────────────────────────────────────────────
@@ -167,7 +167,7 @@ export default function CreativeDashboard() {
       const myProjects = projData || []
       const projectIds = myProjects.map((p) => p.id)
 
-      // Revisions — only if there are projects
+      // Revisions. Only if there are projects
       const { data: revData } = projectIds.length
         ? await supabase
             .from('project_revisions')
@@ -260,8 +260,8 @@ export default function CreativeDashboard() {
   if (loadError) return (
     <div className="p-8 max-w-4xl">
       <div className="card px-6 py-8 flex flex-col items-center text-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center">
-          <AlertCircle size={18} className="text-red-500" />
+        <div className="w-10 h-10 rounded-full bg-status-overdue-bg flex items-center justify-center">
+          <AlertCircle size={18} className="text-status-overdue-text" />
         </div>
         <div>
           <p className="text-sm font-semibold text-text-primary">Couldn't load your overview</p>
@@ -281,16 +281,16 @@ export default function CreativeDashboard() {
     <div className="p-8 max-w-4xl space-y-9">
 
       {/* Greeting */}
-      <div>
+      <div className="anim-rise">
         <p className="text-base text-text-muted">{format(new Date(), 'EEEE, MMMM d')}</p>
-        <h1 className="text-3xl font-bold text-text-primary mt-1">
+        <h1 className="display mt-1">
           Hey, {firstName} 👋
         </h1>
       </div>
 
       {/* Stats row */}
-      <div className="grid grid-cols-3 gap-4">
-        <Stat label="Active projects"   value={activeProjs.length}   icon={FolderKanban} accent="#6C63FF" />
+      <div className="anim-rise d1 grid grid-cols-3 gap-4">
+        <Stat label="Active projects"   value={activeProjs.length}   icon={FolderKanban} accent="var(--violet)" />
         <Stat label="Need your action"  value={actionItems.length}   icon={AlertCircle}  accent={actionItems.length ? '#f59e0b' : '#94a3b8'} />
         <Stat label="Next 14 days"       value={shootsThisWeek}       icon={CalendarDays} accent="#10b981" />
       </div>
@@ -340,10 +340,10 @@ export default function CreativeDashboard() {
             {actionItems.map(({ project, action }) => {
               const ActionIcon = action.icon
               const colors = {
-                amber:  { bg: 'bg-amber-50',  text: 'text-amber-700'  },
-                purple: { bg: 'bg-purple-50', text: 'text-purple-700' },
-                orange: { bg: 'bg-orange-50', text: 'text-orange-700' },
-                blue:   { bg: 'bg-blue-50',   text: 'text-blue-700'   },
+                amber:  { bg: 'bg-status-due-soon-bg',  text: 'text-status-due-soon-text'  },
+                purple: { bg: 'bg-accent/10', text: 'text-status-review-text' },
+                orange: { bg: 'bg-status-due-soon-bg', text: 'text-status-due-soon-text' },
+                blue:   { bg: 'bg-accent/10',   text: 'text-status-review-text'   },
               }[action.color]
 
               return (
@@ -384,7 +384,7 @@ export default function CreativeDashboard() {
               const lbl = shootLabel(item.date)
               const dotColor = item.type === 'shoot'
                 ? '#f59e0b'
-                : (EVENT_COLOR[item.evtType] || '#6C63FF')
+                : (EVENT_COLOR[item.evtType] || 'var(--violet)')
 
               return (
                 <Link

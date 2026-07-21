@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { FileVideo, Image as ImageIcon } from 'lucide-react'
 
-// ── MediaThumb — accurate thumbnails for photos and videos ────────────────────
+// ── MediaThumb. Accurate thumbnails for photos and videos ────────────────────
 // Photos render the real image; videos render an actual frame (~1s in) by
 // letting the browser decode metadata + one frame. Falls back to a line-art
 // icon if the media can't load. No storage or processing needed.

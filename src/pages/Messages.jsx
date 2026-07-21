@@ -78,13 +78,13 @@ function EmojiPicker({ onSelect, onClose }) {
 
   const filtered = q
     ? EMOJI_CATS.flatMap(c => c.emojis).filter(e => {
-        // simple inclusion — emojis don't have search metadata, just show all when searching
+        // simple inclusion. Emojis don't have search metadata, just show all when searching
         return true
       }).slice(0, 80)
     : EMOJI_CATS[cat].emojis
 
   return (
-    <div ref={ref} className="absolute bottom-14 left-0 z-50 w-80 bg-white rounded-2xl shadow-2xl border border-border overflow-hidden select-none">
+    <div ref={ref} className="absolute bottom-14 left-0 z-50 w-80 card shadow-2xl border border-border overflow-hidden select-none">
       {/* Search */}
       <div className="px-3 pt-3 pb-2">
         <input
@@ -140,17 +140,17 @@ function ImageLightbox({ url, onClose }) {
 // ── Pinned Panel ──────────────────────────────────────────────────────────────
 function PinnedPanel({ pinned, isAdmin, onUnpin, onClose }) {
   return (
-    <div className="border-b border-amber-100 bg-amber-50/60 shrink-0">
+    <div className="border-b border-status-due-soon/30 bg-status-due-soon-bg/60 shrink-0">
       <div className="px-5 py-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Pin size={12} className="text-amber-600" />
-          <span className="text-xs font-semibold text-amber-700">{pinned.length} pinned</span>
+          <Pin size={12} className="text-status-due-soon-text" />
+          <span className="text-xs font-semibold text-status-due-soon-text">{pinned.length} pinned</span>
         </div>
         <button onClick={onClose} className="text-text-muted hover:text-text-primary"><X size={13} /></button>
       </div>
       <div className="px-5 pb-3 space-y-1.5 max-h-40 overflow-y-auto">
         {pinned.map((pm) => (
-          <div key={pm.id} className="bg-white rounded-xl px-3 py-2 flex items-start gap-2 border border-amber-100">
+          <div key={pm.id} className="card px-3 py-2 flex items-start gap-2 border border-status-due-soon/30">
             <Pin size={10} className="text-amber-400 mt-0.5 shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="text-[10px] font-medium text-text-muted mb-0.5">
@@ -163,7 +163,7 @@ function PinnedPanel({ pinned, isAdmin, onUnpin, onClose }) {
               }
             </div>
             {isAdmin && (
-              <button onClick={() => onUnpin(pm.message_id)} className="text-text-muted hover:text-red-500 shrink-0">
+              <button onClick={() => onUnpin(pm.message_id)} className="text-text-muted hover:text-status-overdue-text shrink-0">
                 <PinOff size={12} />
               </button>
             )}
@@ -178,15 +178,15 @@ function PinnedPanel({ pinned, isAdmin, onUnpin, onClose }) {
 function PinRequestBanner({ requests, messages, onApprove, onDecline }) {
   if (!requests.length) return null
   return (
-    <div className="border-b border-blue-100 bg-blue-50/60 px-5 py-2 shrink-0">
-      <p className="text-[11px] font-semibold text-blue-700 mb-1.5 flex items-center gap-1.5">
+    <div className="border-b border-accent/30 bg-accent/10/60 px-5 py-2 shrink-0">
+      <p className="text-[11px] font-semibold text-status-review-text mb-1.5 flex items-center gap-1.5">
         <Bell size={10} /> {requests.length} pin request{requests.length !== 1 ? 's' : ''} pending
       </p>
       <div className="space-y-1 max-h-32 overflow-y-auto">
         {requests.map((req) => {
           const msg = messages.find((m) => m.id === req.message_id)
           return (
-            <div key={req.id} className="bg-white rounded-lg px-3 py-1.5 flex items-center gap-2 border border-blue-100">
+            <div key={req.id} className="card px-3 py-1.5 flex items-center gap-2 border border-accent/30">
               <div className="flex-1 min-w-0">
                 <p className="text-[11px] text-text-muted">
                   <span className="font-medium">{req.profiles?.full_name || 'Someone'}</span> wants to pin:
@@ -196,8 +196,8 @@ function PinRequestBanner({ requests, messages, onApprove, onDecline }) {
                 </p>
               </div>
               <div className="flex gap-2 shrink-0">
-                <button onClick={() => onApprove(req)} className="text-[11px] font-semibold text-green-700 hover:underline">Approve</button>
-                <button onClick={() => onDecline(req.id)} className="text-[11px] font-semibold text-red-600 hover:underline">Decline</button>
+                <button onClick={() => onApprove(req)} className="text-[11px] font-semibold text-status-approved-text hover:underline">Approve</button>
+                <button onClick={() => onDecline(req.id)} className="text-[11px] font-semibold text-status-overdue-text hover:underline">Decline</button>
               </div>
             </div>
           )
@@ -233,6 +233,10 @@ export default function Messages() {
   const [search, setSearch]               = useState('')
   const [dmError, setDmError]             = useState('')
   const [dmLoading, setDmLoading]         = useState(null)
+  const [newMode, setNewMode]             = useState('dm')   // 'dm' | 'group'
+  const [groupName, setGroupName]         = useState('')
+  const [groupSel, setGroupSel]           = useState([])     // profile ids for a new group
+  const [peopleQuery, setPeopleQuery]     = useState('')     // filters the new-message people list
 
   const bottomRef    = useRef(null)
   const inputRef     = useRef(null)
@@ -614,8 +618,55 @@ export default function Messages() {
     }
   }
 
+  const toggleGroupMember = (id) =>
+    setGroupSel((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id])
+
+  // Create a group / main team chat with the selected people (plus yourself).
+  // Uses the same tables and RLS path as startDM, which already inserts other
+  // members, so no extra permissions are needed.
+  const createGroup = async () => {
+    setDmError('')
+    if (groupSel.length === 0) { setDmError('Pick at least one person for the chat.'); return }
+    setDmLoading('group')
+    try {
+      const name = groupName.trim() || 'Team chat'
+      const { data: newConv, error: convErr } = await supabase
+        .from('conversations')
+        .insert([{ is_group: true, name }])
+        .select('id')
+        .single()
+      if (convErr) throw new Error(convErr.message)
+
+      const memberIds = [...new Set([user.id, ...groupSel])]
+      const { error: memErr } = await supabase
+        .from('conversation_members')
+        .insert(memberIds.map((profile_id) => ({ conversation_id: newConv.id, profile_id })))
+      if (memErr) throw new Error(memErr.message)
+
+      closeNewModal()
+      await loadConversations(true)
+      setSelectedId(newConv.id)
+    } catch (err) {
+      setDmError(err.message)
+    } finally {
+      setDmLoading(null)
+    }
+  }
+
+  const closeNewModal = () => {
+    setShowNewDM(false)
+    setNewMode('dm')
+    setGroupSel([])
+    setGroupName('')
+    setPeopleQuery('')
+    setDmError('')
+  }
+
   // ── Derived ──────────────────────────────────────────────────────────────────
   const selectedConv = conversations.find((c) => c.id === selectedId) || null
+  const modalPeople = peopleQuery
+    ? allProfiles.filter((p) => (p.full_name || '').toLowerCase().includes(peopleQuery.toLowerCase()))
+    : allProfiles
   const grouped = computeGroups(messages)
   const filteredConvs = search
     ? conversations.filter((c) => getConvName(c, user?.id).toLowerCase().includes(search.toLowerCase()))
@@ -623,16 +674,16 @@ export default function Messages() {
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
-    <div className="flex h-full overflow-hidden bg-white">
+    <div className="flex h-full overflow-hidden bg-surface">
 
       {/* ── LEFT: conversation list ──────────────────────────────────────────── */}
-      <div className="w-[280px] shrink-0 border-r border-border flex flex-col bg-white">
+      <div className="w-[280px] shrink-0 border-r border-border flex flex-col bg-surface">
         {/* Header */}
         <div className="px-4 py-4 border-b border-border">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-base font-bold text-text-primary">{profile?.full_name?.split(' ')[0] || 'Messages'}</h2>
+            <h2 className="font-display text-base text-text-primary">{profile?.full_name?.split(' ')[0] || 'Messages'}</h2>
             <button onClick={() => setShowNewDM(true)}
-              className="w-8 h-8 rounded-full bg-surface-2 flex items-center justify-center text-text-muted hover:text-accent hover:bg-accent/10 transition-colors" title="New message">
+              className="w-8 h-8 rounded-full bg-surface-2 flex items-center justify-center text-text-muted hover:text-accent hover:bg-accent/10 transition-colors" title="New conversation">
               <Plus size={16} />
             </button>
           </div>
@@ -688,10 +739,10 @@ export default function Messages() {
 
       {/* ── RIGHT: chat ──────────────────────────────────────────────────────── */}
       {selectedConv ? (
-        <div className="flex-1 flex flex-col min-w-0 bg-white">
+        <div className="flex-1 flex flex-col min-w-0 bg-surface">
 
           {/* Chat header */}
-          <div className="px-5 py-3 border-b border-border flex items-center gap-3 shrink-0 bg-white">
+          <div className="px-5 py-3 border-b border-border flex items-center gap-3 shrink-0 bg-surface">
             <div className="shrink-0">
               {selectedConv.is_group
                 ? <div className="w-9 h-9 rounded-full bg-gradient-to-br from-accent to-purple-400 flex items-center justify-center"><Users2 size={16} className="text-white" /></div>
@@ -724,12 +775,12 @@ export default function Messages() {
             {/* Header actions */}
             <div className="flex items-center gap-1">
               <button onClick={() => setShowPinned(v => !v)}
-                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-medium border transition-colors ${showPinned ? 'bg-amber-50 border-amber-200 text-amber-700' : 'border-border text-text-muted hover:border-amber-200 hover:text-amber-600'}`}>
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-medium border transition-colors ${showPinned ? 'bg-status-due-soon-bg border-status-due-soon/30 text-status-due-soon-text' : 'border-border text-text-muted hover:border-status-due-soon/30 hover:text-status-due-soon-text'}`}>
                 <Pin size={11} />
                 {pinned.length > 0 ? pinned.length : 'Pins'}
               </button>
               {isAdmin && pinRequests.length > 0 && (
-                <div className="flex items-center gap-1 px-2 py-1.5 rounded-xl bg-blue-50 border border-blue-200 text-xs font-medium text-blue-700">
+                <div className="flex items-center gap-1 px-2 py-1.5 rounded-xl bg-accent/10 border border-accent/30 text-xs font-medium text-status-review-text">
                   <Bell size={11} /> {pinRequests.length}
                 </div>
               )}
@@ -769,7 +820,7 @@ export default function Messages() {
                   const hasText = msg.content?.trim()
                   const hasImg = !!msg.image_url
 
-                  // Bubble border-radius — grouped = square on connecting corner
+                  // Bubble border-radius. Grouped = square on connecting corner
                   const r = isMine
                     ? `18px ${msg.topGrouped ? '4px' : '18px'} ${msg.bottomGrouped ? '4px' : '18px'} 18px`
                     : `${msg.topGrouped ? '4px' : '18px'} 18px 18px ${msg.bottomGrouped ? '4px' : '18px'}`
@@ -806,12 +857,12 @@ export default function Messages() {
                                 {isAdmin ? (
                                   isPinned ? (
                                     <button onClick={() => handleUnpin(msg.id)}
-                                      className="p-1.5 rounded-full text-amber-500 hover:bg-amber-50 transition-colors" title="Unpin">
+                                      className="p-1.5 rounded-full text-amber-500 hover:bg-status-due-soon-bg transition-colors" title="Unpin">
                                       <PinOff size={12} />
                                     </button>
                                   ) : (
                                     <button onClick={() => handlePin(msg.id)}
-                                      className="p-1.5 rounded-full text-text-muted hover:text-amber-500 hover:bg-amber-50 transition-colors" title="Pin">
+                                      className="p-1.5 rounded-full text-text-muted hover:text-amber-500 hover:bg-status-due-soon-bg transition-colors" title="Pin">
                                       <Pin size={12} />
                                     </button>
                                   )
@@ -830,7 +881,7 @@ export default function Messages() {
                             <div className="relative">
                               {isPinned && <Pin size={9} className="absolute -top-2 right-0 text-amber-400 rotate-45 z-10" />}
 
-                              <div className={`relative overflow-hidden ${isMine ? 'bg-accent text-white' : 'bg-[#efefef] text-gray-900'}`}
+                              <div className={`relative overflow-hidden ${isMine ? 'bg-accent text-white' : 'bg-[#efefef] text-text-primary'}`}
                                 style={{ borderRadius: hasImg && !hasText ? (isMine ? '18px 18px 4px 18px' : '18px 18px 18px 4px') : r }}>
 
                                 {/* Image */}
@@ -876,7 +927,7 @@ export default function Messages() {
           </div>
 
           {/* ── Input bar ─────────────────────────────────────────────────── */}
-          <div className="px-4 py-3 border-t border-border bg-white shrink-0">
+          <div className="px-4 py-3 border-t border-border bg-surface shrink-0">
             <div className="flex items-end gap-2">
               {/* Left buttons */}
               <div className="flex items-center gap-1 pb-1.5">
@@ -948,43 +999,105 @@ export default function Messages() {
         </div>
       )}
 
-      {/* ── New DM modal ─────────────────────────────────────────────────────── */}
+      {/* ── New conversation modal (direct message or group chat) ────────────── */}
       {showNewDM && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowNewDM(false)} />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden z-10">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={closeNewModal} />
+          <div className="relative card shadow-2xl w-full max-w-sm overflow-hidden z-10">
             {/* Header */}
             <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
-              <button onClick={() => setShowNewDM(false)} className="text-text-muted hover:text-text-primary"><X size={18} /></button>
-              <h2 className="text-base font-bold text-text-primary flex-1 text-center">New message</h2>
+              <button onClick={closeNewModal} className="text-text-muted hover:text-text-primary"><X size={18} /></button>
+              <h2 className="font-display text-base text-text-primary flex-1 text-center">New conversation</h2>
               <div className="w-5" />
             </div>
-            {/* Search */}
-            <div className="px-4 py-2 border-b border-border">
-              <div className="relative">
-                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
-                <input placeholder="Search people…"
-                  className="w-full pl-8 pr-3 py-2 bg-surface-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-                  autoFocus />
-              </div>
-            </div>
-            {/* People */}
-            <div className="max-h-80 overflow-y-auto divide-y divide-border">
-              {allProfiles.length === 0 ? (
-                <p className="text-sm text-text-muted text-center py-8">No other users yet.</p>
-              ) : allProfiles.map((p) => (
-                <button key={p.id} onClick={() => startDM(p.id)} disabled={!!dmLoading}
-                  className="w-full flex items-center gap-3 px-5 py-3 hover:bg-surface-2 transition-colors text-left disabled:opacity-60">
-                  <Avatar name={p.full_name} url={p.avatar_url} size={10} />
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-text-primary">{p.full_name}</p>
-                    <p className="text-xs text-text-muted capitalize">{p.role}</p>
-                  </div>
-                  {dmLoading === p.id && <Loader2 size={16} className="animate-spin text-accent shrink-0" />}
+
+            {/* Mode toggle */}
+            <div className="flex gap-1 px-4 pt-3">
+              {[['dm', 'Direct'], ['group', 'Group chat']].map(([m, label]) => (
+                <button key={m} onClick={() => { setNewMode(m); setDmError('') }}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                    newMode === m ? 'bg-accent/15 text-accent' : 'text-text-muted hover:text-text-primary hover:bg-surface-2'
+                  }`}>
+                  {label}
                 </button>
               ))}
             </div>
-            {dmError && <p className="text-xs text-red-500 px-5 py-2 border-t border-border">{dmError}</p>}
+
+            {/* Group name (group mode only) */}
+            {newMode === 'group' && (
+              <div className="px-4 pt-3">
+                <input value={groupName} onChange={e => setGroupName(e.target.value)}
+                  placeholder="Chat name, like Team or Editors"
+                  className="w-full px-3 py-2 bg-surface-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-accent placeholder-text-muted" />
+              </div>
+            )}
+
+            {/* Search */}
+            <div className="px-4 py-3">
+              <div className="relative">
+                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+                <input value={peopleQuery} onChange={e => setPeopleQuery(e.target.value)}
+                  placeholder="Search people"
+                  className="w-full pl-8 pr-3 py-2 bg-surface-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-accent placeholder-text-muted"
+                  autoFocus />
+              </div>
+            </div>
+
+            {/* Select everyone (group mode) */}
+            {newMode === 'group' && modalPeople.length > 0 && (
+              <button
+                onClick={() => setGroupSel(
+                  groupSel.length === allProfiles.length ? [] : allProfiles.map(p => p.id)
+                )}
+                className="w-full px-5 pb-2 text-left text-xs font-semibold text-accent hover:underline">
+                {groupSel.length === allProfiles.length ? 'Clear everyone' : 'Add everyone for a main team chat'}
+              </button>
+            )}
+
+            {/* People */}
+            <div className="max-h-72 overflow-y-auto divide-y divide-border border-t border-border">
+              {modalPeople.length === 0 ? (
+                <p className="text-sm text-text-muted text-center py-8">No people found.</p>
+              ) : modalPeople.map((p) => {
+                const selected = groupSel.includes(p.id)
+                return (
+                  <button key={p.id}
+                    onClick={() => newMode === 'group' ? toggleGroupMember(p.id) : startDM(p.id)}
+                    disabled={newMode === 'dm' && !!dmLoading}
+                    className="w-full flex items-center gap-3 px-5 py-3 hover:bg-surface-2 transition-colors text-left disabled:opacity-60">
+                    <Avatar name={p.full_name} url={p.avatar_url} size={10} />
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-text-primary">{p.full_name}</p>
+                      <p className="text-xs text-text-muted capitalize">{p.role}</p>
+                    </div>
+                    {newMode === 'group' && (
+                      <span className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 ${
+                        selected ? 'bg-accent border-accent' : 'border-border'
+                      }`}>
+                        {selected && <Check size={13} className="text-white" />}
+                      </span>
+                    )}
+                    {newMode === 'dm' && dmLoading === p.id && <Loader2 size={16} className="animate-spin text-accent shrink-0" />}
+                  </button>
+                )
+              })}
+            </div>
+
+            {dmError && <p className="text-xs text-status-overdue-text px-5 py-2 border-t border-border">{dmError}</p>}
+
+            {/* Group create action */}
+            {newMode === 'group' && (
+              <div className="flex items-center justify-between gap-3 px-5 py-3 border-t border-border">
+                <span className="text-xs text-text-muted">
+                  {groupSel.length > 0 ? `${groupSel.length} selected` : 'Pick who is in the chat'}
+                </span>
+                <button onClick={createGroup} disabled={dmLoading === 'group'}
+                  className="btn-primary flex items-center gap-1.5 text-xs disabled:opacity-50">
+                  {dmLoading === 'group' ? <Loader2 size={13} className="animate-spin" /> : <Users2 size={13} />}
+                  Create chat
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -35,7 +35,7 @@ const STAGES = [
 // Normalize stages to canonical display key
 const STAGE_KEY_MAP = {
   pitch:           'pitch',
-  briefing:        'production',   // legacy — treat as pre-production
+  briefing:        'production',   // legacy. Treat as pre-production
   pre_production:  'production',
   planning:        'production',
   production:      'production',
@@ -49,7 +49,7 @@ const STAGE_KEY_MAP = {
 const STAGE_DESCRIPTIONS = {
   pitch:           'Waiting to be kicked off.',
   production:      'Upload footage and files for this project.',
-  post_production: 'Footage is ready — time to edit.',
+  post_production: 'Footage is ready. Time to edit.',
   review:          'Revision is under review.',
   delivered:       'Project complete!',
 }
@@ -64,15 +64,15 @@ const REVISION_STATUS_LABELS = {
 }
 
 const REVISION_STATUS_COLORS = {
-  pending_photographer_review: 'bg-amber-50 text-amber-700 border-amber-200',
-  pending_admin_review:        'bg-orange-50 text-orange-700 border-orange-200',
-  pending_creative_review:     'bg-amber-50 text-amber-700 border-amber-200',
-  pending_client_review:       'bg-blue-50 text-blue-700 border-blue-200',
-  pending_editor:              'bg-purple-50 text-purple-700 border-purple-200',
-  approved:                    'bg-green-50 text-green-700 border-green-200',
+  pending_photographer_review: 'bg-status-due-soon-bg text-status-due-soon-text border-status-due-soon/30',
+  pending_admin_review:        'bg-status-due-soon-bg text-status-due-soon-text border-status-due-soon/30',
+  pending_creative_review:     'bg-status-due-soon-bg text-status-due-soon-text border-status-due-soon/30',
+  pending_client_review:       'bg-accent/10 text-status-review-text border-accent/30',
+  pending_editor:              'bg-accent/10 text-status-review-text border-accent/30',
+  approved:                    'bg-status-approved-bg text-status-approved-text border-status-approved/30',
 }
 
-// ── Internal Project Notes (admin/creative only — never shown to client) ──────
+// ── Internal Project Notes (admin/creative only. Never shown to client) ──────
 function ProjectNotesCard({ projectId }) {
   const { user, profile } = useAuth()
   const [notes,   setNotes]   = useState([])
@@ -112,7 +112,7 @@ function ProjectNotesCard({ projectId }) {
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-border p-5">
+    <div className="card border border-border p-5">
       <p className="text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
         <StickyNote size={14} className="text-accent" /> Internal Notes
         <span className="text-xs font-normal text-text-muted">(not visible to client)</span>
@@ -160,7 +160,7 @@ function StagePipeline({ currentStage }) {
   const currentIdx = STAGES.findIndex((s) => s.key === normalised)
 
   return (
-    <div className="bg-white rounded-2xl border border-border p-5 mb-4">
+    <div className="card border border-border p-5 mb-4">
       {/* Pipeline bar */}
       <div className="flex items-center gap-0">
         {STAGES.map((stage, idx) => {
@@ -183,7 +183,7 @@ function StagePipeline({ currentStage }) {
                   {isPast ? <Check size={12} /> : idx + 1}
                 </div>
                 <p className={`text-[10px] mt-1.5 font-medium text-center leading-tight truncate w-full px-0.5 ${
-                  isCurrent ? 'text-accent' : isPast ? 'text-green-600' : 'text-text-muted'
+                  isCurrent ? 'text-accent' : isPast ? 'text-status-approved-text' : 'text-text-muted'
                 }`}>
                   {stage.label}
                 </p>
@@ -214,10 +214,10 @@ function WhosUpBar({ stage, editorProfile, creativeProfile }) {
   const normalised = STAGE_KEY_MAP[stage] || stage
 
   const config = {
-    briefing:        { who: 'Admin',  msg: 'Planning — waiting for admin to begin the project.',   color: 'bg-blue-50 border-blue-200 text-blue-900',   badge: 'bg-blue-100 text-blue-700' },
-    post_production: { who: editorProfile?.full_name || 'Editor', msg: 'Working on the edit.',     color: 'bg-purple-50 border-purple-200 text-purple-900', badge: 'bg-purple-100 text-purple-700' },
-    review:          { who: 'Client', msg: 'Reviewing the latest cut.',                             color: 'bg-amber-50 border-amber-200 text-amber-900',  badge: 'bg-amber-100 text-amber-700' },
-    ready_to_post:   { who: 'Admin',  msg: 'Client approved — admin needs to post and close out.', color: 'bg-green-50 border-green-200 text-green-900',  badge: 'bg-green-100 text-green-700' },
+    briefing:        { who: 'Admin',  msg: 'Planning. Waiting for admin to begin the project.',   color: 'bg-accent/10 border-accent/30 text-status-review-text',   badge: 'bg-accent/10 text-status-review-text' },
+    post_production: { who: editorProfile?.full_name || 'Editor', msg: 'Working on the edit.',     color: 'bg-accent/10 border-accent/30 text-status-review-text', badge: 'bg-accent/10 text-status-review-text' },
+    review:          { who: 'Client', msg: 'Reviewing the latest cut.',                             color: 'bg-status-due-soon-bg border-status-due-soon/30 text-status-due-soon-text',  badge: 'bg-status-due-soon-bg text-status-due-soon-text' },
+    ready_to_post:   { who: 'Admin',  msg: 'Client approved. Admin needs to post and close out.', color: 'bg-status-approved-bg border-status-approved/30 text-status-approved-text',  badge: 'bg-status-approved-bg text-status-approved-text' },
     delivered:       null,
   }
 
@@ -228,7 +228,7 @@ function WhosUpBar({ stage, editorProfile, creativeProfile }) {
     <div className={`rounded-2xl border px-4 py-3 mb-4 flex items-center gap-3 ${c.color}`}>
       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${c.badge}`}>UP NEXT</span>
       <span className="text-sm font-semibold">{c.who}</span>
-      <span className="text-xs opacity-60">—</span>
+      <span className="text-xs opacity-60">·</span>
       <span className="text-xs opacity-75">{c.msg}</span>
     </div>
   )
@@ -244,13 +244,13 @@ function ActionBanner({ project, uploads, revisions, isCreative, isEditor, navig
   // Pitch: both creative and editor see a "pending approval" banner
   if (project.stage === 'pitch') {
     return (
-      <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 flex items-start gap-3">
-        <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center shrink-0 mt-0.5">
-          <Eye size={18} className="text-amber-600" />
+      <div className="mb-6 rounded-2xl border border-status-due-soon/30 bg-status-due-soon-bg px-5 py-4 flex items-start gap-3">
+        <div className="w-9 h-9 rounded-xl bg-status-due-soon-bg flex items-center justify-center shrink-0 mt-0.5">
+          <Eye size={18} className="text-status-due-soon-text" />
         </div>
         <div>
-          <p className="text-sm font-bold text-amber-800">Waiting for client approval</p>
-          <p className="text-xs text-amber-600 mt-0.5">This project pitch has been submitted. The client or admin needs to approve it before work begins.</p>
+          <p className="text-sm font-bold text-status-due-soon-text">Waiting for client approval</p>
+          <p className="text-xs text-status-due-soon-text mt-0.5">This project pitch has been submitted. The client or admin needs to approve it before work begins.</p>
         </div>
       </div>
     )
@@ -295,7 +295,7 @@ function ActionBanner({ project, uploads, revisions, isCreative, isEditor, navig
       banner = {
         variant: 'accent',
         icon: <Upload size={18} />,
-        title: 'Footage is ready — start editing',
+        title: 'Footage is ready. Start editing',
         body: 'Upload your initial cut when done. It will go to the photographer for review first.',
       }
     } else if (latestRev?.status === 'pending_editor') {
@@ -304,7 +304,7 @@ function ActionBanner({ project, uploads, revisions, isCreative, isEditor, navig
       banner = {
         variant: 'red',
         icon: <AlertCircle size={18} />,
-        title: `🔔 ${clientLabel} sent feedback — it's your turn`,
+        title: `🔔 ${clientLabel} sent feedback. It's your turn`,
         body: `${clientLabel} reviewed ${mediaWord} and left comments. Address them and upload a revised version.`,
         action: {
           label: 'View Feedback →',
@@ -336,32 +336,32 @@ function ActionBanner({ project, uploads, revisions, isCreative, isEditor, navig
   if (!banner) return null
 
   const variantClasses = {
-    amber:  'border-amber-400 bg-amber-50',
-    red:    'border-red-400 bg-red-50',
-    blue:   'border-blue-400 bg-blue-50',
+    amber:  'border-amber-400 bg-status-due-soon-bg',
+    red:    'border-red-400 bg-status-overdue-bg',
+    blue:   'border-blue-400 bg-accent/10',
     accent: 'border-accent bg-accent/5',
-    green:  'border-green-400 bg-green-50',
+    green:  'border-green-400 bg-status-approved-bg',
   }
   const iconClasses = {
-    amber:  'text-amber-600',
-    red:    'text-red-600',
-    blue:   'text-blue-600',
+    amber:  'text-status-due-soon-text',
+    red:    'text-status-overdue-text',
+    blue:   'text-status-review-text',
     accent: 'text-accent',
-    green:  'text-green-600',
+    green:  'text-status-approved-text',
   }
   const titleClasses = {
-    amber:  'text-amber-900',
-    red:    'text-red-900',
-    blue:   'text-blue-900',
+    amber:  'text-status-due-soon-text',
+    red:    'text-status-overdue-text',
+    blue:   'text-status-review-text',
     accent: 'text-text-primary',
-    green:  'text-green-900',
+    green:  'text-status-approved-text',
   }
   const bodyClasses = {
-    amber:  'text-amber-700',
-    red:    'text-red-700',
-    blue:   'text-blue-700',
+    amber:  'text-status-due-soon-text',
+    red:    'text-status-overdue-text',
+    blue:   'text-status-review-text',
     accent: 'text-text-muted',
-    green:  'text-green-700',
+    green:  'text-status-approved-text',
   }
 
   return (
@@ -444,17 +444,17 @@ function RevisionCommentsList({ revisionId }) {
   }
 
   return (
-    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
-      <p className="text-xs font-semibold text-amber-800 mb-3">
+    <div className="bg-status-due-soon-bg border border-status-due-soon/30 rounded-xl p-4 mb-4">
+      <p className="text-xs font-semibold text-status-due-soon-text mb-3">
         Accepted comments to address ({comments.length})
       </p>
       <div className="space-y-2">
         {comments.map((c) => (
           <div key={c.id} className="flex gap-2">
-            <span className="text-xs font-semibold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded shrink-0">
+            <span className="text-xs font-semibold text-status-due-soon-text bg-status-due-soon-bg px-1.5 py-0.5 rounded shrink-0">
               {fmtTime(c.timestamp_seconds)}
             </span>
-            <p className="text-xs text-amber-900">{c.content}</p>
+            <p className="text-xs text-status-due-soon-text">{c.content}</p>
           </div>
         ))}
       </div>
@@ -466,7 +466,7 @@ function RevisionCommentsList({ revisionId }) {
 
 function ProjectOverviewCard({ project, creativeProfile, editorProfile }) {
   return (
-    <div className="bg-white rounded-2xl border border-border p-5">
+    <div className="card border border-border p-5">
       <h2 className="text-sm font-semibold text-text-primary mb-4">Project Overview</h2>
 
       <div className="space-y-4">
@@ -493,7 +493,7 @@ function ProjectOverviewCard({ project, creativeProfile, editorProfile }) {
           </div>
         )}
 
-        {/* Inspiration links — visible to the whole team (creative/editor/admin) */}
+        {/* Inspiration links. Visible to the whole team (creative/editor/admin) */}
         {project.inspiration_links?.length > 0 && (
           <div>
             <p className="text-xs text-text-muted mb-1.5 flex items-center gap-1">
@@ -553,7 +553,7 @@ function ProjectOverviewCard({ project, creativeProfile, editorProfile }) {
   )
 }
 
-// ── Shoot Delivery Section (Creative only — footage + notes in one flow) ──────
+// ── Shoot Delivery Section (Creative only. Footage + notes in one flow) ──────
 
 function ShootDeliverySection({ project, uploads, shootNotes, onRefresh }) {
   const { profile } = useAuth()
@@ -699,7 +699,7 @@ function ShootDeliverySection({ project, uploads, shootNotes, onRefresh }) {
 
       onRefresh()
     } catch (err) {
-      setSendError(err.message || 'Failed to send — check permissions.')
+      setSendError(err.message || 'Failed to send. Check permissions.')
     } finally {
       setSending(false)
     }
@@ -708,7 +708,7 @@ function ShootDeliverySection({ project, uploads, shootNotes, onRefresh }) {
   // ── Gate: not started yet ──────────────────────────────────────────────────
   if (!hasUploads && !open) {
     return (
-      <div className="bg-white rounded-2xl border border-border p-6 text-center">
+      <div className="card border border-border p-6 text-center">
         <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center mx-auto mb-3">
           <Upload size={22} className="text-accent" />
         </div>
@@ -724,42 +724,42 @@ function ShootDeliverySection({ project, uploads, shootNotes, onRefresh }) {
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-border p-5 space-y-5">
+    <div className="card border border-border p-5 space-y-5">
       <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
         <Upload size={14} className="text-text-muted" /> Shoot Delivery
       </h2>
 
       {/* ── Uploaded files summary ─────────────────────────────────────────── */}
       {hasUploads && (
-        <div className="bg-green-50 border border-green-200 rounded-xl p-3">
+        <div className="bg-status-approved-bg border border-status-approved/30 rounded-xl p-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Check size={14} className="text-green-600" />
-              <span className="text-sm font-semibold text-green-800">
+              <Check size={14} className="text-status-approved-text" />
+              <span className="text-sm font-semibold text-status-approved-text">
                 {uploads.length} file{uploads.length !== 1 ? 's' : ''} uploaded
               </span>
-              <span className="text-xs text-green-600">· {fmtBytes(totalSize)}</span>
+              <span className="text-xs text-status-approved-text">· {fmtBytes(totalSize)}</span>
             </div>
             <button
               onClick={() => setShowFiles((v) => !v)}
-              className="text-xs text-green-700 hover:text-green-900 font-medium transition-colors"
+              className="text-xs text-status-approved-text hover:text-status-approved-text font-medium transition-colors"
             >
               {showFiles ? 'Hide' : 'Show files'}
             </button>
           </div>
           {showFiles && (
-            <div className="mt-3 space-y-1.5 border-t border-green-200 pt-3">
+            <div className="mt-3 space-y-1.5 border-t border-status-approved/30 pt-3">
               {uploads.map((f) => (
                 <div key={f.id} className="flex items-center gap-2 group">
-                  <Film size={12} className="text-green-600 shrink-0" />
-                  <span className="text-xs text-green-900 truncate flex-1">{f.file_name}</span>
-                  <span className="text-xs text-green-600">{fmtBytes(f.file_size)}</span>
+                  <Film size={12} className="text-status-approved-text shrink-0" />
+                  <span className="text-xs text-status-approved-text truncate flex-1">{f.file_name}</span>
+                  <span className="text-xs text-status-approved-text">{fmtBytes(f.file_size)}</span>
                   {!alreadySent && (
                     <button
                       onClick={() => removeUpload(f)}
                       disabled={removingId === f.id}
                       title="Remove file"
-                      className="p-1 rounded-md text-green-500 hover:text-red-600 hover:bg-red-50 disabled:opacity-40 transition-colors shrink-0">
+                      className="p-1 rounded-md text-green-500 hover:text-status-overdue-text hover:bg-status-overdue-bg disabled:opacity-40 transition-colors shrink-0">
                       {removingId === f.id ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
                     </button>
                   )}
@@ -786,7 +786,7 @@ function ShootDeliverySection({ project, uploads, shootNotes, onRefresh }) {
                     <Loader2 size={13} className="animate-spin text-text-muted" />
                   ) : (
                     <button onClick={() => setFiles((prev) => prev.filter((x) => x.name !== f.name))}>
-                      <X size={13} className="text-text-muted hover:text-red-500" />
+                      <X size={13} className="text-text-muted hover:text-status-overdue-text" />
                     </button>
                   )}
                 </div>
@@ -796,7 +796,7 @@ function ShootDeliverySection({ project, uploads, shootNotes, onRefresh }) {
             <DropZone onFiles={(f) => setFiles((prev) => [...prev, ...f])} />
           )}
 
-          {uploadError && <p className="text-xs text-red-500 mt-2">{uploadError}</p>}
+          {uploadError && <p className="text-xs text-status-overdue-text mt-2">{uploadError}</p>}
 
           {files.length > 0 && (
             <div className="mt-3 flex items-center gap-3 flex-wrap">
@@ -878,7 +878,7 @@ function ShootDeliverySection({ project, uploads, shootNotes, onRefresh }) {
             {sending ? 'Sending…' : 'Send to Editor →'}
           </button>
           {sendError && (
-            <p className="text-xs text-red-500 text-center mt-2">{sendError}</p>
+            <p className="text-xs text-status-overdue-text text-center mt-2">{sendError}</p>
           )}
           <p className="text-xs text-text-muted text-center mt-2">
             This will notify the editor that footage is ready.
@@ -887,7 +887,7 @@ function ShootDeliverySection({ project, uploads, shootNotes, onRefresh }) {
       )}
 
       {alreadySent && (
-        <div className="flex items-center gap-2 text-xs text-green-700 bg-green-50 rounded-xl px-3 py-2">
+        <div className="flex items-center gap-2 text-xs text-status-approved-text bg-status-approved-bg rounded-xl px-3 py-2">
           <CheckCircle2 size={13} />
           Footage delivered to editor.
         </div>
@@ -900,12 +900,12 @@ function ShootDeliverySection({ project, uploads, shootNotes, onRefresh }) {
 
 function FileList({ files, accent = false, onDelete, deletingId }) {
   return (
-    <div className={`mt-2 rounded-xl divide-y ${accent ? 'border border-blue-100 divide-blue-50' : 'border border-border divide-border'}`}>
+    <div className={`mt-2 rounded-xl divide-y ${accent ? 'border border-accent/30 divide-blue-50' : 'border border-border divide-border'}`}>
       {files.map((f) => (
         <div key={f.id} className="flex items-center gap-3 px-3 py-2.5">
           <Film size={13} className={accent ? 'text-blue-300 shrink-0' : 'text-text-muted shrink-0'} />
           <div className="flex-1 min-w-0">
-            <span className={`text-sm truncate block ${accent ? 'text-blue-900' : 'text-text-primary'}`}>{f.file_name}</span>
+            <span className={`text-sm truncate block ${accent ? 'text-status-review-text' : 'text-text-primary'}`}>{f.file_name}</span>
             {f.profiles?.full_name && (
               <span className={`text-xs ${accent ? 'text-blue-400' : 'text-text-muted'}`}>Uploaded by {f.profiles.full_name}</span>
             )}
@@ -913,14 +913,14 @@ function FileList({ files, accent = false, onDelete, deletingId }) {
           <span className={`text-xs shrink-0 ${accent ? 'text-blue-400' : 'text-text-muted'}`}>{fmtBytes(f.file_size)}{f.created_at && ` · ${new Date(f.created_at).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })} EST`}</span>
           {f.file_url && (
             <button onClick={() => forceDownload(f.file_url, f.file_name)}
-              className={`transition-colors shrink-0 ${accent ? 'text-blue-500 hover:text-blue-700' : 'text-accent hover:text-accent/80'}`}
+              className={`transition-colors shrink-0 ${accent ? 'text-blue-500 hover:text-status-review-text' : 'text-accent hover:text-accent/80'}`}
               title="Download">
               <Download size={13} />
             </button>
           )}
           {onDelete && (
             <button onClick={() => onDelete(f)} disabled={deletingId === f.id}
-              className="text-text-muted hover:text-red-500 transition-colors shrink-0 disabled:opacity-40"
+              className="text-text-muted hover:text-status-overdue-text transition-colors shrink-0 disabled:opacity-40"
               title="Delete">
               {deletingId === f.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
             </button>
@@ -947,7 +947,7 @@ async function deleteShootUpload(f) {
 async function downloadFiles(files, setDownloading) {
   setDownloading(true)
   try {
-    // Files are fetched via the CDN and delivered as one zip — a single
+    // Files are fetched via the CDN and delivered as one zip. A single
     // browser download, so nothing gets silently blocked.
     await downloadAll(files, { concurrency: 4, zipName: 'footage' })
   } catch (err) {
@@ -1001,7 +1001,7 @@ function ShootLinkCard({ project, onRefresh }) {
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-border p-5 space-y-3">
+    <div className="card border border-border p-5 space-y-3">
       <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
         <Link2 size={14} className="text-text-muted" /> Linked Shoot
       </h2>
@@ -1018,7 +1018,7 @@ function ShootLinkCard({ project, onRefresh }) {
             onChange={(e) => { setSelected(e.target.value); setDone(false) }}
             disabled={saving}
           >
-            <option value="">— Not linked to a shoot —</option>
+            <option value="">Not linked to a shoot</option>
             {shoots.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.title}{s.shoot_date ? ` · ${format(parseISO(s.shoot_date), 'MMM d, yyyy')}` : ''}
@@ -1036,7 +1036,7 @@ function ShootLinkCard({ project, onRefresh }) {
         </div>
       )}
       {error && (
-        <p className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2 flex items-center gap-1.5">
+        <p className="text-xs text-status-overdue-text bg-status-overdue-bg rounded-lg px-3 py-2 flex items-center gap-1.5">
           <AlertCircle size={12} /> {error}
         </p>
       )}
@@ -1069,19 +1069,19 @@ function SourceFootageSection({ uploads, shootNotes, onRefresh }) {
   const clientSize = clientUploads.reduce((acc, f) => acc + (f.file_size || 0), 0)
 
   return (
-    <div className="bg-white rounded-2xl border border-border p-5 space-y-5">
+    <div className="card border border-border p-5 space-y-5">
       <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
         <Film size={14} className="text-text-muted" /> Source Footage
       </h2>
 
-      {deleteError && <p className="text-xs text-red-500">{deleteError}</p>}
+      {deleteError && <p className="text-xs text-status-overdue-text">{deleteError}</p>}
 
       {/* ── Client Assets ─────────────────────────────────────────────────── */}
       <div>
         <div className="flex items-center gap-2 mb-2">
-          <span className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Client Assets</span>
+          <span className="text-xs font-semibold text-status-review-text uppercase tracking-wide">Client Assets</span>
           {clientUploads.length > 0 && (
-            <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">
+            <span className="text-[10px] font-bold bg-accent/10 text-status-review-text px-1.5 py-0.5 rounded-full">
               {clientUploads.length}
             </span>
           )}
@@ -1090,15 +1090,15 @@ function SourceFootageSection({ uploads, shootNotes, onRefresh }) {
         {clientUploads.length === 0 ? (
           <p className="text-xs text-text-muted italic">No files uploaded by the client yet.</p>
         ) : (
-          <div className="bg-blue-50/60 border border-blue-100 rounded-xl p-3">
+          <div className="bg-accent/10/60 border border-accent/30 rounded-xl p-3">
             <div className="flex items-center gap-3 flex-wrap">
               <div className="flex-1">
-                <p className="text-sm font-bold text-blue-900">
+                <p className="text-sm font-bold text-status-review-text">
                   {clientUploads.length} file{clientUploads.length !== 1 ? 's' : ''}
                 </p>
                 <p className="text-xs text-blue-500">{fmtBytes(clientSize)} total</p>
               </div>
-              <button onClick={() => setShowClient((v) => !v)} className="text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors">
+              <button onClick={() => setShowClient((v) => !v)} className="text-xs text-status-review-text hover:text-status-review-text font-medium transition-colors">
                 {showClient ? 'Hide' : 'Show files'}
               </button>
               <button
@@ -1162,7 +1162,7 @@ function SourceFootageSection({ uploads, shootNotes, onRefresh }) {
           </p>
           <div className="space-y-2">
             {shootNotes.map((n) => (
-              <div key={n.id} className="bg-amber-50 border border-amber-100 rounded-xl p-3">
+              <div key={n.id} className="bg-status-due-soon-bg border border-status-due-soon/30 rounded-xl p-3">
                 <p className="text-xs text-text-muted mb-1">{format(new Date(n.created_at), 'MMM d, h:mm a')}</p>
                 <p className="text-sm text-text-primary whitespace-pre-wrap">{n.content}</p>
               </div>
@@ -1174,7 +1174,7 @@ function SourceFootageSection({ uploads, shootNotes, onRefresh }) {
   )
 }
 
-// ── Footage Uploads Section (admin + creative — upload any files to the project) ─
+// ── Footage Uploads Section (admin + creative. Upload any files to the project) ─
 
 function ProjectMediaSection({ project, uploads, onRefresh }) {
   const { profile } = useAuth()
@@ -1270,7 +1270,7 @@ function ProjectMediaSection({ project, uploads, onRefresh }) {
   const visible   = showAll ? uploads : uploads.slice(0, 3)
 
   return (
-    <div className="bg-white rounded-2xl border border-border p-5 space-y-4">
+    <div className="card border border-border p-5 space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
           <Upload size={14} className="text-text-muted" /> Footage Uploads
@@ -1278,7 +1278,7 @@ function ProjectMediaSection({ project, uploads, onRefresh }) {
         <span className="text-xs text-text-muted">{uploads.length} file{uploads.length !== 1 ? 's' : ''}</span>
       </div>
 
-      {/* Drop zone — always visible */}
+      {/* Drop zone. Always visible */}
       <div
         onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
         onDragLeave={() => setDragging(false)}
@@ -1320,7 +1320,7 @@ function ProjectMediaSection({ project, uploads, onRefresh }) {
               {progress[f.name] === 100 && <Check size={12} className="text-green-500 shrink-0" />}
               {!uploading && (
                 <button onClick={(e) => { e.stopPropagation(); setFiles((prev) => prev.filter((_, j) => j !== i)) }}>
-                  <X size={12} className="text-text-muted hover:text-red-500" />
+                  <X size={12} className="text-text-muted hover:text-status-overdue-text" />
                 </button>
               )}
             </div>
@@ -1337,7 +1337,7 @@ function ProjectMediaSection({ project, uploads, onRefresh }) {
             </div>
           )}
 
-          {error && <p className="text-xs text-red-500">{error}</p>}
+          {error && <p className="text-xs text-status-overdue-text">{error}</p>}
 
           <button
             onClick={handleUpload}
@@ -1382,7 +1382,7 @@ function ProjectMediaSection({ project, uploads, onRefresh }) {
               <button
                 onClick={removeSelected}
                 disabled={bulkRemoving}
-                className="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50">
+                className="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-status-overdue/30 text-status-overdue-text hover:bg-status-overdue-bg transition-colors disabled:opacity-50">
                 {bulkRemoving ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
                 Remove Selected ({selectedIds.size})
               </button>
@@ -1414,7 +1414,7 @@ function ProjectMediaSection({ project, uploads, onRefresh }) {
                 <button
                   onClick={() => removeUpload(f)}
                   disabled={deletingId === f.id}
-                  className="text-text-muted hover:text-red-500 transition-colors shrink-0 disabled:opacity-40"
+                  className="text-text-muted hover:text-status-overdue-text transition-colors shrink-0 disabled:opacity-40"
                   title="Delete"
                 >
                   {deletingId === f.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
@@ -1483,14 +1483,14 @@ function AdminReviewSection({ revision, project, onRefresh }) {
   }
 
   return (
-    <div className="bg-white rounded-2xl border-2 border-orange-200 p-5 space-y-4">
+    <div className="card border-2 border-status-due-soon/30 p-5 space-y-4">
       {/* Header */}
       <div className="flex items-center gap-2">
-        <div className="w-8 h-8 rounded-xl bg-orange-100 flex items-center justify-center shrink-0">
-          <Eye size={16} className="text-orange-600" />
+        <div className="w-8 h-8 rounded-xl bg-status-due-soon-bg flex items-center justify-center shrink-0">
+          <Eye size={16} className="text-status-due-soon-text" />
         </div>
         <div>
-          <h2 className="text-sm font-bold text-text-primary">Admin Review — First Edit</h2>
+          <h2 className="text-sm font-bold text-text-primary">Admin Review. First Edit</h2>
           <p className="text-xs text-text-muted">Review before it reaches the client</p>
         </div>
       </div>
@@ -1505,7 +1505,7 @@ function AdminReviewSection({ revision, project, onRefresh }) {
       </div>
 
       {error && (
-        <p className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
+        <p className="text-xs text-status-overdue-text bg-status-overdue-bg px-3 py-2 rounded-lg">{error}</p>
       )}
 
       {/* Reject panel */}
@@ -1547,7 +1547,7 @@ function AdminReviewSection({ revision, project, onRefresh }) {
           <>
             <button
               onClick={() => setShowReject(true)}
-              className="btn-secondary flex-1 text-sm text-red-600 hover:text-red-700"
+              className="btn-secondary flex-1 text-sm text-status-overdue-text hover:text-status-overdue-text"
               disabled={loading}
             >
               Request Changes
@@ -1558,7 +1558,7 @@ function AdminReviewSection({ revision, project, onRefresh }) {
               className="flex-1 text-sm font-semibold px-4 py-2 rounded-xl bg-green-500 hover:bg-green-600 text-white transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
             >
               {loading ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-              Approve — Send to Client
+              Approve. Send to Client
             </button>
           </>
         )}
@@ -1604,7 +1604,7 @@ function DraftCutPanel({ project, draftRev, onReplace, onRefresh }) {
       await notifyAdminsFn({
         actorId: profile.id,
         type:    'revision_uploaded',
-        title:   `${revLabel} sent for review — "${project.name}"`,
+        title:   `${revLabel} sent for review. "${project.name}"`,
         body:    toClient ? 'Now with the client for review.' : 'Photographer review is next.',
         link:    `/projects/${project.id}`,
       })
@@ -1624,7 +1624,7 @@ function DraftCutPanel({ project, draftRev, onReplace, onRefresh }) {
           profileId: project.creative_id,
           actorId:   profile.id,
           type:      'revision_uploaded',
-          title:     `${revLabel} ready for your review — "${project.name}"`,
+          title:     `${revLabel} ready for your review. "${project.name}"`,
           body:      'Leave your timeline notes before the client sees it.',
           link:      `/projects/${project.id}`,
         })
@@ -1646,10 +1646,10 @@ function DraftCutPanel({ project, draftRev, onReplace, onRefresh }) {
   }
 
   return (
-    <div className="bg-white rounded-2xl border-2 border-dashed border-accent/40 p-5 space-y-3">
+    <div className="card border-2 border-dashed border-accent/40 p-5 space-y-3">
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-surface-2 text-text-secondary uppercase tracking-wide">
-          Draft — not sent
+          Draft. Not sent
         </span>
         <h2 className="text-sm font-bold text-text-primary">{revLabel}</h2>
       </div>
@@ -1657,7 +1657,7 @@ function DraftCutPanel({ project, draftRev, onReplace, onRefresh }) {
         {isPhoto
           ? `${draftRev.photo_urls?.length || 0} photo${(draftRev.photo_urls?.length || 0) !== 1 ? 's' : ''} uploaded.`
           : 'Cut uploaded.'}{' '}
-        Nothing has gone to anyone yet — replace, delete, or send it when you're ready.
+        Nothing has gone to anyone yet. Replace, delete, or send it when you're ready.
         Once sent, it locks until the client requests revisions.
       </p>
       {!isPhoto && draftRev.video_url && (
@@ -1665,7 +1665,7 @@ function DraftCutPanel({ project, draftRev, onReplace, onRefresh }) {
           className="w-full rounded-xl max-h-64" style={{ background: '#000' }} />
       )}
       {error && (
-        <p className="text-xs text-red-500 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p>
+        <p className="text-xs text-status-overdue-text bg-status-overdue-bg border border-status-overdue/30 rounded-lg px-3 py-2">{error}</p>
       )}
       <div className="flex gap-2 flex-wrap">
         <button
@@ -1682,7 +1682,7 @@ function DraftCutPanel({ project, draftRev, onReplace, onRefresh }) {
         <button
           onClick={handleDelete}
           disabled={sending || deleting}
-          className="px-4 py-2 rounded-lg text-sm font-medium text-red-600 border border-red-200 hover:bg-red-50 transition-colors disabled:opacity-50"
+          className="px-4 py-2 rounded-lg text-sm font-medium text-status-overdue-text border border-status-overdue/30 hover:bg-status-overdue-bg transition-colors disabled:opacity-50"
         >
           {deleting ? <Loader2 size={14} className="animate-spin" /> : 'Delete'}
         </button>
@@ -1738,7 +1738,7 @@ function UploadPhotoRevisionSection({ project, revisions, onRefresh }) {
         })
         photoUrls.push(publicUrl)
 
-        // Compressed ~1600px WebP preview — review pages load this (~10x
+        // Compressed ~1600px WebP preview. Review pages load this (~10x
         // smaller = ~10x faster) while downloads keep the untouched original.
         let previewUrl = null
         try {
@@ -1759,7 +1759,7 @@ function UploadPhotoRevisionSection({ project, revisions, onRefresh }) {
         setDoneCount(i + 1)
       }
 
-      // Upload NEVER auto-sends — lands as a draft; explicit Send in DraftCutPanel.
+      // Upload NEVER auto-sends. Lands as a draft; explicit Send in DraftCutPanel.
       if (draftRev) {
         const { error: e } = await supabase.from('project_revisions')
           .update({ photo_urls: photoUrls, preview_urls: previewUrls, uploaded_by: profile.id })
@@ -1801,7 +1801,7 @@ function UploadPhotoRevisionSection({ project, revisions, onRefresh }) {
   }
 
   if (!open) {
-    // A draft exists — show the draft panel (send / replace / delete) instead
+    // A draft exists. Show the draft panel (send / replace / delete) instead
     if (draftRev) {
       return (
         <DraftCutPanel
@@ -1813,14 +1813,14 @@ function UploadPhotoRevisionSection({ project, revisions, onRefresh }) {
       )
     }
     return (
-      <div className="bg-white rounded-2xl border border-border p-6 text-center">
+      <div className="card border border-border p-6 text-center">
         <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center mx-auto mb-3">
           <Camera size={22} className="text-accent" />
         </div>
         <h2 className="text-sm font-bold text-text-primary mb-1">
           {nextRevNum === 1 ? 'Ready to submit your photos?' : `Ready to upload Revision ${nextRevNum}?`}
         </h2>
-        <p className="text-xs text-text-muted mb-4">Upload your edited photos — nothing goes to the client until you press Send.</p>
+        <p className="text-xs text-text-muted mb-4">Upload your edited photos. Nothing goes to the client until you press Send.</p>
         <button onClick={() => setOpen(true)} className="btn-primary">
           {nextRevNum === 1 ? 'Upload Initial Photos' : `Upload Revision ${nextRevNum}`}
         </button>
@@ -1829,13 +1829,13 @@ function UploadPhotoRevisionSection({ project, revisions, onRefresh }) {
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-border p-5 space-y-4">
+    <div className="card border border-border p-5 space-y-4">
       <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
         <Camera size={14} className="text-text-muted" />
-        Upload Photos — {nextRevNum === 1 ? 'Initial Set' : `Revision ${nextRevNum}`}
+        Upload Photos. {nextRevNum === 1 ? 'Initial Set' : `Revision ${nextRevNum}`}
       </h2>
 
-      {/* File picker — hidden while uploading */}
+      {/* File picker. Hidden while uploading */}
       {!uploading && (
         <div
           className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${
@@ -1849,7 +1849,7 @@ function UploadPhotoRevisionSection({ project, revisions, onRefresh }) {
           ) : (
             <>
               <p className="text-sm font-semibold text-text-primary">Click to select photos</p>
-              <p className="text-xs text-text-muted mt-1">JPG, PNG, WEBP — multiple files allowed</p>
+              <p className="text-xs text-text-muted mt-1">JPG, PNG, WEBP. Multiple files allowed</p>
             </>
           )}
           <input
@@ -1887,7 +1887,7 @@ function UploadPhotoRevisionSection({ project, revisions, onRefresh }) {
           <div className="flex gap-1 flex-wrap">
             {photos.map((f, i) => (
               <span key={i} className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
-                i < doneCount ? 'bg-green-100 text-green-700' :
+                i < doneCount ? 'bg-status-approved-bg text-status-approved-text' :
                 i === doneCount ? 'bg-accent/10 text-accent' :
                 'bg-surface-2 text-text-muted'
               }`}>
@@ -1910,7 +1910,7 @@ function UploadPhotoRevisionSection({ project, revisions, onRefresh }) {
         </div>
       )}
 
-      {uploadError && <p className="text-xs text-red-500">{uploadError}</p>}
+      {uploadError && <p className="text-xs text-status-overdue-text">{uploadError}</p>}
 
       <div className="flex gap-2">
         <button onClick={() => { setOpen(false); setPhotos([]) }} className="btn-secondary" disabled={uploading}>Cancel</button>
@@ -1945,12 +1945,12 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
   const latestRev  = [...revisions].sort((a, b) => b.revision_number - a.revision_number)[0]
   const draftRev   = latestRev?.status === 'draft' ? latestRev : null
 
-  // "Rework" = admin rejected and editor is fixing it — update same revision, skip to client
+  // "Rework" = admin rejected and editor is fixing it. Update same revision, skip to client
   const isAdminRework = latestRev?.status === 'pending_editor' && latestRev?.admin_reviewed === true
-  // "Open slot" = admin added an extra revision but no video yet — fill it in place
+  // "Open slot" = admin added an extra revision but no video yet. Fill it in place
   const isOpenSlot    = latestRev?.status === 'pending_editor' && !latestRev?.video_url && !isAdminRework
   const nextRevNum    = (isAdminRework || isOpenSlot || draftRev)
-    ? latestRev.revision_number  // same number — fill the existing revision
+    ? latestRev.revision_number  // same number. Fill the existing revision
     : (latestRev ? latestRev.revision_number + 1 : 1)
 
   const canUpload = ['production', 'post_production'].includes(stage) || (latestRev && ['pending_editor', 'draft'].includes(latestRev.status))
@@ -1979,13 +1979,13 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
       // Upload NEVER auto-sends. Every path lands in 'draft'; the editor sends
       // explicitly via the Send-for-review button (DraftCutPanel).
       if (draftRev) {
-        // Replacing the file on an existing draft (unlocked — DB trigger allows)
+        // Replacing the file on an existing draft (unlocked. DB trigger allows)
         const { error: e } = await supabase.from('project_revisions')
           .update({ video_url: publicUrl, uploaded_by: profile.id })
           .eq('id', draftRev.id)
         if (e) throw new Error(e.message)
       } else if (isAdminRework || isOpenSlot) {
-        // Fill the existing slot — but as a draft, not straight to the client.
+        // Fill the existing slot. But as a draft, not straight to the client.
         const { error: e } = await supabase.from('project_revisions')
           .update({ video_url: publicUrl, status: 'draft', uploaded_by: profile.id })
           .eq('id', latestRev.id)
@@ -2001,7 +2001,7 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
         if (e) throw new Error(e.message)
       }
 
-      // Send-time notifications now live in DraftCutPanel — nothing is sent here.
+      // Send-time notifications now live in DraftCutPanel. Nothing is sent here.
 
       // Save editor note
       if (editorNote.trim()) {
@@ -2034,17 +2034,17 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
     : `Ready to upload ${revisionLabel(nextRevNum)}?`
 
   const gateBody = isAdminRework
-    ? 'Admin requested changes. Fix them and upload — you review it as a draft, then send it to the client (no extra revision count).'
+    ? 'Admin requested changes. Fix them and upload. You review it as a draft, then send it to the client (no extra revision count).'
     : isOpenSlot
-    ? 'Admin opened an extra revision. Upload the cut — it stays a draft until you send it.'
+    ? 'Admin opened an extra revision. Upload the cut. It stays a draft until you send it.'
     : nextRevNum > 1
-    ? `Address the client's feedback and upload your revised cut — nothing is sent until you press Send.`
+    ? `Address the client's feedback and upload your revised cut. Nothing is sent until you press Send.`
     : project.admin_review_required
     ? 'Your cut uploads as a draft; when you send it, admin approves before the client sees it.'
-    : 'Upload your initial cut — it stays a private draft until you send it for review.'
+    : 'Upload your initial cut. It stays a private draft until you send it for review.'
 
   if (!open) {
-    // A draft cut exists — show the draft panel (send / replace / delete)
+    // A draft cut exists. Show the draft panel (send / replace / delete)
     if (draftRev) {
       return (
         <DraftCutPanel
@@ -2056,7 +2056,7 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
       )
     }
     return (
-      <div className="bg-white rounded-2xl border border-border p-6 text-center">
+      <div className="card border border-border p-6 text-center">
         <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center mx-auto mb-3">
           <FileVideo size={22} className="text-accent" />
         </div>
@@ -2075,7 +2075,7 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-border p-5 space-y-4">
+    <div className="card border border-border p-5 space-y-4">
       <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
         <FileVideo size={14} className="text-text-muted" /> Upload {revisionLabel(nextRevNum)}
       </h2>
@@ -2166,7 +2166,7 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
         />
       </div>
 
-      {uploadError && <p className="text-xs text-red-500">{uploadError}</p>}
+      {uploadError && <p className="text-xs text-status-overdue-text">{uploadError}</p>}
 
       <div className="flex gap-2">
         <button
@@ -2195,7 +2195,7 @@ function RevisionsCard({ project, revisions, commentCounts, navigate }) {
   const sorted = [...revisions].sort((a, b) => b.revision_number - a.revision_number)
 
   return (
-    <div className="bg-white rounded-2xl border border-border p-5">
+    <div className="card border border-border p-5">
       <h2 className="text-sm font-semibold text-text-primary mb-4 flex items-center gap-2">
         {project.media_type === 'photo' ? <Camera size={14} className="text-text-muted" /> : <FileVideo size={14} className="text-text-muted" />} Revisions
       </h2>
@@ -2246,7 +2246,7 @@ function RevisionsCard({ project, revisions, commentCounts, navigate }) {
                   {r.video_url && (
                     <button onClick={() => forceDownload(r.video_url, `revision-${r.revision_number}.mp4`)}
                       
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-xs font-semibold text-gray-700 transition-colors" title="Download full quality">
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-2 hover:bg-gray-200 text-xs font-semibold text-text-primary transition-colors" title="Download full quality">
                       <Download size={12} /> Download
                     </button>
                   )}
@@ -2257,7 +2257,7 @@ function RevisionsCard({ project, revisions, commentCounts, navigate }) {
         </div>
       )}
 
-      {/* Caption concept — the copy that ships with this content */}
+      {/* Caption concept. The copy that ships with this content */}
       <CaptionConcept projectId={project.id} initialValue={project.caption_concept} canEdit plain />
 
       <p className="text-xs text-text-muted mt-4 pt-3 border-t border-border">
@@ -2271,7 +2271,7 @@ function RevisionsCard({ project, revisions, commentCounts, navigate }) {
 
 function QuickActionsCard({ projectId, isAdmin }) {
   return (
-    <div className="bg-white rounded-2xl border border-border p-5">
+    <div className="card border border-border p-5">
       <h2 className="text-sm font-semibold text-text-primary mb-3">Quick Actions</h2>
       <div className="space-y-2">
         {isAdmin && (
@@ -2327,7 +2327,7 @@ function ProjectStatusCard({ project, revisions, creativeProfile, editorProfile 
   const current = reviewCurrent || controlMap[stage] || { label: stage, detail: '' }
 
   return (
-    <div className="bg-white rounded-2xl border border-border p-5">
+    <div className="card border border-border p-5">
       <h2 className="text-sm font-semibold text-text-primary mb-3">Who's Up</h2>
       <div className="flex items-start gap-3">
         <div className="w-2 h-2 rounded-full bg-accent mt-1.5 shrink-0 animate-pulse" />
@@ -2481,7 +2481,7 @@ export default function ProjectWorkflow() {
       <div className="mb-6">
         <div className="flex items-start gap-3 flex-wrap">
           <div className="flex-1 min-w-0">
-            <h1 className="text-2xl font-bold text-text-primary">{project.name}</h1>
+            <h1 className="display">{project.name}</h1>
             {project.clients && (
               <p className="text-sm text-text-muted mt-0.5">
                 {project.clients.contact_name || project.clients.name}
@@ -2490,12 +2490,12 @@ export default function ProjectWorkflow() {
           </div>
           <div className="flex gap-2 flex-wrap">
             {isCreative && !isEditor && (
-              <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 font-semibold px-2.5 py-0.5 rounded-full">
+              <span className="text-xs bg-status-due-soon-bg text-status-due-soon-text border border-status-due-soon/30 font-semibold px-2.5 py-0.5 rounded-full">
                 Creative
               </span>
             )}
             {isEditor && !isCreative && (
-              <span className="text-xs bg-green-50 text-green-700 border border-green-200 font-semibold px-2.5 py-0.5 rounded-full">
+              <span className="text-xs bg-status-approved-bg text-status-approved-text border border-status-approved/30 font-semibold px-2.5 py-0.5 rounded-full">
                 Editor
               </span>
             )}
@@ -2531,7 +2531,7 @@ export default function ProjectWorkflow() {
 
       {/* Two-column layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* LEFT COLUMN — 2/3 width */}
+        {/* LEFT COLUMN. 2/3 width */}
         <div className="lg:col-span-2 space-y-6">
           {/* 1. Project Overview */}
           <ProjectOverviewCard
@@ -2540,7 +2540,7 @@ export default function ProjectWorkflow() {
             editorProfile={editorProfile}
           />
 
-          {/* Admin Review Gate — shown to admin when first edit is pending their approval */}
+          {/* Admin Review Gate. Shown to admin when first edit is pending their approval */}
           {isAdmin && (() => {
             const pendingAdminRev = revisions.find((r) => r.status === 'pending_admin_review')
             return pendingAdminRev ? (
@@ -2552,7 +2552,7 @@ export default function ProjectWorkflow() {
             ) : null
           })()}
 
-          {/* Project Media — upload any videos/photos directly to the project */}
+          {/* Project Media. Upload any videos/photos directly to the project */}
           {isCreative && (
             <ProjectMediaSection
               project={project}
@@ -2561,12 +2561,12 @@ export default function ProjectWorkflow() {
             />
           )}
 
-          {/* Link a shoot to this project — before the 2nd draft (admins anytime) */}
+          {/* Link a shoot to this project. Before the 2nd draft (admins anytime) */}
           {canLinkShoot && (
             <ShootLinkCard project={project} onRefresh={fetchAll} />
           )}
 
-          {/* 3a. Source Footage — visible to any editor role (incl. creative+editor combo) */}
+          {/* 3a. Source Footage. Visible to any editor role (incl. creative+editor combo) */}
           {isEditor && (
             <SourceFootageSection
               uploads={uploads}
@@ -2575,7 +2575,7 @@ export default function ProjectWorkflow() {
             />
           )}
 
-          {/* 3b. Upload Revision — visible to any editor role */}
+          {/* 3b. Upload Revision. Visible to any editor role */}
           {isEditor && project?.media_type === 'photo' ? (
             <UploadPhotoRevisionSection
               project={project}
@@ -2591,7 +2591,7 @@ export default function ProjectWorkflow() {
           ) : null}
         </div>
 
-        {/* RIGHT COLUMN — 1/3 width */}
+        {/* RIGHT COLUMN. 1/3 width */}
         <div className="space-y-6">
           {/* 1. Revisions */}
           <RevisionsCard

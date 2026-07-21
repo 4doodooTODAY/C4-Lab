@@ -31,11 +31,11 @@ function fileIcon(name = '') {
 }
 
 const STAGE_COLORS = {
-  post_production: 'bg-purple-50 text-purple-600',
-  review:          'bg-orange-50 text-orange-600',
-  revisions:       'bg-red-50 text-red-600',
-  delivered:       'bg-green-50 text-green-700',
-  production:      'bg-amber-50 text-amber-700',
+  post_production: 'bg-accent/10 text-status-review-text',
+  review:          'bg-status-due-soon-bg text-status-due-soon-text',
+  revisions:       'bg-status-overdue-bg text-status-overdue-text',
+  delivered:       'bg-status-approved-bg text-status-approved-text',
+  production:      'bg-status-due-soon-bg text-status-due-soon-text',
 }
 const STAGE_LABELS = {
   briefing: 'Briefing', pre_production: 'Pre-Production', production: 'Production',
@@ -107,12 +107,12 @@ function ShootsTab({ clientId, clientName }) {
           </div>
           <div className="flex flex-col items-end gap-2 shrink-0">
             {shoot.status === 'completed' ? (
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-50 text-green-700 flex items-center gap-1">
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-status-approved-bg text-status-approved-text flex items-center gap-1">
                 <Check size={9} /> Completed
               </span>
             ) : (
               <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                shoot.status === 'cancelled' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-700'
+                shoot.status === 'cancelled' ? 'bg-status-overdue-bg text-status-overdue-text' : 'bg-accent/10 text-status-review-text'
               }`}>
                 {shoot.status}
               </span>
@@ -129,7 +129,7 @@ function ShootsTab({ clientId, clientName }) {
                   await supabase.from('shoots').update({ status: 'completed' }).eq('id', shoot.id)
                   refetch()
                 }}
-                className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 transition-colors flex items-center gap-1"
+                className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-status-approved-bg text-status-approved-text hover:bg-status-approved-bg transition-colors flex items-center gap-1"
               >
                 <Check size={11} /> Mark Done
               </button>
@@ -364,9 +364,9 @@ function DraftsTab({ clientId }) {
   )
 
   const TYPE_COLORS = {
-    reel:  'bg-purple-50 text-purple-700',
-    post:  'bg-blue-50 text-blue-700',
-    photo: 'bg-amber-50 text-amber-700',
+    reel:  'bg-accent/10 text-status-review-text',
+    post:  'bg-accent/10 text-status-review-text',
+    photo: 'bg-status-due-soon-bg text-status-due-soon-text',
     story: 'bg-pink-50 text-pink-700',
   }
 
@@ -382,10 +382,10 @@ function DraftsTab({ clientId }) {
         const isPendingEditor = versions.some((v) => v.status === 'pending_editor')
 
         let statusLabel = 'No uploads'
-        let statusCls   = 'bg-gray-100 text-gray-500'
-        if (isApproved)      { statusLabel = '✓ Approved';       statusCls = 'bg-green-50 text-green-700' }
-        else if (isPendingClient) { statusLabel = 'Awaiting Client'; statusCls = 'bg-blue-50 text-blue-700' }
-        else if (isPendingEditor) { statusLabel = 'In Revision';     statusCls = 'bg-amber-50 text-amber-700' }
+        let statusCls   = 'bg-surface-2 text-text-secondary'
+        if (isApproved)      { statusLabel = '✓ Approved';       statusCls = 'bg-status-approved-bg text-status-approved-text' }
+        else if (isPendingClient) { statusLabel = 'Awaiting Client'; statusCls = 'bg-accent/10 text-status-review-text' }
+        else if (isPendingEditor) { statusLabel = 'In Revision';     statusCls = 'bg-status-due-soon-bg text-status-due-soon-text' }
 
         return (
           <div

@@ -30,9 +30,9 @@ function Pin({ pin, index, selected, onClick, status }) {
 // ── Comment card in the side panel ────────────────────────────────────────────
 function CommentCard({ comment, index, selected, onSelect, canAct, onAccept, onDecline }) {
   const statusColors = {
-    pending:  'border-amber-200 bg-amber-50',
-    accepted: 'border-green-200 bg-green-50',
-    declined: 'border-red-200 bg-red-50',
+    pending:  'border-status-due-soon/30 bg-status-due-soon-bg',
+    accepted: 'border-status-approved/30 bg-status-approved-bg',
+    declined: 'border-status-overdue/30 bg-status-overdue-bg',
   }
   const statusLabel = { pending: 'Pending', accepted: 'Accepted', declined: 'Declined' }
 
@@ -42,14 +42,14 @@ function CommentCard({ comment, index, selected, onSelect, canAct, onAccept, onD
       className={`p-3 rounded-xl border cursor-pointer transition-all ${selected ? 'ring-2 ring-accent ' : ''}${statusColors[comment.status] || statusColors.pending}`}
     >
       <div className="flex items-start gap-2">
-        <span className="w-5 h-5 rounded-full bg-white border border-current flex items-center justify-center text-[9px] font-bold shrink-0 mt-0.5">
+        <span className="w-5 h-5 rounded-full bg-surface border border-current flex items-center justify-center text-[9px] font-bold shrink-0 mt-0.5">
           {index + 1}
         </span>
         <div className="flex-1 min-w-0">
           <p className="text-xs font-semibold text-text-primary">{comment.profiles?.full_name || 'Unknown'}</p>
           <p className="text-xs text-text-secondary mt-0.5 leading-relaxed">{comment.body}</p>
           <div className="flex items-center justify-between mt-1.5">
-            <span className={`text-[10px] font-semibold ${comment.status === 'accepted' ? 'text-green-600' : comment.status === 'declined' ? 'text-red-600' : 'text-amber-600'}`}>
+            <span className={`text-[10px] font-semibold ${comment.status === 'accepted' ? 'text-status-approved-text' : comment.status === 'declined' ? 'text-status-overdue-text' : 'text-status-due-soon-text'}`}>
               {statusLabel[comment.status]}
             </span>
             <span className="text-[10px] text-text-muted">
@@ -62,13 +62,13 @@ function CommentCard({ comment, index, selected, onSelect, canAct, onAccept, onD
         <div className="flex gap-1.5 mt-2 ml-7">
           <button
             onClick={(e) => { e.stopPropagation(); onAccept(comment.id) }}
-            className="flex-1 flex items-center justify-center gap-1 py-1 rounded-lg bg-green-100 hover:bg-green-200 text-green-700 text-[11px] font-semibold transition-colors"
+            className="flex-1 flex items-center justify-center gap-1 py-1 rounded-lg bg-status-approved-bg hover:bg-green-200 text-status-approved-text text-[11px] font-semibold transition-colors"
           >
             <Check size={11} /> Accept
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onDecline(comment.id) }}
-            className="flex-1 flex items-center justify-center gap-1 py-1 rounded-lg bg-red-100 hover:bg-red-200 text-red-700 text-[11px] font-semibold transition-colors"
+            className="flex-1 flex items-center justify-center gap-1 py-1 rounded-lg bg-status-overdue-bg hover:bg-red-200 text-status-overdue-text text-[11px] font-semibold transition-colors"
           >
             <X size={11} /> Decline
           </button>
@@ -98,7 +98,7 @@ export default function PhotoRevisionReview() {
 
   const [photoIndex,  setPhotoIndex]  = useState(0)
   const [selectedPin, setSelectedPin] = useState(null)
-  const [pendingPin,  setPendingPin]  = useState(null) // {x_pct, y_pct} — not yet saved
+  const [pendingPin,  setPendingPin]  = useState(null) // {x_pct, y_pct}. Not yet saved
   const [newComment,  setNewComment]  = useState('')
   const [saving,      setSaving]      = useState(false)
 
@@ -147,7 +147,7 @@ export default function PhotoRevisionReview() {
 
   useEffect(() => { fetchAll() }, [fetchAll])
 
-  // Safety net: never spin forever — surface a retry after 25s of loading.
+  // Safety net: never spin forever. Surface a retry after 25s of loading.
   useEffect(() => {
     if (!loading) return
     const t = setTimeout(() => {
@@ -174,7 +174,7 @@ export default function PhotoRevisionReview() {
 
   // Self-healing backfill: revisions uploaded before previews existed only
   // have full-res originals. When a team member views one, quietly generate
-  // compressed previews in the background and save them — every later view
+  // compressed previews in the background and save them. Every later view
   // (including the client's) gets the fast path. Runs once per revision.
   const backfillRan = useRef(false)
   useEffect(() => {
@@ -331,7 +331,7 @@ export default function PhotoRevisionReview() {
     }
   }
 
-  // ── Photographer/creative: done reviewing — approve & send to the client ──
+  // ── Photographer/creative: done reviewing. Approve & send to the client ──
   const handlePhotographerDone = async () => {
     setSendingToClient(true)
     try {
@@ -362,7 +362,7 @@ export default function PhotoRevisionReview() {
         link: `/projects/${project.id}`,
       })
     } catch (err) {
-      setError(err.message || 'Failed — check permissions')
+      setError(err.message || 'Failed. Check permissions')
     } finally {
       setSendingToClient(false)
     }
@@ -372,7 +372,7 @@ export default function PhotoRevisionReview() {
     <div className="flex justify-center py-24"><Loader2 size={22} className="animate-spin text-text-muted" /></div>
   )
   if (error) return (
-    <div className="p-8"><p className="text-red-500">{error}</p></div>
+    <div className="p-8"><p className="text-status-overdue-text">{error}</p></div>
   )
 
   const revStatus   = revision?.status
@@ -382,37 +382,37 @@ export default function PhotoRevisionReview() {
   const whosUpBanner = (() => {
     const editor = editorName || 'your editor'
     if (revStatus === 'pending_client_review' && isClient) return {
-      bg: 'bg-blue-50 border-blue-200', icon: '📸', textColor: 'text-blue-800',
+      bg: 'bg-accent/10 border-accent/30', icon: '📸', textColor: 'text-status-review-text',
       title: `${editor} sent you photos to review`,
       sub: 'Click on the photo to pin a comment anywhere, or approve if everything looks great.',
     }
     if (revStatus === 'pending_editor' && isClient) return {
-      bg: 'bg-amber-50 border-amber-200', icon: '⏳', textColor: 'text-amber-800',
+      bg: 'bg-status-due-soon-bg border-status-due-soon/30', icon: '⏳', textColor: 'text-status-due-soon-text',
       title: `Your feedback is with ${editor}`,
       sub: "They've been notified and are working on the changes. We'll let you know when a new version is ready.",
     }
     if (revStatus === 'pending_client_review' && (isEditor || isPhotographer || isAdmin)) return {
-      bg: 'bg-blue-50 border-blue-200', icon: '👀', textColor: 'text-blue-800',
+      bg: 'bg-accent/10 border-accent/30', icon: '👀', textColor: 'text-status-review-text',
       title: 'Waiting for client review',
       sub: 'The client has been notified. You\'ll be alerted when they respond.',
     }
     if (revStatus === 'pending_editor' && (isEditor || isAdmin)) return {
-      bg: 'bg-orange-50 border-orange-200', icon: '🔔', textColor: 'text-orange-800',
-      title: "Client sent feedback — it's your turn",
+      bg: 'bg-status-due-soon-bg border-status-due-soon/30', icon: '🔔', textColor: 'text-status-due-soon-text',
+      title: "Client sent feedback. It's your turn",
       sub: 'Review their pinned comments below and upload a revised set of photos.',
     }
     if ((revStatus === 'pending_photographer_review' || revStatus === 'pending_creative_review') && (isPhotographer || isAdmin) && !isClient) return {
-      bg: 'bg-amber-50 border-amber-200', icon: '👀', textColor: 'text-amber-800',
+      bg: 'bg-status-due-soon-bg border-status-due-soon/30', icon: '👀', textColor: 'text-status-due-soon-text',
       title: 'Review this set before the client sees it',
       sub: 'The editor sent you a new set. Review it, then approve and send it to the client.',
     }
     if ((revStatus === 'pending_photographer_review' || revStatus === 'pending_creative_review') && isClient) return {
-      bg: 'bg-amber-50 border-amber-200', icon: '⏳', textColor: 'text-amber-800',
+      bg: 'bg-status-due-soon-bg border-status-due-soon/30', icon: '⏳', textColor: 'text-status-due-soon-text',
       title: 'Your team is reviewing the latest set',
       sub: "It's being checked internally first. We'll let you know when it's ready for your review.",
     }
     if (revStatus === 'approved') return {
-      bg: 'bg-green-50 border-green-200', icon: '✅', textColor: 'text-green-800',
+      bg: 'bg-status-approved-bg border-status-approved/30', icon: '✅', textColor: 'text-status-approved-text',
       title: 'Photos approved!',
       sub: isClient ? 'You approved these photos.' : 'The client approved this photo set.',
     }
@@ -420,9 +420,9 @@ export default function PhotoRevisionReview() {
   })()
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-gray-50">
+    <div className="flex flex-col h-screen overflow-hidden bg-surface-2">
       {/* Header */}
-      <div className="flex items-center gap-3 px-6 py-3.5 bg-white border-b border-border shrink-0">
+      <div className="flex items-center gap-3 px-6 py-3.5 bg-surface border-b border-border shrink-0">
         <Link to={`/projects/${project?.id}/creative`} className="text-text-muted hover:text-text-primary transition-colors">
           <ArrowLeft size={16} />
         </Link>
@@ -436,10 +436,10 @@ export default function PhotoRevisionReview() {
         </div>
         <div className="ml-auto flex items-center gap-2">
           <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
-            revStatus === 'approved'              ? 'bg-green-50 text-green-700' :
-            revStatus === 'pending_client_review' ? 'bg-blue-50 text-blue-700'  :
-            revStatus === 'pending_editor'        ? 'bg-orange-50 text-orange-700' :
-            revStatus === 'pending_photographer_review' ? 'bg-amber-50 text-amber-700' :
+            revStatus === 'approved'              ? 'bg-status-approved-bg text-status-approved-text' :
+            revStatus === 'pending_client_review' ? 'bg-accent/10 text-status-review-text'  :
+            revStatus === 'pending_editor'        ? 'bg-status-due-soon-bg text-status-due-soon-text' :
+            revStatus === 'pending_photographer_review' ? 'bg-status-due-soon-bg text-status-due-soon-text' :
             'bg-surface-2 text-text-muted'
           }`}>
             {revStatus === 'approved'              ? '✓ Approved' :
@@ -537,10 +537,10 @@ export default function PhotoRevisionReview() {
         </div>
 
         {/* Side panel */}
-        <div className="w-80 bg-white border-l border-border flex flex-col shrink-0 overflow-hidden">
+        <div className="w-80 bg-surface border-l border-border flex flex-col shrink-0 overflow-hidden">
           <div className="px-4 py-3 border-b border-border shrink-0">
             <p className="text-xs font-semibold text-text-muted uppercase tracking-wide">
-              Comments — Photo {photoIndex + 1}
+              Comments. Photo {photoIndex + 1}
               {commentsOnCurrentPhoto.length > 0 && (
                 <span className="ml-1.5 bg-surface-2 text-text-muted px-1.5 py-0.5 rounded-full text-[10px]">
                   {commentsOnCurrentPhoto.length}
@@ -550,9 +550,9 @@ export default function PhotoRevisionReview() {
           </div>
 
           {error && (
-            <div className="mx-3 mt-2 p-2 rounded-lg bg-red-50 border border-red-200">
-              <p className="text-xs text-red-600">{error}</p>
-              <button onClick={() => setError('')} className="text-[10px] text-red-400 hover:text-red-600 mt-0.5">Dismiss</button>
+            <div className="mx-3 mt-2 p-2 rounded-lg bg-status-overdue-bg border border-status-overdue/30">
+              <p className="text-xs text-status-overdue-text">{error}</p>
+              <button onClick={() => setError('')} className="text-[10px] text-red-400 hover:text-status-overdue-text mt-0.5">Dismiss</button>
             </div>
           )}
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
@@ -606,7 +606,7 @@ export default function PhotoRevisionReview() {
             </div>
           )}
 
-          {/* Download panel — shown to client when approved */}
+          {/* Download panel. Shown to client when approved */}
           {isClient && revStatus === 'approved' && photoUrls.length > 0 && (
             <div className="p-3 border-t border-border shrink-0 space-y-1.5">
               <p className="text-[10px] text-text-muted text-center font-medium uppercase tracking-wide mb-2">Download Approved Photos</p>
@@ -627,16 +627,16 @@ export default function PhotoRevisionReview() {
                   />
                 </div>
               )}
-              <p className="text-[9px] text-text-muted text-center pt-1">Original quality — no compression</p>
+              <p className="text-[9px] text-text-muted text-center pt-1">Original quality. No compression</p>
             </div>
           )}
 
-          {/* Photographer/creative: reviewing the editor's set — approve & send to client */}
+          {/* Photographer/creative: reviewing the editor's set. Approve & send to client */}
           {(isPhotographer || isAdmin) && !isClient && (revStatus === 'pending_photographer_review' || revStatus === 'pending_creative_review') && !pendingPin && (
             <div className="p-3 border-t border-border shrink-0 space-y-2">
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
-                <p className="text-xs font-semibold text-amber-800 mb-0.5">You're reviewing the editor's set</p>
-                <p className="text-[11px] text-amber-700">The client can't see this yet. Review the set, then approve it to send to the client.</p>
+              <div className="bg-status-due-soon-bg border border-status-due-soon/30 rounded-xl p-3">
+                <p className="text-xs font-semibold text-status-due-soon-text mb-0.5">You're reviewing the editor's set</p>
+                <p className="text-[11px] text-status-due-soon-text">The client can't see this yet. Review the set, then approve it to send to the client.</p>
               </div>
               <button
                 onClick={handlePhotographerDone}

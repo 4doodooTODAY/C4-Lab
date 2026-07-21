@@ -42,7 +42,7 @@ const STAGE_DISPLAY_MAP = {
 }
 
 const STAGE_CURRENT_LABELS = {
-  pitch:           'Pitch — Awaiting Approval',
+  pitch:           'Pitch. Awaiting Approval',
   briefing:        'Setup & Planning',
   pre_production:  'Pre-Production',
   production:      'In Progress',
@@ -59,9 +59,9 @@ const WHOS_UP = {
   briefing:        { who: 'admin',      label: 'Admin',          msg: 'Set up the project and begin when ready.' },
   pre_production:  { who: 'admin',      label: 'Admin',          msg: 'Set up the project and assign the team.' },
   production:      { who: 'creative',   label: 'Creative',       msg: 'Upload footage and files for this project.' },
-  post_production: { who: 'editor',     label: 'Editor',         msg: 'Upload the first cut — it goes to the creative for review first.' },
+  post_production: { who: 'editor',     label: 'Editor',         msg: 'Upload the first cut. It goes to the creative for review first.' },
   review:          { who: 'varies',     label: 'Review Cycle',   msg: 'Creative → Client → Editor until approved.' },
-  revisions:       { who: 'editor',     label: 'Editor',         msg: 'Client requested changes — upload a revision.' },
+  revisions:       { who: 'editor',     label: 'Editor',         msg: 'Client requested changes. Upload a revision.' },
   ready_to_post:   { who: 'admin',      label: 'Admin',          msg: 'Client approved! Post it online and mark complete.' },
   delivered:       { who: 'done',       label: 'Complete',       msg: 'Project delivered.' },
 }
@@ -75,17 +75,17 @@ const TYPE_LABELS = {
 }
 
 const TYPE_COLORS = {
-  photography:     'bg-purple-50 text-purple-700',
-  videography:     'bg-blue-50 text-blue-700',
-  editing:         'bg-orange-50 text-orange-700',
-  full_production: 'bg-green-50 text-green-700',
+  photography:     'bg-accent/10 text-status-review-text',
+  videography:     'bg-accent/10 text-status-review-text',
+  editing:         'bg-status-due-soon-bg text-status-due-soon-text',
+  full_production: 'bg-status-approved-bg text-status-approved-text',
   social_media:    'bg-pink-50 text-pink-700',
 }
 
 const STATUS_COLORS = {
-  active:    'bg-green-50 text-green-700',
-  on_hold:   'bg-amber-50 text-amber-700',
-  completed: 'bg-blue-50 text-blue-700',
+  active:    'bg-status-approved-bg text-status-approved-text',
+  on_hold:   'bg-status-due-soon-bg text-status-due-soon-text',
+  completed: 'bg-accent/10 text-status-review-text',
   archived:  'bg-slate-100 text-slate-600',
 }
 
@@ -106,17 +106,17 @@ const REVISION_STATUS_LABELS = {
 }
 
 const REVISION_STATUS_COLORS = {
-  pending_photographer_review: 'bg-amber-50 text-amber-700',
-  pending_admin_review:        'bg-orange-50 text-orange-700',
-  pending_creative_review:     'bg-amber-50 text-amber-700',
-  pending_client_review:       'bg-blue-50 text-blue-700',
-  pending_editor:              'bg-purple-50 text-purple-700',
-  approved:                    'bg-green-50 text-green-700',
+  pending_photographer_review: 'bg-status-due-soon-bg text-status-due-soon-text',
+  pending_admin_review:        'bg-status-due-soon-bg text-status-due-soon-text',
+  pending_creative_review:     'bg-status-due-soon-bg text-status-due-soon-text',
+  pending_client_review:       'bg-accent/10 text-status-review-text',
+  pending_editor:              'bg-accent/10 text-status-review-text',
+  approved:                    'bg-status-approved-bg text-status-approved-text',
 }
 
 
 // Same convention as the rest of the app: revision_number 1 is the first cut,
-// and each later number is "Revision (n-1)" — so the client and admin agree.
+// and each later number is "Revision (n-1)". So the client and admin agree.
 function revisionLabel(n) {
   return n === 1 ? 'First Cut' : `Revision ${n}`
 }
@@ -188,7 +188,7 @@ function InlineField({ label, value, displayValue, type = 'text', onSave, icon: 
           onClick={handleEdit}
         >
           <span className={`text-sm font-medium flex-1 ${displayValue ? 'text-text-primary' : 'text-text-muted/60 italic'}`}>
-            {displayValue || '— Add —'}
+            {displayValue || ', Add.'}
           </span>
           {!readOnly && (
             <Pencil
@@ -202,7 +202,7 @@ function InlineField({ label, value, displayValue, type = 'text', onSave, icon: 
   )
 }
 
-// ── Start Project Panel (admin) — replaces legacy "Pitch" stage ───────────────
+// ── Start Project Panel (admin). Replaces legacy "Pitch" stage ───────────────
 function PitchApprovalPanel({ project, profile, onApproved }) {
   const [starting, setStarting] = useState(false)
   const [error,    setError]    = useState('')
@@ -231,15 +231,15 @@ function PitchApprovalPanel({ project, profile, onApproved }) {
   }
 
   return (
-    <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-5">
+    <div className="mb-6 bg-status-due-soon-bg border border-status-due-soon/30 rounded-2xl p-5">
       <div className="flex items-center gap-2 mb-2">
-        <Sparkles size={16} className="text-amber-600" />
+        <Sparkles size={16} className="text-status-due-soon-text" />
         <h3 className="text-sm font-bold text-text-primary">Project Not Started</h3>
       </div>
       <p className="text-xs text-text-muted mb-4">
         This project is waiting to be kicked off. Click below to move it into Pre-Production and start the workflow.
       </p>
-      {error && <p className="text-xs text-red-500 mb-2">{error}</p>}
+      {error && <p className="text-xs text-status-overdue-text mb-2">{error}</p>}
       <button
         onClick={handleStart}
         disabled={starting}
@@ -264,7 +264,7 @@ function StageBar({ currentStage, isAdmin, onStageClick }) {
   const effectiveIdx = stageToIdx[currentStage] ?? 0
 
   return (
-    <div className="bg-white rounded-2xl border border-border p-5 mb-4">
+    <div className="card border border-border p-5 mb-4">
       <p className="text-xs font-semibold text-text-muted mb-3 uppercase tracking-wide">Project Timeline</p>
       <div className="flex items-center gap-0">
         {DISPLAY_STAGES.map((s, i) => {
@@ -285,7 +285,7 @@ function StageBar({ currentStage, isAdmin, onStageClick }) {
                       ? 'border-accent bg-accent scale-125'
                       : isPast
                       ? 'border-green-500 bg-green-500'
-                      : 'border-border bg-white'
+                      : 'border-border bg-surface'
                   } ${isAdmin ? 'cursor-pointer hover:scale-110' : 'cursor-default'}`}
                 />
                 {i < DISPLAY_STAGES.length - 1 && (
@@ -293,7 +293,7 @@ function StageBar({ currentStage, isAdmin, onStageClick }) {
                 )}
               </div>
               <span className={`text-[9px] font-medium text-center leading-tight ${
-                isCurrent ? 'text-accent' : isPast ? 'text-green-600' : 'text-text-muted/60'
+                isCurrent ? 'text-accent' : isPast ? 'text-status-approved-text' : 'text-text-muted/60'
               }`}>
                 {s.label}
               </span>
@@ -324,18 +324,18 @@ function WhosUpBanner({ stage, editorProfile, creativeProfile, onBeginProject, i
     info.who === 'admin'     ? 'Admin' : null
 
   const colorMap = {
-    admin:    'bg-blue-50 border-blue-200 text-blue-900',
-    editor:   'bg-purple-50 border-purple-200 text-purple-900',
-    client:   'bg-amber-50 border-amber-200 text-amber-900',
-    creative: 'bg-green-50 border-green-200 text-green-900',
-    varies:   'bg-gray-50 border-gray-200 text-gray-900',
+    admin:    'bg-accent/10 border-accent/30 text-status-review-text',
+    editor:   'bg-accent/10 border-accent/30 text-status-review-text',
+    client:   'bg-status-due-soon-bg border-status-due-soon/30 text-status-due-soon-text',
+    creative: 'bg-status-approved-bg border-status-approved/30 text-status-approved-text',
+    varies:   'bg-surface-2 border-border text-text-primary',
   }
   const badgeMap = {
-    admin:    'bg-blue-100 text-blue-700',
-    editor:   'bg-purple-100 text-purple-700',
-    client:   'bg-amber-100 text-amber-700',
-    creative: 'bg-green-100 text-green-700',
-    varies:   'bg-gray-100 text-gray-700',
+    admin:    'bg-accent/10 text-status-review-text',
+    editor:   'bg-accent/10 text-status-review-text',
+    client:   'bg-status-due-soon-bg text-status-due-soon-text',
+    creative: 'bg-status-approved-bg text-status-approved-text',
+    varies:   'bg-surface-2 text-text-primary',
   }
 
   return (
@@ -377,7 +377,7 @@ export default function ProjectDetail() {
   const [notesSaving, setNS]            = useState(false)
   const [notesSaved, setNSaved]         = useState(false)
 
-  // Team notes feed (shoot_notes) — visible to everyone but the client
+  // Team notes feed (shoot_notes). Visible to everyone but the client
   const [noteInput, setNoteInput]       = useState('')
   const [postingNote, setPostingNote]   = useState(false)
 
@@ -691,7 +691,7 @@ export default function ProjectDetail() {
     if (!list.length) return
     setDownloading(true)
     setDlProgress({ done: 0, total: list.length })
-    // Concurrent pool instead of one-at-a-time with sleep gaps — much faster.
+    // Concurrent pool instead of one-at-a-time with sleep gaps. Much faster.
     try {
       await downloadAll(list, {
         concurrency: 4,
@@ -819,7 +819,7 @@ export default function ProjectDetail() {
     }
   }
 
-  // Admin adds an extra revision the client can review — for when the 3
+  // Admin adds an extra revision the client can review. For when the 3
   // standard revisions are used up but another cut still needs to go out.
   const reloadRevisions = async () => {
     const { data } = await supabase
@@ -830,7 +830,7 @@ export default function ProjectDetail() {
     setRevisions(data || [])
   }
 
-  // Step 1: admin opens a new empty revision slot. No video yet — the editor
+  // Step 1: admin opens a new empty revision slot. No video yet. The editor
   // (or admin) fills it in through the normal upload flow. It just becomes the
   // next revision number.
   const handleAddRevisionSlot = async () => {
@@ -918,7 +918,7 @@ export default function ProjectDetail() {
           </div>
           <button
             onClick={async () => { await updateProject(id, { stage: 'delivered' }); refetch() }}
-            className="shrink-0 px-6 py-3 rounded-xl bg-white text-green-700 text-sm font-bold hover:bg-green-50 transition-colors flex items-center gap-2 shadow"
+            className="shrink-0 px-6 py-3 rounded-xl bg-surface text-status-approved-text text-sm font-bold hover:bg-status-approved-bg transition-colors flex items-center gap-2 shadow"
           >
             <Check size={16} /> Mark as Posted & Complete
           </button>
@@ -928,7 +928,7 @@ export default function ProjectDetail() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4 mb-6">
         <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-bold text-text-primary">{project.name}</h1>
+          <h1 className="display">{project.name}</h1>
           <div className="flex items-center gap-2 flex-wrap mt-2">
             {project.type && (
               <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${TYPE_COLORS[project.type] || 'bg-surface-2 text-text-muted'}`}>
@@ -953,7 +953,7 @@ export default function ProjectDetail() {
       </div>
 
       {actionError && (
-        <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4">{actionError}</div>
+        <div className="text-xs text-status-overdue-text bg-status-overdue-bg border border-status-overdue/30 rounded-lg px-3 py-2 mb-4">{actionError}</div>
       )}
 
       {/* Stage progress */}
@@ -968,7 +968,7 @@ export default function ProjectDetail() {
         isAdmin={isAdmin}
       />
 
-      {/* ── Editor action CTA — visible when it's the editor's turn ─── */}
+      {/* ── Editor action CTA. Visible when it's the editor's turn ─── */}
       {(() => {
         const isCurrentUserEditor =
           profile?.role === 'editor' ||
@@ -997,7 +997,7 @@ export default function ProjectDetail() {
                 </div>
                 <div>
                   <p className="text-sm font-bold text-text-primary">
-                    {isFirstCut ? "It's your turn — upload the first cut" : "Upload your revised cut"}
+                    {isFirstCut ? "It's your turn. Upload the first cut" : "Upload your revised cut"}
                   </p>
                   <p className="text-xs text-text-muted mt-0.5">
                     {isFirstCut
@@ -1018,14 +1018,14 @@ export default function ProjectDetail() {
 
         if (isCurrentUserCreative && needsCreativeReview && latestRev) {
           return (
-            <div className="mb-6 rounded-2xl border-2 border-amber-300 bg-amber-50 p-5 flex items-center justify-between gap-4">
+            <div className="mb-6 rounded-2xl border-2 border-amber-300 bg-status-due-soon-bg p-5 flex items-center justify-between gap-4">
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
-                  <Eye size={20} className="text-amber-600" />
+                <div className="w-10 h-10 rounded-xl bg-status-due-soon-bg flex items-center justify-center shrink-0">
+                  <Eye size={20} className="text-status-due-soon-text" />
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-amber-900">Review the edit before the client sees it</p>
-                  <p className="text-xs text-amber-700 mt-0.5">The editor submitted a cut. Leave timeline notes, then pass it to the client.</p>
+                  <p className="text-sm font-bold text-status-due-soon-text">Review the edit before the client sees it</p>
+                  <p className="text-xs text-status-due-soon-text mt-0.5">The editor submitted a cut. Leave timeline notes, then pass it to the client.</p>
                 </div>
               </div>
               <Link
@@ -1052,8 +1052,8 @@ export default function ProjectDetail() {
       )}
 
 
-      {/* Project info — inline editable */}
-      <div className="bg-white rounded-2xl border border-border p-5 mb-6">
+      {/* Project info. Inline editable */}
+      <div className="card border border-border p-5 mb-6">
         <p className="text-xs font-semibold text-text-muted mb-4 uppercase tracking-wide">Project Details</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-5">
           <InlineField
@@ -1077,7 +1077,7 @@ export default function ProjectDetail() {
           <div>
             <p className="text-xs text-text-muted mb-1">Client</p>
             <p className="text-sm font-medium text-text-primary">
-              {project.clients ? (project.clients.contact_name || project.clients.name) : <span className="text-text-muted/60 italic">— None —</span>}
+              {project.clients ? (project.clients.contact_name || project.clients.name) : <span className="text-text-muted/60 italic">None</span>}
             </p>
           </div>
         </div>
@@ -1085,13 +1085,13 @@ export default function ProjectDetail() {
       </div>
 
       {/* Assigned Team */}
-      <div className="bg-white rounded-2xl border border-border p-5 mb-6">
+      <div className="card border border-border p-5 mb-6">
         <p className="text-xs font-semibold text-text-muted mb-4 uppercase tracking-wide">Assigned Team</p>
         <div className="space-y-4">
 
           <div className="border-t border-border" />
 
-          {/* Editor row — multiple editors */}
+          {/* Editor row. Multiple editors */}
           <div className="flex gap-3">
             <div className="w-6 flex items-center justify-center shrink-0 mt-1">
               <Scissors size={13} className="text-text-muted" />
@@ -1113,7 +1113,7 @@ export default function ProjectDetail() {
                   onClick={() => isAdmin && setShowEditorSelect(true)}
                   className={`text-sm ${isAdmin ? 'text-text-muted/60 italic hover:text-accent transition-colors cursor-pointer' : 'text-text-muted/60 italic'}`}
                 >
-                  Unassigned — {isAdmin ? 'click to assign' : 'not yet assigned'}
+                  Unassigned. {isAdmin ? 'click to assign' : 'not yet assigned'}
                 </button>
               ) : (
                 <div className="space-y-1.5">
@@ -1125,7 +1125,7 @@ export default function ProjectDetail() {
                         <button
                           onClick={() => handleRemoveEditor(ep.id)}
                           disabled={removingEditor === ep.id}
-                          className="text-text-muted hover:text-red-500 transition-colors"
+                          className="text-text-muted hover:text-status-overdue-text transition-colors"
                         >
                           {removingEditor === ep.id ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
                         </button>
@@ -1141,7 +1141,7 @@ export default function ProjectDetail() {
                     value={selectedEditor}
                     onChange={(e) => setSelectedEditor(e.target.value)}
                   >
-                    <option value="">— Select editor —</option>
+                    <option value="">Select editor</option>
                     {assignProfiles
                       .filter((p) => !editorProfiles.some((ep) => ep.id === p.id))
                       .map((p) => (
@@ -1171,8 +1171,8 @@ export default function ProjectDetail() {
         {/* Left (wider) */}
         <div className="lg:col-span-2 space-y-5">
 
-          {/* Linked Shoot — pulls that shoot's footage into this project */}
-          <div className="bg-white rounded-2xl border border-border p-5 space-y-2">
+          {/* Linked Shoot. Pulls that shoot's footage into this project */}
+          <div className="card border border-border p-5 space-y-2">
             <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
               <LinkIcon size={14} className="text-text-muted" /> Linked Shoot
             </h2>
@@ -1183,7 +1183,7 @@ export default function ProjectDetail() {
               <div className="flex gap-2">
                 <select className="input flex-1 text-sm" value={linkShoot} disabled={linkingShoot}
                   onChange={(e) => setLinkShoot(e.target.value)}>
-                  <option value="">— Not linked to a shoot —</option>
+                  <option value="">Not linked to a shoot</option>
                   {shoots.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.title}{s.shoot_date ? ` · ${format(parseISO(s.shoot_date), 'MMM d, yyyy')}` : ''}
@@ -1200,7 +1200,7 @@ export default function ProjectDetail() {
           </div>
 
           {/* Footage Uploads */}
-          <div className="bg-white rounded-2xl border border-border p-5">
+          <div className="card border border-border p-5">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
                 <Upload size={14} className="text-text-muted" /> Footage Uploads
@@ -1208,7 +1208,7 @@ export default function ProjectDetail() {
               <span className="text-xs text-text-muted">{shootUploads.length} file{shootUploads.length !== 1 ? 's' : ''}</span>
             </div>
 
-            {/* Drop zone — always visible, click to open file picker */}
+            {/* Drop zone. Always visible, click to open file picker */}
             <div
               onDragOver={(e) => { e.preventDefault(); setMediaDragOver(true) }}
               onDragLeave={() => setMediaDragOver(false)}
@@ -1250,12 +1250,12 @@ export default function ProjectDetail() {
                     <span className="text-text-muted shrink-0">{fmtBytes(f.size)}</span>
                     {!uploadingMedia && (
                       <button onClick={(e) => { e.stopPropagation(); setMediaFiles((prev) => prev.filter((_, j) => j !== i)) }}>
-                        <X size={12} className="text-text-muted hover:text-red-500" />
+                        <X size={12} className="text-text-muted hover:text-status-overdue-text" />
                       </button>
                     )}
                   </div>
                 ))}
-                {mediaUploadError && <p className="text-xs text-red-500">{mediaUploadError}</p>}
+                {mediaUploadError && <p className="text-xs text-status-overdue-text">{mediaUploadError}</p>}
                 <div className="flex items-center gap-3 flex-wrap">
                   <button
                     onClick={handleMediaUpload}
@@ -1319,7 +1319,7 @@ export default function ProjectDetail() {
                     <button
                       onClick={() => removeUploads(shootUploads.filter((f) => selectedFiles.has(f.id)))}
                       disabled={removingUploads}
-                      className="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50">
+                      className="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-status-overdue/30 text-status-overdue-text hover:bg-status-overdue-bg transition-colors disabled:opacity-50">
                       {removingUploads ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
                       Remove Selected ({selectedFiles.size})
                     </button>
@@ -1380,7 +1380,7 @@ export default function ProjectDetail() {
                         <button
                           onClick={() => removeUploads([f])}
                           disabled={removingUploads}
-                          className="text-text-muted hover:text-red-600 transition-colors shrink-0 disabled:opacity-40"
+                          className="text-text-muted hover:text-status-overdue-text transition-colors shrink-0 disabled:opacity-40"
                           title="Remove file"
                         >
                           <X size={14} />
@@ -1393,8 +1393,8 @@ export default function ProjectDetail() {
             )}
           </div>
 
-          {/* Team Notes — visible to everyone but the client */}
-          <div className="bg-white rounded-2xl border border-border p-5">
+          {/* Team Notes. Visible to everyone but the client */}
+          <div className="card border border-border p-5">
             <div className="flex items-center justify-between mb-1">
               <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
                 <StickyNote size={14} className="text-text-muted" /> Notes
@@ -1441,7 +1441,7 @@ export default function ProjectDetail() {
           </div>
 
           {/* Inspiration Links (optional) */}
-          <div className="bg-white rounded-2xl border border-border p-5">
+          <div className="card border border-border p-5">
             <div className="flex items-center justify-between mb-1">
               <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
                 <Sparkles size={14} className="text-text-muted" /> Inspiration Links
@@ -1458,7 +1458,7 @@ export default function ProjectDetail() {
                     <a href={url} target="_blank" rel="noopener noreferrer"
                       className="text-xs text-accent hover:underline truncate flex-1">{url}</a>
                     <button onClick={() => removeInspoLink(i)} disabled={savingInspo}
-                      className="p-1 text-text-muted hover:text-red-600 rounded-md hover:bg-red-50 disabled:opacity-40 shrink-0"
+                      className="p-1 text-text-muted hover:text-status-overdue-text rounded-md hover:bg-status-overdue-bg disabled:opacity-40 shrink-0"
                       title="Remove link">
                       <X size={12} />
                     </button>
@@ -1483,13 +1483,13 @@ export default function ProjectDetail() {
           </div>
 
           {/* Revisions */}
-          <div className="bg-white rounded-2xl border border-border p-5">
+          <div className="card border border-border p-5">
             <div className="flex items-center justify-between mb-1">
               <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
                 {project?.media_type === 'photo' ? <Camera size={14} className="text-text-muted" /> : <FileVideo size={14} className="text-text-muted" />} Revisions
               </h2>
             </div>
-            <p className="text-xs text-text-muted mb-4">Client can approve at any revision — up to 3 total.</p>
+            <p className="text-xs text-text-muted mb-4">Client can approve at any revision. Up to 3 total.</p>
             {loadingExtras ? (
               <Loader2 size={16} className="animate-spin text-text-muted" />
             ) : revisions.length === 0 ? (
@@ -1518,7 +1518,7 @@ export default function ProjectDetail() {
                     <div className="flex items-center gap-2 shrink-0">
                       {r.video_url && (
                         <button onClick={() => forceDownload(r.video_url, `revision-${r.revision_number}.mp4`)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-xs font-semibold text-gray-700 transition-colors">
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-2 hover:bg-gray-200 text-xs font-semibold text-text-primary transition-colors">
                           <Download size={12} /> Download
                         </button>
                       )}
@@ -1538,7 +1538,7 @@ export default function ProjectDetail() {
               </div>
             )}
 
-            {/* Caption concept — the copy that ships with this content */}
+            {/* Caption concept. The copy that ships with this content */}
             <CaptionConcept projectId={id} initialValue={project?.caption_concept} canEdit plain />
 
             {/* Admin-only: add an extra revision once the 3 client revisions are used up */}
@@ -1557,13 +1557,13 @@ export default function ProjectDetail() {
               return (
                 <div className="mt-4 pt-4 border-t border-border">
                   <p className="text-xs font-semibold text-text-primary flex items-center gap-1.5">
-                    <Plus size={12} /> Extra revision <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700">Admin only</span>
+                    <Plus size={12} /> Extra revision <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-accent/10 text-status-review-text">Admin only</span>
                   </p>
 
                   {openSlot ? (
                     <>
                       <p className="text-xs text-text-muted mt-1 mb-2">
-                        {revisionLabel(openSlot.revision_number)} is open. You or the editor can upload the video — it goes straight to the client.
+                        {revisionLabel(openSlot.revision_number)} is open. You or the editor can upload the video. It goes straight to the client.
                       </p>
                       <input
                         ref={extraRevInputRef}
@@ -1598,7 +1598,7 @@ export default function ProjectDetail() {
                   ) : (
                     <>
                       <p className="text-xs text-text-muted mt-1 mb-2">
-                        The client's 3 revisions are used up. Open {revisionLabel(nextRevNum)} — then you or the editor can upload the cut for the client.
+                        The client's 3 revisions are used up. Open {revisionLabel(nextRevNum)}. Then you or the editor can upload the cut for the client.
                       </p>
                       <button
                         onClick={handleAddRevisionSlot}
@@ -1610,7 +1610,7 @@ export default function ProjectDetail() {
                       </button>
                     </>
                   )}
-                  {extraRevError && <p className="text-xs text-red-500 mt-2">{extraRevError}</p>}
+                  {extraRevError && <p className="text-xs text-status-overdue-text mt-2">{extraRevError}</p>}
                 </div>
               )
             })()}
@@ -1621,7 +1621,7 @@ export default function ProjectDetail() {
         {/* Right column */}
         <div className="space-y-5">
           {/* Quick links */}
-          <div className="bg-white rounded-2xl border border-border p-5">
+          <div className="card border border-border p-5">
             <h2 className="text-sm font-semibold text-text-primary mb-3">Quick Links</h2>
             <div className="space-y-1.5">
               <Link
@@ -1648,7 +1648,7 @@ export default function ProjectDetail() {
           </div>
 
           {/* Internal Notes */}
-          <div className="bg-white rounded-2xl border border-border p-5">
+          <div className="card border border-border p-5">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-semibold text-text-primary">Internal Notes</h2>
               <span className="text-xs text-text-muted flex items-center gap-1"><StickyNote size={11} /> Admin only</span>
@@ -1674,19 +1674,19 @@ export default function ProjectDetail() {
 
       {/* Danger Zone */}
       {isAdmin && (
-        <div className="mt-6 bg-white rounded-2xl border border-red-100 p-5">
-          <h2 className="text-sm font-semibold text-red-600 mb-4">Danger Zone</h2>
+        <div className="mt-6 card border border-status-overdue/30 p-5">
+          <h2 className="text-sm font-semibold text-status-overdue-text mb-4">Danger Zone</h2>
           <div className="space-y-3">
             {project.status !== 'archived' && (
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-text-primary">Archive project</p>
-                  <p className="text-xs text-text-muted">Mark as archived — data is preserved.</p>
+                  <p className="text-xs text-text-muted">Mark as archived. Data is preserved.</p>
                 </div>
                 <button
                   onClick={handleArchive}
                   disabled={archiving}
-                  className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border border-amber-200 text-amber-700 hover:bg-amber-50 transition-all disabled:opacity-50"
+                  className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border border-status-due-soon/30 text-status-due-soon-text hover:bg-status-due-soon-bg transition-all disabled:opacity-50"
                 >
                   {archiving ? <Loader2 size={13} className="animate-spin" /> : null}
                   Archive
@@ -1703,7 +1703,7 @@ export default function ProjectDetail() {
                   </div>
                   <button
                     onClick={() => setDeleteStep(1)}
-                    className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-all"
+                    className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border border-status-overdue/30 text-status-overdue-text hover:bg-status-overdue-bg transition-all"
                   >
                     <Trash2 size={13} /> Delete
                   </button>

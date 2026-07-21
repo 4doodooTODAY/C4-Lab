@@ -3,7 +3,7 @@ import { Download, Loader2, Check } from 'lucide-react'
 import { forceDownload } from '../../lib/r2'
 
 /**
- * DownloadButton — gets a presigned attachment URL from the edge function
+ * DownloadButton. Gets a presigned attachment URL from the edge function
  * and lets the browser handle the download natively. No blob, no memory
  * pressure, no CORS issue. Works for any file size.
  */

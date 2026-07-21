@@ -8,7 +8,7 @@ export default function AppShell() {
   return (
     <NotificationProvider>
       <UploadProgressBar />
-      <div className="flex h-screen overflow-hidden bg-surface-2">
+      <div className="app-ground flex h-screen overflow-hidden">
         <Sidebar />
         <NotificationPanel />
         <main className="flex-1 overflow-y-auto flex flex-col">

@@ -39,7 +39,7 @@ function CopyButton({ text }) {
   )
 }
 
-// ── Create modal (title only — the page IS the gallery now) ────────────────────
+// ── Create modal (title only. The page IS the gallery now) ────────────────────
 function CreateShootModal({ onClose, onCreated, team }) {
   const [title,   setTitle]   = useState('')
   const [assignee, setAssignee] = useState('')
@@ -75,7 +75,7 @@ function CreateShootModal({ onClose, onCreated, team }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={!saving ? onClose : undefined} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md z-10">
+      <div className="relative card shadow-2xl w-full max-w-md z-10">
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-border">
           <h2 className="text-base font-bold text-text-primary">New Gallery Link</h2>
           {!saving && (
@@ -85,12 +85,12 @@ function CreateShootModal({ onClose, onCreated, team }) {
 
         {created ? (
           <div className="px-6 py-8 text-center">
-            <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-3">
-              <Check size={22} className="text-green-600" />
+            <div className="w-12 h-12 rounded-full bg-status-approved-bg flex items-center justify-center mx-auto mb-3">
+              <Check size={22} className="text-status-approved-text" />
             </div>
             <p className="text-sm font-semibold text-text-primary mb-1">{created.title}</p>
             <p className="text-xs text-text-muted mb-4">
-              Gallery created — upload photos, then share this link
+              Gallery created. Upload photos, then share this link
             </p>
             <div className="flex items-center gap-2 bg-surface-2 border border-border rounded-xl px-3 py-2 text-left mb-5">
               <LinkIcon size={12} className="text-text-muted shrink-0" />
@@ -116,7 +116,7 @@ function CreateShootModal({ onClose, onCreated, team }) {
               <div>
                 <label className="label">Assign to <span className="text-text-muted font-normal">(optional)</span></label>
                 <select className="input" value={assignee} onChange={(e) => setAssignee(e.target.value)} disabled={saving}>
-                  <option value="">— No one yet —</option>
+                  <option value="">No one yet</option>
                   {team.map((t) => (
                     <option key={t.id} value={t.id}>{t.full_name}</option>
                   ))}
@@ -126,11 +126,11 @@ function CreateShootModal({ onClose, onCreated, team }) {
             )}
             <p className="text-xs text-text-muted bg-surface-2 rounded-lg px-3 py-2">
               Create the gallery, upload photos, then share the link. Clients open it
-              with just their name and number — no account — to view, favorite,
+              with just their name and number. No account. To view, favorite,
               comment, and download full-quality files.
             </p>
             {error && (
-              <p className="text-xs text-red-500 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p>
+              <p className="text-xs text-status-overdue-text bg-status-overdue-bg border border-status-overdue/30 rounded-lg px-3 py-2">{error}</p>
             )}
             <div className="flex justify-end gap-2 pt-1">
               <button type="button" onClick={onClose} disabled={saving} className="btn-secondary">Cancel</button>
@@ -225,14 +225,14 @@ function GalleryDrawer({ shoot }) {
           await supabase.from('one_off_shoot_images')
             .update({ thumb_path: thumbPath, preview_path: prevPath, width: d.width, height: d.height })
             .eq('id', item.id)
-        } catch { /* best-effort — next open retries */ }
+        } catch { /* best-effort. Next open retries */ }
       }
       load()
     })()
   }, [images, load])
 
   // Prevent the browser from navigating to a dropped file when the drop lands
-  // outside the dropzone — the #1 cause of "drag-and-drop doesn't work".
+  // outside the dropzone. The #1 cause of "drag-and-drop doesn't work".
   useEffect(() => {
     const prevent = (e) => { e.preventDefault() }
     window.addEventListener('dragover', prevent)
@@ -248,7 +248,7 @@ function GalleryDrawer({ shoot }) {
   // with ANY difference are never treated as duplicates. Duplicates become
   // soft-deleted rows (recoverable trash) sharing the canonical copy's storage.
   const uploadFiles = async (fileList) => {
-    // Accept any file type — photos, videos, RAW, ZIP, PDF, anything. Files the
+    // Accept any file type. Photos, videos, RAW, ZIP, PDF, anything. Files the
     // browser can't preview get a labelled placeholder tile but upload at full
     // quality and stay downloadable.
     const files = Array.from(fileList)
@@ -302,7 +302,7 @@ function GalleryDrawer({ shoot }) {
         // Canonical may be a just-uploaded job (has .row after upload) or an
         // existing DB row.
         const canonical = job.dupOf.row || job.dupOf
-        if (!canonical.original_path) throw new Error('canonical upload failed — duplicate skipped')
+        if (!canonical.original_path) throw new Error('canonical upload failed. Duplicate skipped')
         const { error } = await supabase.from('one_off_shoot_images').insert({
           shoot_id:       shoot.id,
           file_name:      job.file.name,
@@ -342,7 +342,7 @@ function GalleryDrawer({ shoot }) {
       let thumbBlob, prevBlob, width = null, height = null
       if (isVid) {
         const poster = await generateThumbnail(job.file)
-        // Video with an unreadable codec still uploads — falls back to a tile.
+        // Video with an unreadable codec still uploads. Falls back to a tile.
         if (poster) { thumbBlob = poster; prevBlob = poster }
         else { const ph = await generatePlaceholder(job.file.name); thumbBlob = ph; prevBlob = ph }
       } else if (isGalleryImage(job.file.name) || isRawImage(job.file.name)) {
@@ -362,7 +362,7 @@ function GalleryDrawer({ shoot }) {
         const ph = await generatePlaceholder(job.file.name); thumbBlob = ph; prevBlob = ph
       }
 
-      // Original — raw bytes, no recompression, private bucket. XHR with
+      // Original. Raw bytes, no recompression, private bucket. XHR with
       // progress so the batch speed/ETA stays live.
       await uploadToBucketWithProgress({
         bucket: 'shoot-originals',
@@ -428,7 +428,7 @@ function GalleryDrawer({ shoot }) {
       .select('original_path')
       .eq('id', img.id)
       .single()
-    // Storage objects may be shared with duplicate rows in Trash — only remove
+    // Storage objects may be shared with duplicate rows in Trash. Only remove
     // the underlying files when no other row references them.
     if (row?.original_path) {
       const { count } = await supabase
@@ -518,7 +518,7 @@ function GalleryDrawer({ shoot }) {
               {progress.eta != null && progress.eta > 1 && (
                 <span className="text-accent font-semibold">{fmtEta(progress.eta)}</span>
               )}
-              {progress.failed > 0 && <span className="text-red-500">· {progress.failed} failed</span>}
+              {progress.failed > 0 && <span className="text-status-overdue-text">· {progress.failed} failed</span>}
             </p>
             <div className="h-1 max-w-xs mx-auto bg-surface-3 rounded-full overflow-hidden">
               <div className="h-full bg-accent rounded-full transition-all duration-200"
@@ -529,7 +529,7 @@ function GalleryDrawer({ shoot }) {
           <p className="text-xs text-text-muted flex items-center justify-center gap-1.5">
             <Upload size={12} />
             Drop photos, videos, or any files here or <span className="text-accent font-medium">browse</span>
-            — originals stay full quality
+           . Originals stay full quality
           </p>
         )}
       </div>
@@ -545,7 +545,7 @@ function GalleryDrawer({ shoot }) {
       {images === null ? (
         <div className="flex justify-center py-4"><Loader2 size={14} className="animate-spin text-text-muted" /></div>
       ) : images.length === 0 ? (
-        <p className="text-xs text-text-muted text-center py-2">Nothing uploaded yet — add photos, videos, or any files.</p>
+        <p className="text-xs text-text-muted text-center py-2">Nothing uploaded yet. Add photos, videos, or any files.</p>
       ) : (
         <>
         {/* Bulk actions bar */}
@@ -576,7 +576,7 @@ function GalleryDrawer({ shoot }) {
                 loading="lazy"
                 className={`w-full h-full object-cover ${selected.has(img.id) ? 'opacity-75' : ''}`}
               />
-              {/* Select checkbox — visible on hover or when anything is selected */}
+              {/* Select checkbox. Visible on hover or when anything is selected */}
               <button
                 onClick={() => toggleSelected(img.id)}
                 className={`absolute bottom-1 left-1 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-opacity ${
@@ -621,7 +621,7 @@ function GalleryDrawer({ shoot }) {
         </>
       )}
 
-      {/* Trash — recoverable duplicates / removals */}
+      {/* Trash. Recoverable duplicates / removals */}
       {trash.length > 0 && (
         <div>
           <button
@@ -634,7 +634,7 @@ function GalleryDrawer({ shoot }) {
           {showTrash && (
             <div className="mt-1.5 space-y-1">
               {trash.map((t) => (
-                <div key={t.id} className="flex items-center gap-2 bg-white border border-border rounded-lg px-2.5 py-1.5">
+                <div key={t.id} className="flex items-center gap-2 bg-surface border border-border rounded-lg px-2.5 py-1.5">
                   <img src={previewUrl(t.thumb_path)} alt="" className="w-7 h-7 rounded object-cover shrink-0 opacity-50" />
                   <div className="flex-1 min-w-0">
                     <p className="text-xs text-text-primary truncate">{t.file_name}</p>
@@ -662,7 +662,7 @@ function GalleryDrawer({ shoot }) {
           {comments.map((c) => {
             const img = (images || []).find((i) => i.id === c.image_id)
             return (
-              <div key={c.id} className="flex items-center gap-2 bg-white border border-border rounded-lg px-2.5 py-1.5">
+              <div key={c.id} className="flex items-center gap-2 bg-surface border border-border rounded-lg px-2.5 py-1.5">
                 {img && (
                   <img src={previewUrl(img.thumb_path)} alt="" className="w-7 h-7 rounded object-cover shrink-0" />
                 )}
@@ -710,7 +710,7 @@ function LeadsDrawer({ shoot }) {
         <div key={lead.id} className="px-4 py-3 flex items-center gap-4 text-xs">
           <div className="flex-1 min-w-0">
             <p className="font-medium text-text-primary truncate">
-              {lead.phone || lead.name || lead.email || '—'}
+              {lead.phone || lead.name || lead.email || 'Not set'}
             </p>
             {(lead.name || lead.email) && (
               <p className="text-text-muted truncate">{[lead.name, lead.email].filter(Boolean).join(' · ')}</p>
@@ -752,7 +752,7 @@ function ShootRow({ shoot, onToggleActive, isAdmin, team, onAssign }) {
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-border overflow-hidden">
+    <div className="card border border-border overflow-hidden">
       {/* Header row */}
       <div
         className="flex items-center gap-3 p-4 cursor-pointer hover:bg-surface-2/40 transition-colors"
@@ -765,7 +765,7 @@ function ShootRow({ shoot, onToggleActive, isAdmin, team, onAssign }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <p className="text-sm font-semibold text-text-primary truncate">{shoot.title}</p>
-            <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${shoot.active ? 'bg-green-50 text-green-700' : 'bg-surface-2 text-text-muted'}`}>
+            <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${shoot.active ? 'bg-status-approved-bg text-status-approved-text' : 'bg-surface-2 text-text-muted'}`}>
               {shoot.active ? 'Active' : 'Inactive'}
             </span>
           </div>
@@ -786,7 +786,7 @@ function ShootRow({ shoot, onToggleActive, isAdmin, team, onAssign }) {
               value={shoot.assigned_profile_id || ''}
               onChange={handleAssign}
               onClick={(e) => e.stopPropagation()}
-              className="text-[11px] border border-border rounded-lg px-1.5 py-1 bg-white text-text-secondary max-w-[130px] hidden sm:block"
+              className="text-[11px] border border-border rounded-lg px-1.5 py-1 bg-surface text-text-secondary max-w-[130px] hidden sm:block"
               title="Assign to a creative or editor"
             >
               <option value="">Unassigned</option>
@@ -859,7 +859,7 @@ export default function OneOffShoots() {
         .from('one_off_shoots')
         .select('id, slug, title, active, created_at, assigned_profile_id')
         .order('created_at', { ascending: false }),
-      // Admins can be assigned too — they wear the creative hat as needed
+      // Admins can be assigned too. They wear the creative hat as needed
       supabase.from('profiles').select('id, full_name, role')
         .in('role', ['creative', 'editor', 'admin']).order('full_name'),
     ])
@@ -886,8 +886,8 @@ export default function OneOffShoots() {
           <h1 className="font-display text-xl font-bold text-text-primary">Gallery Links</h1>
           <p className="text-sm text-text-muted mt-0.5">
             {isAdmin
-              ? 'Shareable delivery galleries — upload, send the link, capture leads'
-              : 'Galleries assigned to you — upload the files, then the link goes to the client'}
+              ? 'Shareable delivery galleries. Upload, send the link, capture leads'
+              : 'Galleries assigned to you. Upload the files, then the link goes to the client'}
           </p>
         </div>
         {isAdmin && (

@@ -68,13 +68,13 @@ function PhoneGate({ slug, onClaim, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 z-10">
+      <div className="relative card shadow-2xl w-full max-w-sm p-6 z-10">
         <div className="w-11 h-11 rounded-full bg-accent/10 flex items-center justify-center mb-4">
           <Phone size={18} className="text-accent" />
         </div>
         <h2 className="text-base font-bold text-text-primary">Unlock this gallery</h2>
         <p className="text-sm text-text-secondary mt-1 mb-4">
-          Just your name and number — then you can download full-resolution files,
+          Just your name and number. Then you can download full-resolution files,
           mark favorites, and leave comments. No account or email needed.
         </p>
         <form onSubmit={submit} className="space-y-3">
@@ -103,7 +103,7 @@ function PhoneGate({ slug, onClaim, onClose }) {
             onChange={(e) => setPhone(e.target.value)}
           />
           {error && (
-            <p className="text-xs text-red-500 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p>
+            <p className="text-xs text-status-overdue-text bg-status-overdue-bg border border-status-overdue/30 rounded-lg px-3 py-2">{error}</p>
           )}
           <button type="submit" disabled={saving} className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50">
             {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
@@ -361,7 +361,7 @@ export default function ShootGallery() {
     if (!claim) return
     supabase.rpc('get_shoot_proofing', { p_claim: claim }).then(({ data, error }) => {
       if (error) {
-        // Claim expired or invalid — clear it
+        // Claim expired or invalid. Clear it
         sessionStorage.removeItem(claimKey(slug))
         setClaim(null)
         return
@@ -457,7 +457,7 @@ export default function ShootGallery() {
         setClaim(null)
         requireClaim((newClaim) => downloadOne(imageId, newClaim))
       } else {
-        showToast('Download failed — try again')
+        showToast('Download failed. Try again')
       }
     }
     setDownloading(false)
@@ -473,7 +473,7 @@ export default function ShootGallery() {
     try {
       const { files } = await callDownload({ claim: c, all: true })
 
-      // Zip the originals client-side (store mode — images are already
+      // Zip the originals client-side (store mode. Images are already
       // compressed; zipping is for the single-file UX, not size).
       // Fetch with capped concurrency so big galleries don't stampede.
       const entries = {}
@@ -502,7 +502,7 @@ export default function ShootGallery() {
       setToast('')
 
       const names = Object.keys(entries)
-      if (!names.length) throw new Error('Download failed — try again')
+      if (!names.length) throw new Error('Download failed. Try again')
 
       const zipped = await new Promise((resolve, reject) =>
         zip(entries, (err, data) => (err ? reject(err) : resolve(data)))
@@ -522,7 +522,7 @@ export default function ShootGallery() {
         setClaim(null)
         requireClaim((newClaim) => downloadAll(newClaim))
       } else {
-        showToast('Download failed — try again')
+        showToast('Download failed. Try again')
       }
     }
     setDownloadingAll(false)
@@ -575,7 +575,7 @@ export default function ShootGallery() {
       <main className="px-5 sm:px-8 pb-16 max-w-6xl mx-auto">
         {images.length === 0 ? (
           <div className="text-center py-20">
-            <p className="text-white/40 text-sm">Your gallery is on the way — check back soon.</p>
+            <p className="text-white/40 text-sm">Your gallery is on the way. Check back soon.</p>
           </div>
         ) : (
           <div
@@ -653,7 +653,7 @@ export default function ShootGallery() {
 
       {/* Toast */}
       {toast && (
-        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 bg-white text-text-primary text-sm font-medium px-4 py-2 rounded-xl shadow-2xl z-50">
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 bg-surface text-text-primary text-sm font-medium px-4 py-2 rounded-xl shadow-2xl z-50">
           {toast}
         </div>
       )}

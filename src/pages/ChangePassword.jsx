@@ -3,12 +3,14 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Loader2, Lock, Camera, ArrowRight, Check, Eye, EyeOff, KeyRound, AlertTriangle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import LogoBadge from '../components/ui/Logo'
+import FallingDisks from '../components/ui/FallingDisks'
 
 const ROLE_LABELS = { admin: 'Admin', creative: 'Creative', client: 'Client' }
 const ROLE_COLORS = {
-  admin:    'text-purple-700 bg-purple-50',
-  creative: 'text-blue-700 bg-blue-50',
-  client:   'text-green-700 bg-green-50',
+  admin:    'text-status-review-text bg-accent/10',
+  creative: 'text-status-review-text bg-accent/10',
+  client:   'text-status-approved-text bg-status-approved-bg',
 }
 
 function getInitials(name) {
@@ -41,7 +43,7 @@ export default function ChangePassword() {
 
   // ── Invite / recovery link handling (token_hash flow) ──────────────────────
   // Emails link here with ?token_hash=…&type=invite|recovery. The token is
-  // single-use, so we DON'T redeem it automatically — email security scanners
+  // single-use, so we DON'T redeem it automatically. Email security scanners
   // load pages, and auto-redeeming would burn the link before the human
   // arrives. The person clicks the button; only then do we verify.
   const tokenHash = searchParams.get('token_hash')
@@ -64,7 +66,7 @@ export default function ChangePassword() {
       setRedeeming(false)
       return
     }
-    // Session is live — drop the token from the URL and continue to password setup
+    // Session is live. Drop the token from the URL and continue to password setup
     window.history.replaceState({}, '', '/change-password')
     setRedeeming(false)
   }
@@ -84,7 +86,7 @@ export default function ChangePassword() {
 
     try {
       const timeout = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Request timed out — please try again')), 10000)
+        setTimeout(() => reject(new Error('Request timed out. Please try again')), 10000)
       )
       const update = supabase.auth.updateUser({ password })
       const { error: updateError } = await Promise.race([update, timeout])
@@ -99,7 +101,7 @@ export default function ChangePassword() {
         return
       }
 
-      // Clear the must_change_password flag — and WAIT for it. If this is only
+      // Clear the must_change_password flag. And WAIT for it. If this is only
       // fire-and-forget, the cached profile still says the password needs
       // changing, so ProtectedRoute bounces the user straight back here and
       // they get stuck in a loop. Update the DB, then update the in-memory
@@ -128,7 +130,7 @@ export default function ChangePassword() {
       return
     }
     if (file.size > MAX_PHOTO_BYTES) {
-      setError('Photo is too large — please pick one under 5 MB.')
+      setError('Photo is too large. Please pick one under 5 MB.')
       return
     }
     setError('')
@@ -142,7 +144,7 @@ export default function ChangePassword() {
     try {
       const ext = photoFile.name.split('.').pop()
       const path = `${user.id}/avatar.${ext}`
-      // Never let a hung storage request block signup — 15s cap, then move on
+      // Never let a hung storage request block signup. 15s cap, then move on
       const timeout = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('Upload timed out')), 15000)
       )
@@ -156,7 +158,7 @@ export default function ChangePassword() {
       await supabase.from('profiles').update({ avatar_url: `${publicUrl}?t=${Date.now()}` }).eq('id', user.id)
     } catch (err) {
       console.error('Avatar upload failed:', err)
-      // Don't block — just continue
+      // Don't block. Just continue
     }
     finish()
   }
@@ -167,31 +169,30 @@ export default function ChangePassword() {
   // Arrived from an email link but not signed in yet → redeem gate first
   if (tokenHash && !user) {
     return (
-      <div className="min-h-screen bg-sidebar flex items-center justify-center p-4">
-        <div className="w-full max-w-sm">
+      <div className="app-ground min-h-screen flex items-center justify-center p-4">
+        <FallingDisks />
+        <div className="relative z-10 w-full max-w-sm">
           <div className="flex items-center justify-center gap-3 mb-8">
-            <div className="w-10 h-10 rounded-xl bg-accent flex items-center justify-center shrink-0">
-              <span className="text-white font-bold text-base leading-none">C4</span>
-            </div>
+            <div className="shrink-0"><LogoBadge size={40} /></div>
             <div>
-              <p className="text-white font-semibold leading-tight">C4 Lab</p>
+              <p className="font-display text-white font-semibold leading-tight">C4C Lab</p>
               <p className="text-white/40 text-xs leading-tight">Connect Four Creative</p>
             </div>
           </div>
-          <div className="bg-white rounded-2xl shadow-2xl px-6 py-8 text-center">
+          <div className="card shadow-2xl px-6 py-8 text-center">
             <div className="w-12 h-12 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-4">
               <KeyRound size={20} className="text-accent" />
             </div>
-            <h1 className="text-base font-bold text-text-primary mb-1">
-              {tokenType === 'invite' ? 'Welcome to C4 Lab' : 'Reset your password'}
+            <h1 className="font-display text-lg text-text-primary mb-1">
+              {tokenType === 'invite' ? 'Welcome to C4C Lab' : 'Reset your password'}
             </h1>
             <p className="text-sm text-text-secondary mb-5">
               {tokenType === 'invite'
-                ? "You're one click away — continue to create your password."
+                ? "You're one click away. Continue to create your password."
                 : 'Continue to choose a new password.'}
             </p>
             {redeemError ? (
-              <div className="text-left text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2.5 flex items-start gap-2 mb-4">
+              <div className="text-left text-xs text-status-overdue-text bg-status-overdue-bg border border-status-overdue/30 rounded-lg px-3 py-2.5 flex items-start gap-2 mb-4">
                 <AlertTriangle size={13} className="shrink-0 mt-0.5" /> {redeemError}
               </div>
             ) : null}
@@ -215,21 +216,20 @@ export default function ChangePassword() {
   }
 
   return (
-    <div className="min-h-screen bg-sidebar flex items-center justify-center p-4">
-      <div className="w-full max-w-sm">
+    <div className="app-ground min-h-screen flex items-center justify-center p-4">
+      <FallingDisks />
+      <div className="relative z-10 w-full max-w-sm">
 
         {/* Logo */}
         <div className="flex items-center justify-center gap-3 mb-8">
-          <div className="w-10 h-10 rounded-xl bg-accent flex items-center justify-center shrink-0">
-            <span className="text-white font-bold text-base leading-none">C4</span>
-          </div>
+          <div className="shrink-0"><LogoBadge size={40} /></div>
           <div>
-            <p className="text-white font-semibold leading-tight">C4 Lab</p>
+            <p className="font-display text-white font-semibold leading-tight">C4C Lab</p>
             <p className="text-white/40 text-xs leading-tight">Connect Four Creative</p>
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
+        <div className="card shadow-2xl overflow-hidden">
 
           {/* Step indicator */}
           <div className="flex border-b border-border">
@@ -239,7 +239,7 @@ export default function ChangePassword() {
               const active = step === n
               return (
                 <div key={label} className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-medium transition-colors ${
-                  active ? 'text-accent border-b-2 border-accent' : done ? 'text-green-600' : 'text-text-muted'
+                  active ? 'text-accent border-b-2 border-accent' : done ? 'text-status-approved-text' : 'text-text-muted'
                 }`}>
                   {done ? <Check size={12} /> : <span className={`w-4 h-4 rounded-full text-[9px] flex items-center justify-center font-bold ${active ? 'bg-accent text-white' : 'bg-surface-3 text-text-muted'}`}>{n}</span>}
                   {label}
@@ -258,7 +258,7 @@ export default function ChangePassword() {
                     <Lock size={16} className="text-accent" />
                   </div>
                   <div>
-                    <h1 className="text-base font-bold text-text-primary">Welcome to C4 Lab</h1>
+                    <h1 className="text-base font-bold text-text-primary">Welcome to C4C Lab</h1>
                     <p className="text-xs text-text-muted">Create your password to get started</p>
                   </div>
                 </div>
@@ -272,11 +272,11 @@ export default function ChangePassword() {
                     {getInitials(profile?.full_name)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-text-primary truncate">{profile?.full_name || '—'}</p>
-                    <p className="text-xs text-text-muted truncate">{user?.email || '—'}</p>
+                    <p className="text-sm font-semibold text-text-primary truncate">{profile?.full_name || 'Not set'}</p>
+                    <p className="text-xs text-text-muted truncate">{user?.email || 'Not set'}</p>
                   </div>
                   <span className={`text-xs font-medium px-2 py-0.5 rounded-full capitalize shrink-0 ${ROLE_COLORS[profile?.role] || 'bg-surface-3 text-text-muted'}`}>
-                    {ROLE_LABELS[profile?.role] || profile?.role || '—'}
+                    {ROLE_LABELS[profile?.role] || profile?.role || 'Not set'}
                   </span>
                 </div>
               </div>
@@ -330,7 +330,7 @@ export default function ChangePassword() {
                   </div>
                 </div>
                 {error && (
-                  <p className="text-xs text-red-500 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p>
+                  <p className="text-xs text-status-overdue-text bg-status-overdue-bg border border-status-overdue/30 rounded-lg px-3 py-2">{error}</p>
                 )}
                 <button
                   type="submit"
@@ -389,7 +389,7 @@ export default function ChangePassword() {
               </div>
 
               {error && (
-                <p className="text-xs text-red-500 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p>
+                <p className="text-xs text-status-overdue-text bg-status-overdue-bg border border-status-overdue/30 rounded-lg px-3 py-2">{error}</p>
               )}
 
               <div className="space-y-2 pt-1">
@@ -399,7 +399,7 @@ export default function ChangePassword() {
                   className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {uploading ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-                  {photoPreview ? 'Save Photo & Enter C4 Lab' : 'Finish Setup'}
+                  {photoPreview ? 'Save Photo & Enter C4C Lab' : 'Finish Setup'}
                 </button>
                 <button
                   onClick={finish}
@@ -414,7 +414,7 @@ export default function ChangePassword() {
         </div>
 
         <p className="text-center text-white/30 text-xs mt-5">
-          This link was sent by your C4 Lab admin. If you weren't expecting this, ignore it.
+          This link was sent by your C4C Lab admin. If you weren't expecting this, ignore it.
         </p>
       </div>
     </div>

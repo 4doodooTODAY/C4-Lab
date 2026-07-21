@@ -24,10 +24,10 @@ const TYPE_LABELS = {
 }
 
 const TYPE_COLORS = {
-  photography:     'bg-purple-50 text-purple-700',
-  videography:     'bg-blue-50 text-blue-700',
-  editing:         'bg-orange-50 text-orange-700',
-  full_production: 'bg-green-50 text-green-700',
+  photography:     'bg-accent/10 text-status-review-text',
+  videography:     'bg-accent/10 text-status-review-text',
+  editing:         'bg-status-due-soon-bg text-status-due-soon-text',
+  full_production: 'bg-status-approved-bg text-status-approved-text',
   social_media:    'bg-pink-50 text-pink-700',
 }
 
@@ -43,12 +43,12 @@ const STAGE_LABELS = {
 
 const STAGE_COLORS = {
   briefing:        'bg-slate-100 text-slate-600',
-  pre_production:  'bg-blue-50 text-blue-600',
-  production:      'bg-amber-50 text-amber-600',
-  post_production: 'bg-purple-50 text-purple-600',
-  review:          'bg-orange-50 text-orange-600',
-  revisions:       'bg-red-50 text-red-600',
-  delivered:       'bg-green-50 text-green-600',
+  pre_production:  'bg-accent/10 text-status-review-text',
+  production:      'bg-status-due-soon-bg text-status-due-soon-text',
+  post_production: 'bg-accent/10 text-status-review-text',
+  review:          'bg-status-due-soon-bg text-status-due-soon-text',
+  revisions:       'bg-status-overdue-bg text-status-overdue-text',
+  delivered:       'bg-status-approved-bg text-status-approved-text',
 }
 
 const STAGE_DOT = {
@@ -83,12 +83,12 @@ function ProjectCard({ project, onClick, status, isPinned, onTogglePin }) {
   const visible  = teamMembers.slice(0, 3)
   const overflow = teamMembers.length - 3
 
-  const clientName = project.clients?.contact_name || project.clients?.name || '—'
+  const clientName = project.clients?.contact_name || project.clients?.name || 'Not set'
 
   return (
     <div
       onClick={onClick}
-      className="bg-white rounded-2xl border border-border p-5 hover:shadow-md hover:border-border-strong transition-all cursor-pointer flex flex-col gap-3"
+      className="card border border-border p-5 hover:shadow-md hover:border-border-strong transition-all cursor-pointer flex flex-col gap-3"
     >
       {/* Top row */}
       <div className="flex items-start justify-between gap-2">
@@ -99,7 +99,7 @@ function ProjectCard({ project, onClick, status, isPinned, onTogglePin }) {
         <PinButton pinned={isPinned} onToggle={onTogglePin} />
       </div>
 
-      {/* Status + stage — the at-a-glance row */}
+      {/* Status + stage. The at-a-glance row */}
       <div className="flex items-center gap-1.5 flex-wrap">
         <StatusBadge status={status} />
         <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${STAGE_COLORS[project.stage] || 'bg-surface-2 text-text-muted'}`}>
@@ -146,7 +146,7 @@ function ProjectCard({ project, onClick, status, isPinned, onTogglePin }) {
             <span className="text-xs text-text-muted">No team</span>
           )}
         </div>
-        <span className="text-[10px] text-text-muted truncate">{IN_CONTROL[project.stage] || '—'}</span>
+        <span className="text-[10px] text-text-muted truncate">{IN_CONTROL[project.stage] || 'Not set'}</span>
       </div>
     </div>
   )
@@ -208,7 +208,7 @@ export default function Projects() {
           <div className="flex gap-2 flex-wrap">
             {readyToPost.map((p) => (
               <a key={p.id} href={`/projects/${p.id}`}
-                className="px-4 py-2 rounded-xl bg-white text-green-700 text-sm font-bold hover:bg-green-50 transition-colors shrink-0">
+                className="px-4 py-2 rounded-xl bg-surface text-status-approved-text text-sm font-bold hover:bg-status-approved-bg transition-colors shrink-0">
                 Open {p.name}
               </a>
             ))}
@@ -231,10 +231,10 @@ export default function Projects() {
       <div className="grid grid-cols-3 gap-4 mb-6">
         {[
           { label: 'Total',        value: total,       color: 'text-text-primary' },
-          { label: 'Active',       value: activeCount, color: 'text-green-600' },
-          { label: 'Due This Week',value: dueThisWeek, color: 'text-amber-600' },
+          { label: 'Active',       value: activeCount, color: 'text-status-approved-text' },
+          { label: 'Due This Week',value: dueThisWeek, color: 'text-status-due-soon-text' },
         ].map(({ label, value, color }) => (
-          <div key={label} className="bg-white rounded-2xl border border-border p-4">
+          <div key={label} className="card border border-border p-4">
             <p className="text-xs text-text-muted mb-1">{label}</p>
             <p className={`text-2xl font-bold ${color}`}>{value}</p>
           </div>
@@ -269,7 +269,7 @@ export default function Projects() {
           <Loader2 size={22} className="animate-spin text-text-muted" />
         </div>
       ) : filtered.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-border p-12 text-center">
+        <div className="card border border-border p-12 text-center">
           <FolderKanban size={36} className="mx-auto text-text-muted/30 mb-3" />
           <p className="text-sm font-semibold text-text-primary mb-1">
             {projects.length === 0 ? 'No projects yet' : 'No projects match your filters'}

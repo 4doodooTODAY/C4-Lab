@@ -8,6 +8,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext'
 import { useNotifications } from '../../contexts/NotificationContext'
 import Avatar from '../ui/Avatar'
+import LogoBadge from '../ui/Logo'
 
 const NAV = {
   admin: [
@@ -76,17 +77,15 @@ export default function Sidebar() {
       {/* Brand */}
       <div className="px-5 py-5 border-b border-white/5">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center shrink-0">
-            <span className="text-white font-bold text-sm leading-none">C4</span>
-          </div>
+          <div className="shrink-0"><LogoBadge size={32} /></div>
           <div>
-            <p className="text-white font-semibold text-sm leading-tight">C4 Lab</p>
+            <p className="font-display text-white font-semibold text-sm leading-tight">C4C Lab</p>
             <p className="text-white/40 text-xs leading-tight">Connect Four Creative</p>
           </div>
         </div>
       </div>
 
-      {/* Admin/Creative toggle — only for admins */}
+      {/* Admin/Creative toggle. Only for admins */}
       {isAdmin && (
         <div className="px-3 pt-3 pb-1">
           <button
@@ -95,11 +94,11 @@ export default function Sidebar() {
           >
             <div className="flex items-center gap-2">
               {viewMode === 'admin'
-                ? <ShieldCheck size={13} className="text-accent" />
-                : <Scissors size={13} className="text-purple-400" />
+                ? <ShieldCheck size={13} className="text-accent-hover" />
+                : <Scissors size={13} className="text-accent-warm" />
               }
               <span className="text-xs font-semibold text-white/70">
-                {viewMode === 'admin' ? 'Admin View' : 'Creative View'}
+                {viewMode === 'admin' ? 'Admin view' : 'Creative view'}
               </span>
             </div>
             <span className="text-[10px] text-white/30 font-medium">switch</span>
@@ -115,9 +114,9 @@ export default function Sidebar() {
             to={to}
             end={end}
             className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-100 ${
+              `flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors duration-100 ${
                 isActive
-                  ? 'bg-sidebar-active text-white'
+                  ? 'bg-accent/20 text-white shadow-[inset_2px_0_0_0_rgb(var(--violet-rgb))]'
                   : 'text-white/50 hover:text-white hover:bg-sidebar-hover'
               }`
             }

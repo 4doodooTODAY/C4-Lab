@@ -81,7 +81,7 @@ const VideoPlayer = forwardRef(function VideoPlayer({ videoUrl, onTimeUpdate }, 
           <p className="text-xs text-white/50">
             {isDriveUrl(videoUrl)
               ? 'Make sure the Drive file is shared as "Anyone with the link can view".'
-              : 'Could not load the video. The file may still be processing — try again in a moment.'}
+              : 'Could not load the video. The file may still be processing. Try again in a moment.'}
           </p>
         </div>
       )}

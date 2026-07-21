@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 
-// Shared avatar component — shows photo if available, otherwise initials.
+// Shared avatar component. Shows photo if available, otherwise initials.
 // A broken photo URL falls back to initials via onError instead of
 // rendering a broken image.
 export default function Avatar({ name, url, size = 8, className = '' }) {
@@ -40,11 +40,11 @@ export default function Avatar({ name, url, size = 8, className = '' }) {
   )
 }
 
-// Tag badge component — used next to names throughout the app
+// Tag badge component. Used next to names throughout the app
 const TAG_STYLES = {
-  Photographer: 'bg-amber-50  text-amber-700  border-amber-200',
-  Videographer: 'bg-blue-50   text-blue-700   border-blue-200',
-  Editor:       'bg-green-50  text-green-700  border-green-200',
+  Photographer: 'bg-status-due-soon-bg  text-status-due-soon-text  border-status-due-soon/30',
+  Videographer: 'bg-accent/10   text-status-review-text   border-accent/30',
+  Editor:       'bg-status-approved-bg  text-status-approved-text  border-status-approved/30',
 }
 
 export function TagBadge({ tag }) {

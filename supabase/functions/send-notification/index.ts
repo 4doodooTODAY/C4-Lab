@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
           'Authorization': `Bearer ${RESEND_API_KEY}`,
         },
         body: JSON.stringify({
-          from: `C4 Lab <${FROM_EMAIL}>`,
+          from: `C4C Lab <${FROM_EMAIL}>`,
           to: [recipientEmail],
           subject: notification.title,
           html: `
@@ -85,17 +85,17 @@ Deno.serve(async (req) => {
                   <span style="color:white;font-weight:700;font-size:14px;">C4</span>
                 </div>
                 <div>
-                  <div style="font-weight:600;font-size:14px;color:#111;">C4 Lab</div>
+                  <div style="font-weight:600;font-size:14px;color:#111;">C4C Lab</div>
                   <div style="font-size:12px;color:#888;">Connect Four Creative</div>
                 </div>
               </div>
               <h2 style="font-size:18px;font-weight:700;color:#111;margin:0 0 8px;">${notification.title}</h2>
               ${notification.body ? `<p style="font-size:14px;color:#555;margin:0 0 24px;">${notification.body}</p>` : ''}
               <a href="${actionUrl}" style="display:inline-block;background:#6C63FF;color:white;padding:12px 24px;border-radius:10px;text-decoration:none;font-size:14px;font-weight:600;">
-                Open C4 Lab →
+                Open C4C Lab →
               </a>
               <p style="font-size:11px;color:#aaa;margin-top:32px;">
-                You're receiving this because you're part of the C4 Lab workspace.
+                You're receiving this because you're part of the C4C Lab workspace.
               </p>
             </div>
           `,

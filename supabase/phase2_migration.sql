@@ -1,5 +1,5 @@
 -- ============================================================
--- C4 Lab — Phase 2 Migration
+-- C4C Lab — Phase 2 Migration
 -- Run this in Supabase SQL Editor
 -- Safe to run even if some columns already exist (uses IF NOT EXISTS)
 -- ============================================================

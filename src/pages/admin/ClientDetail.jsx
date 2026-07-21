@@ -75,7 +75,7 @@ function AssignTeamModal({ clientId, creatives, assignedIds, onClose, onSave }) 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 z-10">
+      <div className="relative card shadow-2xl w-full max-w-md p-6 z-10">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-base font-semibold text-text-primary">Assign Team</h2>
           <button onClick={onClose} className="btn-ghost p-1.5"><X size={16} /></button>
@@ -103,7 +103,7 @@ function AssignTeamModal({ clientId, creatives, assignedIds, onClose, onSave }) 
                 <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
                   active ? 'bg-accent border-accent' : 'border-border-strong'
                 }`}>
-                  {active && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                  {active && <div className="w-1.5 h-1.5 rounded-full bg-surface" />}
                 </div>
               </button>
             )
@@ -121,7 +121,7 @@ function AssignTeamModal({ clientId, creatives, assignedIds, onClose, onSave }) 
   )
 }
 
-// ── Login Accounts — a client can have up to 2 sign-ins ──────────────────────
+// ── Login Accounts. A client can have up to 2 sign-ins ──────────────────────
 function LoginAccounts({ client }) {
   const { createUser } = useAuth()
   const [members, setMembers]   = useState(null)   // [{ profile_id, profiles }]
@@ -149,7 +149,7 @@ function LoginAccounts({ client }) {
     setSaving(true)
     setError('')
     try {
-      // Invite the new login (client role) — they get the usual set-password email
+      // Invite the new login (client role). They get the usual set-password email
       const created = await createUser({
         email: email.trim(), full_name: name.trim(), role: 'client',
       })
@@ -159,7 +159,7 @@ function LoginAccounts({ client }) {
       if (memberErr) throw new Error(memberErr.message)
       if (created?.emailed === false && created?.invite_link) {
         await navigator.clipboard.writeText(created.invite_link)
-        window.alert('Email could not send yet — the setup link was copied to your clipboard. Send it to them directly.')
+        window.alert('Email could not send yet. The setup link was copied to your clipboard. Send it to them directly.')
       }
       setShowAdd(false)
       setName(''); setEmail('')
@@ -197,20 +197,20 @@ function LoginAccounts({ client }) {
       {members === null ? (
         <Loader2 size={14} className="animate-spin text-text-muted" />
       ) : members.length === 0 ? (
-        <p className="text-xs text-text-muted">No login accounts yet — invite the client from Contact Info above.</p>
+        <p className="text-xs text-text-muted">No login accounts yet. Invite the client from Contact Info above.</p>
       ) : (
         <div className="space-y-2">
           {members.map((m) => (
             <div key={m.profile_id} className="flex items-center gap-3 p-2.5 rounded-xl border border-border">
               <Avatar name={m.profiles?.full_name} size={8} />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-text-primary truncate">{m.profiles?.full_name || '—'}</p>
+                <p className="text-sm font-medium text-text-primary truncate">{m.profiles?.full_name || 'Not set'}</p>
                 <div className="flex items-center gap-1.5">
                   {isPrimary(m.profile_id) && (
                     <span className="text-[10px] font-medium text-accent">Primary</span>
                   )}
                   {m.profiles?.must_change_password && (
-                    <span className="text-[10px] font-medium text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full">Invite pending</span>
+                    <span className="text-[10px] font-medium text-status-due-soon-text bg-status-due-soon-bg px-1.5 py-0.5 rounded-full">Invite pending</span>
                   )}
                 </div>
               </div>
@@ -218,7 +218,7 @@ function LoginAccounts({ client }) {
                 <button
                   onClick={() => handleRemove(m.profile_id)}
                   disabled={removing === m.profile_id}
-                  className="p-1.5 rounded-lg text-text-muted hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-40"
+                  className="p-1.5 rounded-lg text-text-muted hover:text-status-overdue-text hover:bg-status-overdue-bg transition-colors disabled:opacity-40"
                   title="Remove this login"
                 >
                   {removing === m.profile_id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
@@ -235,7 +235,7 @@ function LoginAccounts({ client }) {
             <input className="input" placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
             <input type="email" className="input" placeholder="their@email.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
           </div>
-          {error && <p className="text-xs text-red-500">{error}</p>}
+          {error && <p className="text-xs text-status-overdue-text">{error}</p>}
           <div className="flex gap-2 justify-end">
             <button type="button" onClick={() => setShowAdd(false)} className="btn-secondary text-xs" disabled={saving}>Cancel</button>
             <button type="submit" disabled={saving} className="btn-primary text-xs flex items-center gap-1.5 disabled:opacity-50">
@@ -429,7 +429,7 @@ export default function ClientDetail() {
       const res = await callAction({ action: 'resend_invite', email: client.email, full_name: client.contact_name, role: 'client' }, session)
       if (res?.emailed === false && res?.invite_link) {
         await navigator.clipboard.writeText(res.invite_link)
-        alert(`Email couldn't send yet — the setup link was copied to your clipboard. Send it to ${client.email} directly.`)
+        alert(`Email couldn't send yet. The setup link was copied to your clipboard. Send it to ${client.email} directly.`)
       } else {
         alert(`Invite resent to ${client.email}`)
       }
@@ -493,10 +493,10 @@ export default function ClientDetail() {
   const isPending = !client.profile_id || authUser?.user_metadata?.must_change_password
 
   const STATUS_BADGE = {
-    new:         { label: 'New', class: 'bg-blue-50 text-blue-600' },
-    in_progress: { label: 'In Progress', class: 'bg-amber-50 text-amber-600' },
-    in_review:   { label: 'In Review', class: 'bg-purple-50 text-purple-600' },
-    done:        { label: 'Done', class: 'bg-green-50 text-green-600' },
+    new:         { label: 'New', class: 'bg-accent/10 text-status-review-text' },
+    in_progress: { label: 'In Progress', class: 'bg-status-due-soon-bg text-status-due-soon-text' },
+    in_review:   { label: 'In Review', class: 'bg-accent/10 text-status-review-text' },
+    done:        { label: 'Done', class: 'bg-status-approved-bg text-status-approved-text' },
   }
 
   return (
@@ -510,18 +510,18 @@ export default function ClientDetail() {
         <Avatar name={client.contact_name || client.name} size={14} />
         <div>
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-2xl font-bold text-text-primary">{client.contact_name || '—'}</h1>
+            <h1 className="display">{client.contact_name || 'Not set'}</h1>
             {isLocked && (
-              <span className="text-xs font-medium text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">Locked</span>
+              <span className="text-xs font-medium text-status-overdue-text bg-status-overdue-bg border border-status-overdue/30 px-2 py-0.5 rounded-full">Locked</span>
             )}
             {isPending ? (
-              <span className="text-xs font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">Invite pending</span>
+              <span className="text-xs font-medium text-status-due-soon-text bg-status-due-soon-bg px-2 py-0.5 rounded-full">Invite pending</span>
             ) : (
-              <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full">Active</span>
+              <span className="text-xs font-medium text-status-approved-text bg-status-approved-bg px-2 py-0.5 rounded-full">Active</span>
             )}
           </div>
           <div className="flex items-center gap-3 mt-1 text-sm text-text-muted">
-            <span className="flex items-center gap-1"><Building2 size={13} /> {client.name || '—'}</span>
+            <span className="flex items-center gap-1"><Building2 size={13} /> {client.name || 'Not set'}</span>
             {authUser?.last_sign_in_at && (
               <span>· Last seen {formatDistanceToNow(new Date(authUser.last_sign_in_at), { addSuffix: true })}</span>
             )}
@@ -531,7 +531,7 @@ export default function ClientDetail() {
 
       <div className="space-y-5">
         {error && (
-          <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>
+          <div className="text-xs text-status-overdue-text bg-status-overdue-bg border border-status-overdue/30 rounded-lg px-3 py-2">{error}</div>
         )}
 
         {/* Contact Info */}
@@ -570,7 +570,7 @@ export default function ClientDetail() {
           </form>
         </div>
 
-        {/* Login Accounts — up to 2 people can sign in for this client */}
+        {/* Login Accounts. Up to 2 people can sign in for this client */}
         <LoginAccounts client={client} />
 
         {/* Assigned Team */}
@@ -631,7 +631,7 @@ export default function ClientDetail() {
             <span className="text-xs text-text-muted">{footageUploads.length} file{footageUploads.length !== 1 ? 's' : ''}</span>
           </div>
 
-          {/* Drop zone — always visible */}
+          {/* Drop zone. Always visible */}
           <div
             onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
             onDragLeave={() => setDragOver(false)}
@@ -671,13 +671,13 @@ export default function ClientDetail() {
                     <span className="text-text-muted shrink-0">{fmtBytes(f.size)}</span>
                     {!uploading && (
                       <button onClick={(e) => { e.stopPropagation(); setUploadFiles((prev) => prev.filter((_, j) => j !== i)) }}>
-                        <X size={12} className="text-text-muted hover:text-red-500" />
+                        <X size={12} className="text-text-muted hover:text-status-overdue-text" />
                       </button>
                     )}
                   </div>
                 )
               })}
-              {uploadError && <p className="text-xs text-red-500 mt-1">{uploadError}</p>}
+              {uploadError && <p className="text-xs text-status-overdue-text mt-1">{uploadError}</p>}
               <button
                 onClick={handleFootageUpload}
                 disabled={uploading}
@@ -728,7 +728,7 @@ export default function ClientDetail() {
           </div>
           <textarea
             className="input w-full min-h-[100px] resize-y"
-            placeholder="Add notes about this client — preferences, context, reminders..."
+            placeholder="Add notes about this client. Preferences, context, reminders..."
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
           />
@@ -756,12 +756,12 @@ export default function ClientDetail() {
               <div className="flex justify-between text-sm">
                 <span className="text-text-muted">Account created</span>
                 <span className="text-text-primary font-medium">
-                  {authUser.created_at ? format(new Date(authUser.created_at), 'MMM d, yyyy') : '—'}
+                  {authUser.created_at ? format(new Date(authUser.created_at), 'MMM d, yyyy') : 'Not set'}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-text-muted">Email confirmed</span>
-                <span className={`font-medium ${authUser.email_confirmed_at ? 'text-green-600' : 'text-amber-600'}`}>
+                <span className={`font-medium ${authUser.email_confirmed_at ? 'text-status-approved-text' : 'text-status-due-soon-text'}`}>
                   {authUser.email_confirmed_at ? 'Yes' : 'No'}
                 </span>
               </div>
@@ -770,10 +770,10 @@ export default function ClientDetail() {
         )}
 
         {/* Danger Zone */}
-        <div className="card p-6 border-red-100">
-          <h2 className="text-sm font-semibold text-red-600 mb-4">Danger Zone</h2>
+        <div className="card p-6 border-status-overdue/30">
+          <h2 className="text-sm font-semibold text-status-overdue-text mb-4">Danger Zone</h2>
           <div className="space-y-3">
-            {/* Lock / Unlock — only if account exists */}
+            {/* Lock / Unlock. Only if account exists */}
             {client.profile_id && (
               <div className="flex items-center justify-between">
                 <div>
@@ -782,7 +782,7 @@ export default function ClientDetail() {
                 </div>
                 <button onClick={handleLockToggle} disabled={locking}
                   className={`flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border transition-all disabled:opacity-50 ${
-                    isLocked ? 'border-green-200 text-green-700 hover:bg-green-50' : 'border-amber-200 text-amber-700 hover:bg-amber-50'
+                    isLocked ? 'border-status-approved/30 text-status-approved-text hover:bg-status-approved-bg' : 'border-status-due-soon/30 text-status-due-soon-text hover:bg-status-due-soon-bg'
                   }`}>
                   {locking ? <Loader2 size={13} className="animate-spin" /> : isLocked ? <Unlock size={13} /> : <Lock size={13} />}
                   {isLocked ? 'Unlock' : 'Lock'}
@@ -798,7 +798,7 @@ export default function ClientDetail() {
                     <p className="text-xs text-text-muted">Permanently delete this client account</p>
                   </div>
                   <button onClick={() => setDeleteStep(1)}
-                    className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-all">
+                    className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border border-status-overdue/30 text-status-overdue-text hover:bg-status-overdue-bg transition-all">
                     <Trash2 size={13} /> Remove
                   </button>
                 </div>

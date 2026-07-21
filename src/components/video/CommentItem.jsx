@@ -14,7 +14,7 @@ function getInitials(name) {
   return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
 }
 
-const COLORS = ['#6C63FF', '#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6']
+const COLORS = ['var(--violet)', '#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6']
 function avatarColor(id) {
   if (!id) return COLORS[0]
   let hash = 0
@@ -25,7 +25,7 @@ function avatarColor(id) {
 export default function CommentItem({ comment, onSeek, onDelete, onResolve, isActive }) {
   const { user } = useAuth()
   const isOwn = comment.author_id === user?.id
-  // profiles join may return null if RLS blocks other users — fall back gracefully
+  // profiles join may return null if RLS blocks other users. Fall back gracefully
   const authorName = comment.profiles?.full_name || (isOwn ? 'You' : 'Team member')
   const color = avatarColor(comment.author_id)
 
@@ -53,7 +53,7 @@ export default function CommentItem({ comment, onSeek, onDelete, onResolve, isAc
         <div className="flex items-center gap-2 mb-0.5">
           <span className="text-xs font-semibold text-text-primary truncate">{authorName}</span>
           {comment.is_internal && (
-            <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">Internal</span>
+            <span className="text-xs bg-status-due-soon-bg text-status-due-soon-text px-1.5 py-0.5 rounded font-medium">Internal</span>
           )}
           <button
             onClick={(e) => { e.stopPropagation(); onSeek(comment.timestamp_seconds) }}
@@ -81,7 +81,7 @@ export default function CommentItem({ comment, onSeek, onDelete, onResolve, isAc
         {onDelete && isOwn && (
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(comment.id) }}
-            className="text-text-muted hover:text-red-500 transition-colors"
+            className="text-text-muted hover:text-status-overdue-text transition-colors"
           >
             <Trash2 size={13} />
           </button>

@@ -35,14 +35,14 @@ export default function CaptionConcept({ projectId, initialValue, canEdit = true
     timer.current = setTimeout(() => save(text), 900)
   }
 
-  if (!canEdit && !value) return null // nothing drafted yet — nothing to show clients
+  if (!canEdit && !value) return null // nothing drafted yet. Nothing to show clients
 
   return (
     <div className={plain
       ? 'mt-4 pt-4 border-t border-border'
       : dark
         ? 'bg-white/5 border border-white/10 rounded-xl p-4'
-        : 'bg-white rounded-2xl border border-border p-5'}>
+        : 'card border border-border p-5'}>
       <div className="flex items-center gap-2 mb-1">
         <Type size={13} className={dark ? 'text-white/50' : 'text-text-muted'} />
         <h3 className={`text-sm font-semibold ${dark ? 'text-white' : 'text-text-primary'}`}>Caption Concept</h3>
@@ -50,7 +50,7 @@ export default function CaptionConcept({ projectId, initialValue, canEdit = true
         {saved && <Check size={11} className="text-green-500" />}
       </div>
       <p className={`text-xs mb-3 ${dark ? 'text-white/40' : 'text-text-muted'}`}>
-        {canEdit ? 'Draft the caption to post with this content — saves automatically.' : 'The caption planned for this content.'}
+        {canEdit ? 'Draft the caption to post with this content. Saves automatically.' : 'The caption planned for this content.'}
       </p>
       {canEdit ? (
         <textarea

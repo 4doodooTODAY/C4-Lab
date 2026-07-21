@@ -66,8 +66,8 @@ export default function NotificationSettings() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'failed')
       setTestResult(data.sent > 0
-        ? 'Test notification sent — check your device.'
-        : 'No active subscription found — enable push first.')
+        ? 'Test notification sent. Check your device.'
+        : 'No active subscription found. Enable push first.')
     } catch (err) {
       setTestResult(`Test failed: ${err.message}`)
     }
@@ -101,7 +101,7 @@ export default function NotificationSettings() {
               </p>
             </div>
             {pushEnabled ? (
-              <span className="text-xs font-medium text-green-600 bg-green-50 px-2.5 py-1 rounded-full flex items-center gap-1">
+              <span className="text-xs font-medium text-status-approved-text bg-status-approved-bg px-2.5 py-1 rounded-full flex items-center gap-1">
                 <Check size={11} /> On
               </span>
             ) : (

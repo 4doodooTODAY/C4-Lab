@@ -14,7 +14,7 @@ const REPLY_TO       = 'yourmove@connectfourcreative.com'
 
 // ── Branded auth email via Resend ─────────────────────────────────────────────
 // Invite links carry token_hash to OUR page; nothing is redeemed until the
-// person clicks there — so email security scanners can't burn the link.
+// person clicks there. So email security scanners can't burn the link.
 async function sendAuthEmail(to: string, name: string, link: string, kind: 'invite' | 'recovery') {
   if (!RESEND_API_KEY) throw new Error('email not configured')
   const isInvite = kind === 'invite'
@@ -25,18 +25,18 @@ async function sendAuthEmail(to: string, name: string, link: string, kind: 'invi
       from: FROM,
       to: [to],
       reply_to: REPLY_TO,
-      subject: isInvite ? 'Welcome to C4 Lab — set up your account' : 'Reset your C4 Lab password',
+      subject: isInvite ? 'Welcome to C4C Lab. Set up your account' : 'Reset your C4C Lab password',
       html: `
         <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:480px;margin:0 auto;padding:32px 24px">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:24px">
             <div style="width:36px;height:36px;border-radius:10px;background:#6C63FF;color:#fff;font-weight:700;font-size:15px;line-height:36px;text-align:center">C4</div>
-            <div style="font-weight:600;color:#111827">C4 Lab</div>
+            <div style="font-weight:600;color:#111827">C4C Lab</div>
           </div>
           <h2 style="margin:0 0 8px;color:#111827;font-size:20px">${isInvite ? `Hi ${name || 'there'}, your account is ready` : 'Reset your password'}</h2>
           <p style="color:#4b5563;font-size:14px;line-height:1.6;margin:0 0 24px">
             ${isInvite
-              ? 'Your team at Connect Four Creative set you up on C4 Lab — where you can review your content, leave feedback, and download your files. Click below to create your password.'
-              : 'Click below to choose a new password for your C4 Lab account.'}
+              ? 'Your team at Connect Four Creative set you up on C4C Lab. Where you can review your content, leave feedback, and download your files. Click below to create your password.'
+              : 'Click below to choose a new password for your C4C Lab account.'}
           </p>
           <a href="${link}" style="display:inline-block;background:#6C63FF;color:#fff;text-decoration:none;font-weight:600;font-size:14px;padding:12px 24px;border-radius:10px">
             ${isInvite ? 'Set Up My Account' : 'Reset Password'}
@@ -52,7 +52,7 @@ async function sendAuthEmail(to: string, name: string, link: string, kind: 'invi
 
 // ── Generate a scanner-proof setup link ────────────────────────────────────────
 // New users → invite token; existing users → recovery token. Either way the
-// link points at our /change-password page with token_hash — the token is only
+// link points at our /change-password page with token_hash. The token is only
 // redeemed when the person clicks "Set up my account" there.
 // deno-lint-ignore no-explicit-any
 async function makeSetupLink(admin: any, email: string, meta: Record<string, unknown>) {
@@ -90,7 +90,7 @@ Deno.serve(async (req) => {
     // ── Admin gate ─────────────────────────────────────────────────────────
     // Every action except the public forgot-password requires an admin JWT
     // (or the service-role key for backend calls). This function can delete
-    // users — it must never be callable by ordinary logged-in users.
+    // users. It must never be callable by ordinary logged-in users.
     if (action !== 'forgot_password') {
       const jwt = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '')
       let allowed = false
@@ -155,7 +155,7 @@ Deno.serve(async (req) => {
           const link = `${APP_URL}/change-password?token_hash=${encodeURIComponent(data.properties.hashed_token)}&type=recovery`
           await sendAuthEmail(email, '', link, 'recovery')
         }
-      } catch { /* swallow — never reveal whether an email exists */ }
+      } catch { /* swallow. Never reveal whether an email exists */ }
       // Always succeed so the form can't be used to probe for accounts
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200,

@@ -42,7 +42,7 @@ export default function VideoReview() {
   return (
     <div className="flex flex-col h-screen overflow-hidden">
       {/* Top bar */}
-      <header className="flex items-center gap-3 px-5 py-3 bg-white border-b border-border shrink-0">
+      <header className="flex items-center gap-3 px-5 py-3 bg-surface border-b border-border shrink-0">
         <Link to="/videos" className="btn-ghost p-1.5 -ml-1.5 text-text-muted">
           <ArrowLeft size={16} />
         </Link>
@@ -54,8 +54,8 @@ export default function VideoReview() {
         </div>
         {/* Status badge */}
         <span className={`text-xs font-medium px-2.5 py-1 rounded-full capitalize ${
-          media.status === 'approved' ? 'bg-green-100 text-green-700' :
-          media.status === 'changes_requested' ? 'bg-amber-100 text-amber-700' :
+          media.status === 'approved' ? 'bg-status-approved-bg text-status-approved-text' :
+          media.status === 'changes_requested' ? 'bg-status-due-soon-bg text-status-due-soon-text' :
           'bg-surface-3 text-text-muted'
         }`}>
           {media.status?.replace('_', ' ') || 'Awaiting review'}
@@ -79,7 +79,7 @@ export default function VideoReview() {
         </div>
 
         {/* Right: comment sidebar */}
-        <aside className="w-[300px] shrink-0 bg-white border-l border-border flex flex-col overflow-hidden">
+        <aside className="w-[300px] shrink-0 bg-surface border-l border-border flex flex-col overflow-hidden">
           <CommentSidebar
             comments={comments}
             loading={commentsLoading}

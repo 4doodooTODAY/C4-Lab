@@ -1,11 +1,11 @@
 import { useState, useRef } from 'react'
-import { Loader2, Check, User, Lock, Camera } from 'lucide-react'
+import { Loader2, Check, User, Lock, Camera, Scissors, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import Avatar from '../components/ui/Avatar'
 import NotificationSettings from '../components/settings/NotificationSettings'
 
-const ROLE_LABELS = { admin: 'Admin', creative: 'Creative', client: 'Client' }
+const ROLE_LABELS = { admin: 'Admin', creative: 'Creative', editor: 'Editor', client: 'Client' }
 
 export default function Settings() {
   const { profile, user } = useAuth()
@@ -25,6 +25,26 @@ export default function Settings() {
   const [pwSaving, setPwSaving] = useState(false)
   const [pwSaved, setPwSaved] = useState(false)
   const [pwError, setPwError] = useState('')
+
+  // Creative profile fields
+  const [creativeAbout, setCreativeAbout] = useState(profile?.creative_about || '')
+  const [creativeEquipment, setCreativeEquipment] = useState(profile?.creative_equipment || '')
+  const [creativeShoots, setCreativeShoots] = useState(profile?.creative_ideal_shoots || [])
+  const [newShootType, setNewShootType] = useState('')
+  const [creativeSaving, setCreativeSaving] = useState(false)
+  const [creativeSaved, setCreativeSaved] = useState(false)
+  const [creativeError, setCreativeError] = useState('')
+
+  // Editor profile fields
+  const [editorAbout, setEditorAbout] = useState(profile?.editor_about || '')
+  const [editorSoftware, setEditorSoftware] = useState(profile?.editor_software || '')
+  const [editorEdits, setEditorEdits] = useState(profile?.editor_ideal_edits || [])
+  const [editorAiTools, setEditorAiTools] = useState(profile?.editor_ai_tools || [])
+  const [newEditType, setNewEditType] = useState('')
+  const [newAiTool, setNewAiTool] = useState('')
+  const [editorSaving, setEditorSaving] = useState(false)
+  const [editorSaved, setEditorSaved] = useState(false)
+  const [editorError, setEditorError] = useState('')
 
   const handleAvatarClick = () => fileInputRef.current?.click()
 
@@ -76,16 +96,85 @@ export default function Settings() {
     setPwSaving(false)
   }
 
+  const handleCreativeSave = async (e) => {
+    e.preventDefault()
+    setCreativeSaving(true)
+    setCreativeError('')
+    const { error } = await supabase.from('profiles').update({
+      creative_about: creativeAbout.trim() || null,
+      creative_equipment: creativeEquipment.trim() || null,
+      creative_ideal_shoots: creativeShoots.length > 0 ? creativeShoots : null,
+    }).eq('id', user.id)
+    if (error) { setCreativeError(error.message) } else {
+      setCreativeSaved(true)
+      setTimeout(() => setCreativeSaved(false), 2500)
+    }
+    setCreativeSaving(false)
+  }
+
+  const handleEditorSave = async (e) => {
+    e.preventDefault()
+    setEditorSaving(true)
+    setEditorError('')
+    const { error } = await supabase.from('profiles').update({
+      editor_about: editorAbout.trim() || null,
+      editor_software: editorSoftware.trim() || null,
+      editor_ideal_edits: editorEdits.length > 0 ? editorEdits : null,
+      editor_ai_tools: editorAiTools.length > 0 ? editorAiTools : null,
+    }).eq('id', user.id)
+    if (error) { setEditorError(error.message) } else {
+      setEditorSaved(true)
+      setTimeout(() => setEditorSaved(false), 2500)
+    }
+    setEditorSaving(false)
+  }
+
+  const addShootType = () => {
+    if (!newShootType.trim()) return
+    if (!creativeShoots.includes(newShootType.trim())) {
+      setCreativeShoots([...creativeShoots, newShootType.trim()])
+    }
+    setNewShootType('')
+  }
+
+  const removeShootType = (type) => {
+    setCreativeShoots(creativeShoots.filter(t => t !== type))
+  }
+
+  const addEditType = () => {
+    if (!newEditType.trim()) return
+    if (!editorEdits.includes(newEditType.trim())) {
+      setEditorEdits([...editorEdits, newEditType.trim()])
+    }
+    setNewEditType('')
+  }
+
+  const removeEditType = (type) => {
+    setEditorEdits(editorEdits.filter(t => t !== type))
+  }
+
+  const addAiTool = () => {
+    if (!newAiTool.trim()) return
+    if (!editorAiTools.includes(newAiTool.trim())) {
+      setEditorAiTools([...editorAiTools, newAiTool.trim()])
+    }
+    setNewAiTool('')
+  }
+
+  const removeAiTool = (tool) => {
+    setEditorAiTools(editorAiTools.filter(t => t !== tool))
+  }
+
   return (
     <div className="p-8 max-w-xl">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-text-primary">Settings</h1>
-        <p className="text-text-secondary mt-1">Manage your account details.</p>
+      <div className="anim-rise mb-8">
+        <h1 className="display">Settings</h1>
+        <p className="text-text-secondary mt-2">Your account, your profile, your notifications.</p>
       </div>
 
       <div className="space-y-5">
         {/* Profile */}
-        <div className="card p-6">
+        <div className="anim-rise d1 card p-6">
           <div className="flex items-center gap-2 mb-5">
             <User size={15} className="text-text-muted" />
             <h2 className="text-sm font-semibold text-text-primary">Profile</h2>
@@ -114,7 +203,7 @@ export default function Settings() {
                 {avatarUrl ? 'Change photo' : 'Upload photo'}
               </button>
               <p className="text-xs text-text-muted mt-0.5">JPG, PNG or GIF</p>
-              {avatarError && <p className="text-xs text-red-500 mt-1">{avatarError}</p>}
+              {avatarError && <p className="text-xs text-status-overdue-text mt-1">{avatarError}</p>}
             </div>
             <input
               ref={fileInputRef}
@@ -145,15 +234,15 @@ export default function Settings() {
               <button type="submit" disabled={nameSaving || name.trim() === profile?.full_name}
                 className="btn-primary flex items-center gap-1.5 shrink-0 disabled:opacity-50">
                 {nameSaving ? <Loader2 size={13} className="animate-spin" /> : nameSaved ? <Check size={13} /> : null}
-                {nameSaved ? 'Saved!' : 'Save'}
+                {nameSaved ? 'Saved' : 'Save'}
               </button>
             </div>
-            {nameError && <p className="text-xs text-red-500 mt-1.5">{nameError}</p>}
+            {nameError && <p className="text-xs text-status-overdue-text mt-1.5">{nameError}</p>}
           </form>
         </div>
 
         {/* Password */}
-        <div className="card p-6">
+        <div className="anim-rise d2 card p-6">
           <div className="flex items-center gap-2 mb-5">
             <Lock size={15} className="text-text-muted" />
             <h2 className="text-sm font-semibold text-text-primary">Change Password</h2>
@@ -169,14 +258,134 @@ export default function Settings() {
               <input type="password" className="input w-full" value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Same as above" required />
             </div>
-            {pwError && <p className="text-xs text-red-500">{pwError}</p>}
+            {pwError && <p className="text-xs text-status-overdue-text">{pwError}</p>}
             <button type="submit" disabled={pwSaving || !newPassword || !confirmPassword}
               className="btn-primary flex items-center gap-1.5 disabled:opacity-50">
               {pwSaving ? <Loader2 size={13} className="animate-spin" /> : pwSaved ? <Check size={13} /> : null}
-              {pwSaved ? 'Password updated!' : 'Update Password'}
+              {pwSaved ? 'Password updated' : 'Update password'}
             </button>
           </form>
         </div>
+
+        {/* Creative Profile Section */}
+        {(profile?.role === 'creative' || profile?.role === 'admin') && (
+          <div className="anim-rise d3 card p-6">
+            <div className="flex items-center gap-2 mb-5">
+              <Camera size={15} className="text-text-muted" />
+              <h2 className="text-sm font-semibold text-text-primary">Creative profile</h2>
+            </div>
+            <form onSubmit={handleCreativeSave} className="space-y-4">
+              <div>
+                <label className="label">About You</label>
+                <textarea className="input resize-none text-xs" rows={3}
+                  placeholder="Tell clients and the team about your creative vision and experience…"
+                  value={creativeAbout} onChange={(e) => setCreativeAbout(e.target.value)} />
+              </div>
+              <div>
+                <label className="label">Equipment You Use</label>
+                <textarea className="input resize-none text-xs" rows={2}
+                  placeholder="e.g. Canon R5, DJI Mavic 3, Neewer lighting kit…"
+                  value={creativeEquipment} onChange={(e) => setCreativeEquipment(e.target.value)} />
+              </div>
+              <div>
+                <label className="label">Ideal Types of Shoots</label>
+                <div className="flex gap-2 mb-2">
+                  <input type="text" className="input text-xs flex-1"
+                    placeholder="e.g. Restaurant Photography, Wedding Photos & Video"
+                    value={newShootType} onChange={(e) => setNewShootType(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addShootType() } }} />
+                  <button type="button" onClick={addShootType} className="btn-secondary text-xs">Add</button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {creativeShoots.map((type) => (
+                    <span key={type} className="inline-flex items-center gap-2 bg-surface-2 text-text-primary text-xs px-2.5 py-1.5 rounded-full">
+                      {type}
+                      <button type="button" onClick={() => removeShootType(type)} className="hover:text-status-overdue-text">
+                        <X size={12} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+              {creativeError && <p className="text-xs text-status-overdue-text bg-status-overdue-bg rounded-sm px-3 py-2">{creativeError}</p>}
+              <button type="submit" disabled={creativeSaving}
+                className="btn-primary flex items-center gap-1.5 disabled:opacity-50">
+                {creativeSaving ? <Loader2 size={13} className="animate-spin" /> : creativeSaved ? <Check size={13} /> : null}
+                {creativeSaved ? 'Saved' : 'Save profile'}
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* Editor Profile Section */}
+        {(profile?.role === 'editor' || profile?.role === 'admin') && (
+          <div className="anim-rise d4 card p-6">
+            <div className="flex items-center gap-2 mb-5">
+              <Scissors size={15} className="text-text-muted" />
+              <h2 className="text-sm font-semibold text-text-primary">Editor profile</h2>
+            </div>
+            <form onSubmit={handleEditorSave} className="space-y-4">
+              <div>
+                <label className="label">About You</label>
+                <textarea className="input resize-none text-xs" rows={3}
+                  placeholder="Tell the team about your editing style and experience…"
+                  value={editorAbout} onChange={(e) => setEditorAbout(e.target.value)} />
+              </div>
+              <div>
+                <label className="label">Editing Software You Use</label>
+                <textarea className="input resize-none text-xs" rows={2}
+                  placeholder="e.g. Adobe Premiere Pro, Final Cut Pro, DaVinci Resolve, Photoshop…"
+                  value={editorSoftware} onChange={(e) => setEditorSoftware(e.target.value)} />
+              </div>
+              <div>
+                <label className="label">Ideal Types of Edits</label>
+                <div className="flex gap-2 mb-2">
+                  <input type="text" className="input text-xs flex-1"
+                    placeholder="e.g. Reels, Long-form videos, Photo retouching"
+                    value={newEditType} onChange={(e) => setNewEditType(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addEditType() } }} />
+                  <button type="button" onClick={addEditType} className="btn-secondary text-xs">Add</button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {editorEdits.map((type) => (
+                    <span key={type} className="inline-flex items-center gap-2 bg-surface-2 text-text-primary text-xs px-2.5 py-1.5 rounded-full">
+                      {type}
+                      <button type="button" onClick={() => removeEditType(type)} className="hover:text-status-overdue-text">
+                        <X size={12} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="label">AI Tools You're Proficient With</label>
+                <div className="flex gap-2 mb-2">
+                  <input type="text" className="input text-xs flex-1"
+                    placeholder="e.g. Adobe Firefly, ChatGPT, Runway AI"
+                    value={newAiTool} onChange={(e) => setNewAiTool(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addAiTool() } }} />
+                  <button type="button" onClick={addAiTool} className="btn-secondary text-xs">Add</button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {editorAiTools.map((tool) => (
+                    <span key={tool} className="inline-flex items-center gap-2 bg-surface-2 text-text-primary text-xs px-2.5 py-1.5 rounded-full">
+                      {tool}
+                      <button type="button" onClick={() => removeAiTool(tool)} className="hover:text-status-overdue-text">
+                        <X size={12} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+              {editorError && <p className="text-xs text-status-overdue-text bg-status-overdue-bg rounded-sm px-3 py-2">{editorError}</p>}
+              <button type="submit" disabled={editorSaving}
+                className="btn-primary flex items-center gap-1.5 disabled:opacity-50">
+                {editorSaving ? <Loader2 size={13} className="animate-spin" /> : editorSaved ? <Check size={13} /> : null}
+                {editorSaved ? 'Saved' : 'Save profile'}
+              </button>
+            </form>
+          </div>
+        )}
 
         {/* Notifications */}
         <NotificationSettings />

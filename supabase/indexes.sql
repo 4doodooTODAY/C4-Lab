@@ -1,5 +1,5 @@
 -- ============================================================
--- C4 Lab — Performance Indexes
+-- C4C Lab — Performance Indexes
 -- Run this once in Supabase SQL Editor
 -- ============================================================
 

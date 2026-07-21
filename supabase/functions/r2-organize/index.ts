@@ -1,5 +1,5 @@
 /**
- * r2-organize — admin-only edge function
+ * r2-organize. Admin-only edge function
  *
  * POST { action: 'audit' }
  *   → lists every R2 object, cross-references shoot_uploads + project_revisions,
@@ -73,7 +73,7 @@ function cleanFilename(key: string): string {
   return base.replace(/^\d{10,}-/, '')
 }
 
-/** Sanitize a name for use as an R2 "folder" — keep spaces, strip only dangerous chars */
+/** Sanitize a name for use as an R2 "folder". Keep spaces, strip only dangerous chars */
 function sanitize(s: string): string {
   return (s || 'Unknown').replace(/[<>:"/\\|?*\x00-\x1f]/g, '').trim() || 'Unknown'
 }
@@ -191,7 +191,7 @@ Deno.serve(async (req) => {
       //   {Client}/{Project}/Cuts/v{n} - {filename}
       //   {Client}/{Project}/Photos/{filename}
 
-      // We need client/project names — fetch them
+      // We need client/project names. Fetch them
       const projectIds = [...new Set([
         ...uploads.map(u => u.project_id).filter(Boolean),
         ...revisions.map(r => r.project_id).filter(Boolean),
@@ -268,7 +268,7 @@ Deno.serve(async (req) => {
 
           // Update DB
           if (m.field === 'photo_urls') {
-            // photo_urls is an array — update the specific entry
+            // photo_urls is an array. Update the specific entry
             const { data: rev } = await db.from('project_revisions').select('photo_urls').eq('id', m.dbId).single()
             const urls = (rev?.photo_urls ?? []).map((u: string) => u === publicUrlFor(m.oldKey) ? m.newUrl : u)
             await db.from('project_revisions').update({ photo_urls: urls }).eq('id', m.dbId)

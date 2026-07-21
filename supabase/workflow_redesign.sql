@@ -1,4 +1,4 @@
--- ── C4 Lab Workflow Redesign Migration ───────────────────────────────────────
+-- ── C4C Lab Workflow Redesign Migration ───────────────────────────────────────
 -- Replaces the "concept → project" two-step system with a unified project
 -- model where a project starts in a 'pitch' stage and flows through the
 -- full production → photographer review → client review cycle.

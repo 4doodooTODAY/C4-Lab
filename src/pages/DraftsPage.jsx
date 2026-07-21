@@ -14,10 +14,10 @@ import { formatDistanceToNow } from 'date-fns'
 
 function statusConfig(status) {
   switch (status) {
-    case 'pending_client_review': return { label: 'Awaiting Client',  cls: 'bg-blue-50 text-blue-700 border-blue-200' }
-    case 'pending_editor':        return { label: 'Client Reviewed',  cls: 'bg-amber-50 text-amber-700 border-amber-200' }
-    case 'approved':              return { label: 'Approved',         cls: 'bg-green-50 text-green-700 border-green-200' }
-    default:                      return { label: status || 'Unknown', cls: 'bg-gray-100 text-gray-600 border-gray-200' }
+    case 'pending_client_review': return { label: 'Awaiting Client',  cls: 'bg-accent/10 text-status-review-text border-accent/30' }
+    case 'pending_editor':        return { label: 'Client Reviewed',  cls: 'bg-status-due-soon-bg text-status-due-soon-text border-status-due-soon/30' }
+    case 'approved':              return { label: 'Approved',         cls: 'bg-status-approved-bg text-status-approved-text border-status-approved/30' }
+    default:                      return { label: status || 'Unknown', cls: 'bg-surface-2 text-text-secondary border-border' }
   }
 }
 
@@ -29,7 +29,7 @@ function VersionCard({ version, onReview }) {
   const Icon = hasVideo ? Film : Image
 
   return (
-    <div className="bg-white rounded-2xl border border-border p-5 flex flex-col gap-4 shadow-sm hover:shadow-md transition-shadow">
+    <div className="card border border-border p-5 flex flex-col gap-4 shadow-sm hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-surface-2 flex items-center justify-center shrink-0">
@@ -151,7 +151,7 @@ function UploadModal({ draftId, clientName, projectName, onClose, onUploaded }) 
         })
         videoUrl = result.publicUrl
       } else {
-        // Upload ALL photos in parallel — much faster than sequential
+        // Upload ALL photos in parallel. Much faster than sequential
         const totalFiles = files.length
         const perFilePct = new Array(totalFiles).fill(0)
 
@@ -191,7 +191,7 @@ function UploadModal({ draftId, clientName, projectName, onClose, onUploaded }) 
 
       onUploaded()
     } catch (e) {
-      if (e.name === 'AbortError') return // user cancelled — just close
+      if (e.name === 'AbortError') return // user cancelled. Just close
       setError(e.message)
       setUploading(false)
     } finally {
@@ -201,7 +201,7 @@ function UploadModal({ draftId, clientName, projectName, onClose, onUploaded }) 
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+      <div className="card shadow-2xl w-full max-w-md">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <h2 className="text-sm font-semibold text-text-primary">Upload New Draft</h2>
           <button onClick={handleCancel} className="text-text-muted hover:text-text-primary transition-colors">
@@ -217,14 +217,14 @@ function UploadModal({ draftId, clientName, projectName, onClose, onUploaded }) 
               <button
                 onClick={() => { setMediaType('video'); setFiles([]) }}
                 disabled={uploading}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all disabled:opacity-50 ${mediaType === 'video' ? 'bg-white shadow text-text-primary' : 'text-text-muted hover:text-text-secondary'}`}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all disabled:opacity-50 ${mediaType === 'video' ? 'bg-surface shadow text-text-primary' : 'text-text-muted hover:text-text-secondary'}`}
               >
                 <Film size={12} /> Video
               </button>
               <button
                 onClick={() => { setMediaType('photos'); setFiles([]) }}
                 disabled={uploading}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all disabled:opacity-50 ${mediaType === 'photos' ? 'bg-white shadow text-text-primary' : 'text-text-muted hover:text-text-secondary'}`}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all disabled:opacity-50 ${mediaType === 'photos' ? 'bg-surface shadow text-text-primary' : 'text-text-muted hover:text-text-secondary'}`}
               >
                 <Image size={12} /> Photos
               </button>
@@ -290,9 +290,9 @@ function UploadModal({ draftId, clientName, projectName, onClose, onUploaded }) 
           )}
 
           {error && (
-            <div className="flex items-start gap-2 p-3 rounded-xl bg-red-50 border border-red-200">
-              <AlertCircle size={13} className="text-red-500 shrink-0 mt-0.5" />
-              <p className="text-xs text-red-600">{error}</p>
+            <div className="flex items-start gap-2 p-3 rounded-xl bg-status-overdue-bg border border-status-overdue/30">
+              <AlertCircle size={13} className="text-status-overdue-text shrink-0 mt-0.5" />
+              <p className="text-xs text-status-overdue-text">{error}</p>
             </div>
           )}
         </div>
@@ -441,7 +441,7 @@ export default function DraftsPage() {
     </div>
   )
   if (error) return (
-    <div className="p-8"><p className="text-red-500">{error}</p></div>
+    <div className="p-8"><p className="text-status-overdue-text">{error}</p></div>
   )
   if (!draft) return (
     <div className="p-8"><p className="text-text-muted text-sm">Draft not found.</p></div>
@@ -452,9 +452,9 @@ export default function DraftsPage() {
 
   // Draft type badge
   const typeBadge = {
-    reel:  { label: 'Reel',  cls: 'bg-purple-50 text-purple-700', icon: Film },
-    post:  { label: 'Post',  cls: 'bg-blue-50 text-blue-700',     icon: Image },
-    photo: { label: 'Photo', cls: 'bg-amber-50 text-amber-700',   icon: Image },
+    reel:  { label: 'Reel',  cls: 'bg-accent/10 text-status-review-text', icon: Film },
+    post:  { label: 'Post',  cls: 'bg-accent/10 text-status-review-text',     icon: Image },
+    photo: { label: 'Photo', cls: 'bg-status-due-soon-bg text-status-due-soon-text',   icon: Image },
   }[draft.type] || { label: draft.type, cls: 'bg-surface-2 text-text-muted', icon: Film }
 
   const TypeIcon = typeBadge.icon
@@ -469,9 +469,9 @@ export default function DraftsPage() {
   const approvedVersion = versions.find((v) => v.status === 'approved')
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface-2">
       {/* Header */}
-      <div className="bg-white border-b border-border sticky top-0 z-10">
+      <div className="bg-surface border-b border-border sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-6 py-4 flex items-center gap-3 flex-wrap">
           <button
             onClick={() => navigate(-1)}
@@ -491,10 +491,10 @@ export default function DraftsPage() {
             {typeBadge.label}
           </span>
           <div className="ml-auto flex items-center gap-2">
-            {/* Publish button — admin/editor/creative, after approved */}
+            {/* Publish button. Admin/editor/creative, after approved */}
             {canPublish && overallStatus === 'approved' && (
               published ? (
-                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
+                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-status-approved-bg text-status-approved-text border border-status-approved/30">
                   <Globe size={11} /> Published
                 </span>
               ) : (
@@ -522,7 +522,7 @@ export default function DraftsPage() {
 
       <div className="max-w-4xl mx-auto px-6 py-8 space-y-8">
         {/* Draft info */}
-        <div className="bg-white rounded-2xl border border-border p-6 space-y-4">
+        <div className="card border border-border p-6 space-y-4">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 min-w-0">
               <h2 className="text-base font-semibold text-text-primary">{draft.title}</h2>
@@ -540,14 +540,14 @@ export default function DraftsPage() {
                 </span>
               )}
               {published && (
-                <span className="flex items-center gap-1 text-[11px] font-semibold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">
+                <span className="flex items-center gap-1 text-[11px] font-semibold text-status-approved-text bg-status-approved-bg border border-status-approved/30 px-2 py-0.5 rounded-full">
                   <Globe size={9} /> Published
                 </span>
               )}
             </div>
           </div>
 
-          {/* Assigned editor — shown to all team, editable by admin */}
+          {/* Assigned editor. Shown to all team, editable by admin */}
           {isCreativeOrAdmin && (
             <div className="pt-4 border-t border-border flex items-center gap-3">
               <User size={13} className="text-text-muted shrink-0" />
@@ -556,9 +556,9 @@ export default function DraftsPage() {
                 <select
                   value={assignedEditor?.id || ''}
                   onChange={(e) => handleChangeEditor(e.target.value || null)}
-                  className="flex-1 text-xs border border-border rounded-lg px-2.5 py-1.5 bg-white text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/30"
+                  className="flex-1 text-xs border border-border rounded-lg px-2.5 py-1.5 bg-surface text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/30"
                 >
-                  <option value="">— Unassigned —</option>
+                  <option value="">Unassigned</option>
                   {allEditors.map((e) => (
                     <option key={e.id} value={e.id}>{e.full_name}</option>
                   ))}
@@ -609,7 +609,7 @@ export default function DraftsPage() {
           </div>
 
           {versions.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-dashed border-border p-10 text-center">
+            <div className="card border border-dashed border-border p-10 text-center">
               <Upload size={32} className="mx-auto text-text-muted/30 mb-3" />
               <p className="text-sm font-medium text-text-muted">No drafts uploaded yet</p>
               {isCreativeOrAdmin && (
@@ -632,11 +632,11 @@ export default function DraftsPage() {
 
         {/* Status callouts */}
         {isClient && overallStatus === 'pending_client_review' && (
-          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 flex items-start gap-3">
+          <div className="bg-accent/10 border border-accent/30 rounded-2xl p-5 flex items-start gap-3">
             <Clock size={16} className="text-blue-500 shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-semibold text-blue-800">Ready for your review</p>
-              <p className="text-xs text-blue-700 mt-1">
+              <p className="text-sm font-semibold text-status-review-text">Ready for your review</p>
+              <p className="text-xs text-status-review-text mt-1">
                 The creative team has uploaded a draft for you to review. Click "Review" on the draft card to leave feedback or approve.
               </p>
             </div>
@@ -644,11 +644,11 @@ export default function DraftsPage() {
         )}
 
         {isClient && overallStatus === 'pending_editor' && (
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex items-start gap-3">
+          <div className="bg-status-due-soon-bg border border-status-due-soon/30 rounded-2xl p-5 flex items-start gap-3">
             <Clock size={16} className="text-amber-500 shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-semibold text-amber-800">Your feedback is being reviewed</p>
-              <p className="text-xs text-amber-700 mt-1">
+              <p className="text-sm font-semibold text-status-due-soon-text">Your feedback is being reviewed</p>
+              <p className="text-xs text-status-due-soon-text mt-1">
                 The creative team is working on the next draft based on your feedback. You'll see a new version here when it's ready.
               </p>
             </div>
@@ -656,13 +656,13 @@ export default function DraftsPage() {
         )}
 
         {overallStatus === 'approved' && (
-          <div className="bg-green-50 border border-green-200 rounded-2xl p-5 flex items-start gap-3">
+          <div className="bg-status-approved-bg border border-status-approved/30 rounded-2xl p-5 flex items-start gap-3">
             <Check size={16} className="text-green-500 shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-semibold text-green-800">
+              <p className="text-sm font-semibold text-status-approved-text">
                 {published ? 'Draft approved and published!' : 'Draft approved!'}
               </p>
-              <p className="text-xs text-green-700 mt-1">
+              <p className="text-xs text-status-approved-text mt-1">
                 {isClient
                   ? 'You approved this draft. Download the final file above.'
                   : published

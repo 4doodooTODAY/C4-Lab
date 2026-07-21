@@ -50,7 +50,7 @@ export default function UploadProgressBar() {
         {allDone ? (
           <>
             <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
-            <span className="text-green-600">
+            <span className="text-status-approved-text">
               {done.length === 1 ? done[0].name : `${done.length} files`} uploaded
             </span>
           </>

@@ -24,10 +24,10 @@ const DRAFT_TYPE_LABELS = {
   post: 'Post', reel: 'Reel', story: 'Story', carousel: 'Carousel', other: 'Other',
 }
 const DRAFT_STATUS_COLORS = {
-  pending_client: 'bg-amber-50 text-amber-700 border-amber-200',
-  approved:       'bg-green-50 text-green-700 border-green-200',
-  declined:       'bg-red-50 text-red-700 border-red-200',
-  scrapped:       'bg-gray-100 text-gray-500 border-gray-200',
+  pending_client: 'bg-status-due-soon-bg text-status-due-soon-text border-status-due-soon/30',
+  approved:       'bg-status-approved-bg text-status-approved-text border-status-approved/30',
+  declined:       'bg-status-overdue-bg text-status-overdue-text border-status-overdue/30',
+  scrapped:       'bg-surface-2 text-text-secondary border-border',
 }
 const DRAFT_STATUS_LABELS = {
   pending_client: 'Awaiting Client',
@@ -36,20 +36,20 @@ const DRAFT_STATUS_LABELS = {
   scrapped:       'Scrapped',
 }
 const SHOOT_STATUS_COLORS = {
-  scheduled:  'bg-blue-50 text-blue-700',
-  completed:  'bg-green-50 text-green-700',
-  cancelled:  'bg-red-50 text-red-600',
+  scheduled:  'bg-accent/10 text-status-review-text',
+  completed:  'bg-status-approved-bg text-status-approved-text',
+  cancelled:  'bg-status-overdue-bg text-status-overdue-text',
 }
 const STAGE_LABELS = {
   briefing: 'Briefing', pre_production: 'Pre-Production', production: 'Production',
   post_production: 'Post-Production', review: 'Review', revisions: 'Revisions', delivered: 'Delivered', ready_to_post: 'Ready to Post',
 }
 const STAGE_COLORS = {
-  briefing: 'bg-slate-100 text-slate-600', pre_production: 'bg-blue-50 text-blue-600',
-  production: 'bg-amber-50 text-amber-700', post_production: 'bg-purple-50 text-purple-600',
-  review: 'bg-orange-50 text-orange-600', revisions: 'bg-red-50 text-red-600',
-  delivered: 'bg-green-50 text-green-700',
-  ready_to_post: 'bg-blue-50 text-blue-600',
+  briefing: 'bg-slate-100 text-slate-600', pre_production: 'bg-accent/10 text-status-review-text',
+  production: 'bg-status-due-soon-bg text-status-due-soon-text', post_production: 'bg-accent/10 text-status-review-text',
+  review: 'bg-status-due-soon-bg text-status-due-soon-text', revisions: 'bg-status-overdue-bg text-status-overdue-text',
+  delivered: 'bg-status-approved-bg text-status-approved-text',
+  ready_to_post: 'bg-accent/10 text-status-review-text',
 }
 
 // ── New Shoot Modal ────────────────────────────────────────────────────────────
@@ -63,7 +63,7 @@ function NewShootModal({ clientId, onClose, onCreated }) {
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
 
-  // Load team members assigned to this client — plus all admins, who can
+  // Load team members assigned to this client. Plus all admins, who can
   // always be assigned as the shooter themselves
   useEffect(() => {
     if (!clientId) return
@@ -103,14 +103,14 @@ function NewShootModal({ clientId, onClose, onCreated }) {
       }
       const row = await createShoot(payload)
 
-      // Optionally create a calendar event — non-fatal if it fails
+      // Optionally create a calendar event. Non-fatal if it fails
       if (form.shoot_date) {
         try {
           const timeStr = (form.shoot_time || '09:00').slice(0, 5)
           const startAt = new Date(`${form.shoot_date}T${timeStr}:00`)
           const endAt   = new Date(startAt.getTime() + 4 * 60 * 60 * 1000)
           const { data: evtData } = await supabase.from('calendar_events').insert({
-            title:      `${form.title.trim()} — Shoot`,
+            title:      `${form.title.trim()} Shoot`,
             event_type: 'shoot',
             start_at:   startAt.toISOString(),
             end_at:     endAt.toISOString(),
@@ -128,7 +128,7 @@ function NewShootModal({ clientId, onClose, onCreated }) {
             }
           }
         } catch (_) {
-          // Calendar event creation is best-effort — shoot was saved successfully
+          // Calendar event creation is best-effort. Shoot was saved successfully
         }
       }
 
@@ -142,7 +142,7 @@ function NewShootModal({ clientId, onClose, onCreated }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 z-10">
+      <div className="relative card shadow-2xl w-full max-w-md p-6 z-10">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-base font-semibold text-text-primary">Schedule Shoot</h2>
           <button onClick={onClose} className="btn-ghost p-1.5"><X size={16} /></button>
@@ -171,7 +171,7 @@ function NewShootModal({ clientId, onClose, onCreated }) {
           <div>
             <label className="label">Photographer / Videographer</label>
             <select className="input" value={selectedMember} onChange={(e) => setSelectedMember(e.target.value)}>
-              <option value="">— None —</option>
+              <option value="">None</option>
               {clientTeam.map((m) => (
                 <option key={m.id} value={m.id}>{m.full_name}</option>
               ))}
@@ -186,7 +186,7 @@ function NewShootModal({ clientId, onClose, onCreated }) {
             <p className="text-xs text-text-muted mb-1">(only visible to creative team)</p>
             <textarea className="input resize-none" rows={3} value={form.creative_notes} onChange={set('creative_notes')} placeholder="What are we shooting?" />
           </div>
-          {error && <p className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
+          {error && <p className="text-xs text-status-overdue-text bg-status-overdue-bg rounded-lg px-3 py-2">{error}</p>}
           <div className="flex gap-2 justify-end pt-1">
             <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
             <button type="submit" disabled={saving || !form.title.trim()} className="btn-primary flex items-center gap-1.5 disabled:opacity-50">
@@ -242,7 +242,7 @@ function NewDraftModal({ clientId, shoots, onClose, onCreated }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 z-10 max-h-[90vh] overflow-y-auto">
+      <div className="relative card shadow-2xl w-full max-w-lg p-6 z-10 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-base font-semibold text-text-primary">New Content Draft</h2>
           <button onClick={onClose} className="btn-ghost p-1.5"><X size={16} /></button>
@@ -275,7 +275,7 @@ function NewDraftModal({ clientId, shoots, onClose, onCreated }) {
                 <option value="">None</option>
                 {shoots.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.title}{s.shoot_date ? ` — ${format(parseISO(s.shoot_date), 'MMM d')}` : ''}
+                    {s.title}{s.shoot_date ? ` · ${format(parseISO(s.shoot_date), 'MMM d')}` : ''}
                   </option>
                 ))}
               </select>
@@ -285,7 +285,7 @@ function NewDraftModal({ clientId, shoots, onClose, onCreated }) {
             <label className="label">Inspiration Links</label>
             <textarea className="input resize-none text-xs" rows={3} value={form.inspiration_links} onChange={set('inspiration_links')} placeholder="One URL per line or comma-separated..." />
           </div>
-          {error && <p className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
+          {error && <p className="text-xs text-status-overdue-text bg-status-overdue-bg rounded-lg px-3 py-2">{error}</p>}
           <div className="flex gap-2 justify-end pt-1">
             <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
             <button type="submit" disabled={saving} className="btn-primary flex items-center gap-1.5 disabled:opacity-50">
@@ -385,9 +385,9 @@ function OverviewTab({ client, shoots, projects, requests, onClientUpdated }) {
   }
 
   const stats = [
-    { label: 'Shoots',   value: shoots.length,    color: 'text-blue-600' },
-    { label: 'Projects', value: projects.length,  color: 'text-purple-600' },
-    { label: 'Requests', value: requests.length,  color: 'text-green-600' },
+    { label: 'Shoots',   value: shoots.length,    color: 'text-status-review-text' },
+    { label: 'Projects', value: projects.length,  color: 'text-status-review-text' },
+    { label: 'Requests', value: requests.length,  color: 'text-status-approved-text' },
   ]
 
   return (
@@ -446,7 +446,7 @@ function OverviewTab({ client, shoots, projects, requests, onClientUpdated }) {
                 onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
               />
             </div>
-            {editErr && <p className="text-xs text-red-500">{editErr}</p>}
+            {editErr && <p className="text-xs text-status-overdue-text">{editErr}</p>}
           </div>
         ) : (
           <div className="space-y-2 text-sm">
@@ -463,7 +463,7 @@ function OverviewTab({ client, shoots, projects, requests, onClientUpdated }) {
               </div>
             ))}
             {!form.name && !form.contact_name && !form.email && !form.phone && !form.notes && (
-              <p className="text-text-muted italic text-xs">No details yet — click Edit to add them.</p>
+              <p className="text-text-muted italic text-xs">No details yet. Click Edit to add them.</p>
             )}
           </div>
         )}
@@ -509,10 +509,10 @@ function OverviewTab({ client, shoots, projects, requests, onClientUpdated }) {
               <div key={a.id} className="flex items-center gap-3">
                 <Avatar name={a.profiles?.full_name} url={a.profiles?.avatar_url} size={8} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-text-primary">{a.profiles?.full_name || '—'}</p>
+                  <p className="text-sm font-medium text-text-primary">{a.profiles?.full_name || 'Not set'}</p>
                   <p className="text-xs text-text-muted capitalize">{a.role}</p>
                 </div>
-                <button onClick={() => handleRemove(a.id)} className="text-text-muted hover:text-red-500 transition-colors p-1">
+                <button onClick={() => handleRemove(a.id)} className="text-text-muted hover:text-status-overdue-text transition-colors p-1">
                   <X size={14} />
                 </button>
               </div>
@@ -601,7 +601,7 @@ function ShootsTab({ clientId, client }) {
                 e.stopPropagation()
                 setDeleteShootConfirm(shoot.id)
               }}
-              className="text-[10px] text-text-muted hover:text-red-500 transition-colors p-1"
+              className="text-[10px] text-text-muted hover:text-status-overdue-text transition-colors p-1"
               title="Delete shoot"
             >
               <Trash2 size={12} />
@@ -615,7 +615,7 @@ function ShootsTab({ clientId, client }) {
               }}
               className={`text-xs font-semibold px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 ${
                 shoot.status === 'scheduled'
-                  ? 'bg-green-50 text-green-700 hover:bg-green-100'
+                  ? 'bg-status-approved-bg text-status-approved-text hover:bg-status-approved-bg'
                   : 'bg-surface-2 text-text-muted hover:bg-surface-3'
               }`}
             >
@@ -683,9 +683,9 @@ function ShootsTab({ clientId, client }) {
       {deleteShootConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDeleteShootConfirm(null)} />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 z-10">
-            <div className="w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
-              <Trash2 size={22} className="text-red-500" />
+          <div className="relative card shadow-2xl w-full max-w-sm p-6 z-10">
+            <div className="w-12 h-12 rounded-2xl bg-status-overdue-bg flex items-center justify-center mx-auto mb-4">
+              <Trash2 size={22} className="text-status-overdue-text" />
             </div>
             <h2 className="text-base font-bold text-text-primary text-center mb-1">Delete shoot?</h2>
             <p className="text-xs text-text-muted text-center mb-5">
@@ -878,19 +878,19 @@ function ContentTab({ clientId, shoots, projects, onRefetchProjects }) {
           </button>
           {draft.status === 'scrapped' ? (
             <button onClick={() => setDeleteConfirm(draft.id)} disabled={!!updating}
-              title="Permanently delete" className="p-1.5 text-text-muted hover:text-red-600 transition-colors">
+              title="Permanently delete" className="p-1.5 text-text-muted hover:text-status-overdue-text transition-colors">
               <X size={13} />
             </button>
           ) : (
             <button onClick={() => handleStatus(draft.id, 'scrapped')} disabled={!!updating}
-              title="Scrap" className="p-1.5 text-text-muted hover:text-red-500 transition-colors">
+              title="Scrap" className="p-1.5 text-text-muted hover:text-status-overdue-text transition-colors">
               <Trash2 size={13} />
             </button>
           )}
         </div>
       </div>
 
-      {/* Upload drafts — always available for admin/creative/editor */}
+      {/* Upload drafts. Always available for admin/creative/editor */}
       <div className="mt-2 pt-2 border-t border-border">
         <button
           onClick={() => navigate(`/drafts/${draft.id}`)}
@@ -900,7 +900,7 @@ function ContentTab({ clientId, shoots, projects, onRefetchProjects }) {
         </button>
       </div>
 
-      {/* Only admins and clients can approve concepts — photographers/creatives can create but not approve */}
+      {/* Only admins and clients can approve concepts. Photographers/creatives can create but not approve */}
       {draft.status === 'pending_client' && isAdminUser && (
         <div className="flex gap-2 mt-2">
           <button onClick={() => handleStatus(draft.id, 'approved')} disabled={!!updating}
@@ -909,7 +909,7 @@ function ContentTab({ clientId, shoots, projects, onRefetchProjects }) {
             Approve Concept
           </button>
           <button onClick={() => handleStatus(draft.id, 'scrapped')} disabled={!!updating}
-            className="btn-secondary text-xs flex-1 text-red-500 hover:border-red-200">
+            className="btn-secondary text-xs flex-1 text-status-overdue-text hover:border-status-overdue/30">
             Decline
           </button>
         </div>
@@ -983,7 +983,7 @@ function ContentTab({ clientId, shoots, projects, onRefetchProjects }) {
       {editDraft && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setEditDraft(null)} />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 z-10 max-h-[90vh] overflow-y-auto">
+          <div className="relative card shadow-2xl w-full max-w-lg p-6 z-10 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-base font-semibold text-text-primary">Edit Concept</h2>
               <button onClick={() => setEditDraft(null)} className="btn-ghost p-1.5"><X size={16} /></button>
@@ -1014,7 +1014,7 @@ function ContentTab({ clientId, shoots, projects, onRefetchProjects }) {
                   <label className="label">Linked Shoot</label>
                   <select className="input" value={editForm.shoot_id} onChange={e => setEditForm(f => ({...f, shoot_id: e.target.value}))}>
                     <option value="">None</option>
-                    {shoots.map(s => <option key={s.id} value={s.id}>{s.title}{s.shoot_date ? ` — ${format(parseISO(s.shoot_date), 'MMM d')}` : ''}</option>)}
+                    {shoots.map(s => <option key={s.id} value={s.id}>{s.title}{s.shoot_date ? ` · ${format(parseISO(s.shoot_date), 'MMM d')}` : ''}</option>)}
                   </select>
                 </div>
               )}
@@ -1037,9 +1037,9 @@ function ContentTab({ clientId, shoots, projects, onRefetchProjects }) {
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDeleteConfirm(null)} />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 z-10">
-            <div className="w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
-              <Trash2 size={22} className="text-red-500" />
+          <div className="relative card shadow-2xl w-full max-w-sm p-6 z-10">
+            <div className="w-12 h-12 rounded-2xl bg-status-overdue-bg flex items-center justify-center mx-auto mb-4">
+              <Trash2 size={22} className="text-status-overdue-text" />
             </div>
             <h2 className="text-base font-bold text-text-primary text-center mb-1">Permanently delete concept?</h2>
             <p className="text-xs text-text-muted text-center mb-5">
@@ -1182,7 +1182,7 @@ function ProjectsTab({ clientId, projects, onRefetch }) {
             <div>
               <label className="label">Editor <span className="font-normal text-text-muted">(optional)</span></label>
               <select className="input" value={newEditor} onChange={(e) => setNewEditor(e.target.value)}>
-                <option value="">— None —</option>
+                <option value="">None</option>
                 {teamMembers.map((m) => (
                   <option key={m.id} value={m.id}>{m.full_name}</option>
                 ))}
@@ -1219,7 +1219,7 @@ function ProjectsTab({ clientId, projects, onRefetch }) {
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-semibold text-text-primary">{p.name}</p>
                   {!editorName && (
-                    <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                    <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-status-due-soon-bg text-status-due-soon-text border border-status-due-soon/30">
                       <AlertCircle size={9} /> Waiting for editor
                     </span>
                   )}
@@ -1240,7 +1240,7 @@ function ProjectsTab({ clientId, projects, onRefetch }) {
                   {STAGE_LABELS[p.stage] || p.stage}
                 </span>
                 {p.stage === 'delivered' && (
-                  <span className="text-[10px] text-green-600 font-semibold flex items-center gap-0.5">
+                  <span className="text-[10px] text-status-approved-text font-semibold flex items-center gap-0.5">
                     <Check size={9} /> Posted Online
                   </span>
                 )}
@@ -1281,7 +1281,7 @@ function ProjectsTab({ clientId, projects, onRefetch }) {
                   onChange={(e) => setSelectedEditor(e.target.value)}
                   autoFocus
                 >
-                  <option value="">— Select editor —</option>
+                  <option value="">Select editor</option>
                   {teamMembers.map((m) => (
                     <option key={m.id} value={m.id}>{m.full_name} ({m.role})</option>
                   ))}
@@ -1322,7 +1322,7 @@ function RequestsTab({ requests }) {
         <div key={r.id} className="card p-4 flex items-center gap-4">
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-text-primary capitalize">{r.type?.replace('_', ' ') || 'Request'}</p>
-            <p className="text-xs text-text-secondary mt-0.5 line-clamp-2">{r.idea || r.file_name || '—'}</p>
+            <p className="text-xs text-text-secondary mt-0.5 line-clamp-2">{r.idea || r.file_name || 'Not set'}</p>
             {r.target_date && (
               <p className="text-xs text-text-muted mt-1 flex items-center gap-1">
                 <CalendarDays size={10} /> Target: {format(parseISO(r.target_date), 'MMM d')}
@@ -1331,9 +1331,9 @@ function RequestsTab({ requests }) {
           </div>
           <div className="flex flex-col items-end gap-1 shrink-0">
             <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-              r.status === 'new' ? 'bg-amber-50 text-amber-700' :
-              r.status === 'in_progress' ? 'bg-blue-50 text-blue-700' :
-              r.status === 'done' ? 'bg-green-50 text-green-700' :
+              r.status === 'new' ? 'bg-status-due-soon-bg text-status-due-soon-text' :
+              r.status === 'in_progress' ? 'bg-accent/10 text-status-review-text' :
+              r.status === 'done' ? 'bg-status-approved-bg text-status-approved-text' :
               'bg-surface-2 text-text-muted'
             }`}>
               {r.status}

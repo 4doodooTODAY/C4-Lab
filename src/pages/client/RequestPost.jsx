@@ -80,8 +80,8 @@ export default function RequestPost() {
     return (
       <div className="p-8 max-w-lg">
         <div className="card p-12 text-center">
-          <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-            <CheckCircle size={28} className="text-green-600" />
+          <div className="w-14 h-14 rounded-full bg-status-approved-bg flex items-center justify-center mx-auto mb-4">
+            <CheckCircle size={28} className="text-status-approved-text" />
           </div>
           <h2 className="text-lg font-bold text-text-primary mb-1">Request submitted!</h2>
           <p className="text-sm text-text-secondary mb-6">
@@ -104,7 +104,7 @@ export default function RequestPost() {
   return (
     <div className="p-8 max-w-lg">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-text-primary">Request a Post</h1>
+        <h1 className="display">Request a Post</h1>
         <p className="text-text-secondary mt-1">Tell your team what you have in mind.</p>
       </div>
 
@@ -194,7 +194,7 @@ export default function RequestPost() {
           <textarea
             className="input w-full resize-none text-xs"
             rows={2}
-            placeholder="More links — one per line..."
+            placeholder="More links. One per line..."
             value={form.inspiration_links_extra}
             onChange={(e) => set('inspiration_links_extra', e.target.value)}
           />
@@ -214,7 +214,7 @@ export default function RequestPost() {
           />
         </div>
 
-        {error && <p className="text-xs text-red-500">{error}</p>}
+        {error && <p className="text-xs text-status-overdue-text">{error}</p>}
 
         <button
           type="submit"

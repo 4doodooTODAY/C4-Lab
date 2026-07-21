@@ -36,13 +36,13 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let mounted = true
 
-    // Single source of truth — onAuthStateChange handles everything including initial session
+    // Single source of truth. OnAuthStateChange handles everything including initial session
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return
 
       if (!session) {
         // If there's a ?code= in the URL, Supabase is still exchanging an invite/recovery token.
-        // Stay in loading state — SIGNED_IN will fire once the exchange completes.
+        // Stay in loading state. SIGNED_IN will fire once the exchange completes.
         // Redirecting to /login now would strip the code from the URL and break the flow.
         if (event === 'INITIAL_SESSION') {
           const hasCode = new URLSearchParams(window.location.search).has('code')
@@ -68,7 +68,7 @@ export function AuthProvider({ children }) {
           if (mounted && fresh) { setProfile(fresh); setCachedProfile(fresh) }
         }).catch(() => {})
       } else {
-        // No cache — fetch and wait (first login)
+        // No cache. Fetch and wait (first login)
         const fallback = setTimeout(() => { if (mounted) setLoading(false) }, 8000)
         fetchProfile(session.user.id)
           .then((data) => { if (mounted) { setProfile(data); if (data) setCachedProfile(data) } })
@@ -119,7 +119,7 @@ export function AuthProvider({ children }) {
     })
   }
 
-  // isAdmin is false when an admin has switched to creative view — they get full creative permissions only
+  // isAdmin is false when an admin has switched to creative view. They get full creative permissions only
   const isAdmin = profile?.role === 'admin' && viewMode !== 'creative'
 
   return (

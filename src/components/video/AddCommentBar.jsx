@@ -40,7 +40,7 @@ export default function AddCommentBar({ currentTime, onAdd }) {
   }
 
   return (
-    <div className="border-t border-border bg-white p-4">
+    <div className="border-t border-border bg-surface p-4">
       <form onSubmit={handleSubmit} className="space-y-2">
         {/* Timestamp row */}
         <div className="flex items-center gap-2">
@@ -53,7 +53,7 @@ export default function AddCommentBar({ currentTime, onAdd }) {
               onClick={() => setIsInternal((v) => !v)}
               className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded transition-colors ${
                 isInternal
-                  ? 'bg-amber-100 text-amber-700 font-medium'
+                  ? 'bg-status-due-soon-bg text-status-due-soon-text font-medium'
                   : 'text-text-muted hover:text-text-primary'
               }`}
             >
@@ -84,7 +84,7 @@ export default function AddCommentBar({ currentTime, onAdd }) {
           </button>
         </div>
 
-        {error && <p className="text-xs text-red-500">{error}</p>}
+        {error && <p className="text-xs text-status-overdue-text">{error}</p>}
       </form>
     </div>
   )

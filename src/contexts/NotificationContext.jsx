@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import { supabase } from '../lib/supabase'
 import { useAuth } from './AuthContext'
 
-// Notification types that are internal to the team — clients should never see these
+// Notification types that are internal to the team. Clients should never see these
 const TEAM_ONLY_TYPES = ['message']
 
 // VAPID key pair rotated 2026-07-02 (old private key was replaced server-side).
@@ -43,7 +43,7 @@ export function NotificationProvider({ children }) {
       })
   }, [user?.id])
 
-  // Realtime — new notifications
+  // Realtime. New notifications
   useEffect(() => {
     if (!user?.id) return
     const ch = supabase
@@ -61,7 +61,7 @@ export function NotificationProvider({ children }) {
     return () => supabase.removeChannel(ch)
   }, [user?.id])
 
-  // Check if push already enabled — and self-heal after the VAPID key rotation:
+  // Check if push already enabled. And self-heal after the VAPID key rotation:
   // if an existing subscription was created with a different applicationServerKey,
   // drop it and re-subscribe with the current key, then upsert to the DB.
   useEffect(() => {

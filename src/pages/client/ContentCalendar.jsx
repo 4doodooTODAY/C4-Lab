@@ -20,12 +20,12 @@ import { fmtTime } from '../../lib/time'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const ITEM_STYLES = {
-  shoot:       { bg: 'bg-purple-100', text: 'text-purple-700', dot: 'bg-purple-500', border: 'border-purple-200' },
-  draft:       { bg: 'bg-amber-50',   text: 'text-amber-700',  dot: 'bg-amber-500',  border: 'border-amber-200' },
-  approved:    { bg: 'bg-green-50',   text: 'text-green-700',  dot: 'bg-green-500',  border: 'border-green-200' },
-  review:      { bg: 'bg-orange-50',  text: 'text-orange-700', dot: 'bg-orange-500', border: 'border-orange-200' },
+  shoot:       { bg: 'bg-accent/10', text: 'text-status-review-text', dot: 'bg-purple-500', border: 'border-accent/30' },
+  draft:       { bg: 'bg-status-due-soon-bg',   text: 'text-status-due-soon-text',  dot: 'bg-amber-500',  border: 'border-status-due-soon/30' },
+  approved:    { bg: 'bg-status-approved-bg',   text: 'text-status-approved-text',  dot: 'bg-green-500',  border: 'border-status-approved/30' },
+  review:      { bg: 'bg-status-due-soon-bg',  text: 'text-status-due-soon-text', dot: 'bg-orange-500', border: 'border-status-due-soon/30' },
   draftReview: { bg: 'bg-accent/10', text: 'text-accent',      dot: 'bg-accent',     border: 'border-accent/30' },
-  event:       { bg: 'bg-blue-50',    text: 'text-blue-700',   dot: 'bg-blue-500',   border: 'border-blue-200' },
+  event:       { bg: 'bg-accent/10',    text: 'text-status-review-text',   dot: 'bg-blue-500',   border: 'border-accent/30' },
 }
 
 const DRAFT_TYPE_LABELS = {
@@ -48,7 +48,7 @@ function ItemDetail({ item, onApprove, onDecline, onClose, updating }) {
   const style = ITEM_STYLES[item.kind] || ITEM_STYLES.event
 
   return (
-    <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+    <div className="card border border-border shadow-sm overflow-hidden">
       {/* Color bar */}
       <div className={`h-1 ${style.dot}`} />
       <div className="p-5">
@@ -57,8 +57,8 @@ function ItemDetail({ item, onApprove, onDecline, onClose, updating }) {
             <div className="flex items-center gap-2 flex-wrap mb-1">
               <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${style.bg} ${style.text}`}>
                 {item.kind === 'shoot'    ? 'Shoot Day' :
-                 item.kind === 'draft'    ? `${DRAFT_TYPE_LABELS[item.type] || 'Draft'} — Needs Approval` :
-                 item.kind === 'approved' ? `${DRAFT_TYPE_LABELS[item.type] || 'Content'} — Approved` :
+                 item.kind === 'draft'    ? `${DRAFT_TYPE_LABELS[item.type] || 'Draft'}. Needs Approval` :
+                 item.kind === 'approved' ? `${DRAFT_TYPE_LABELS[item.type] || 'Content'}. Approved` :
                  item.kind === 'review'   ? 'Ready to Review' :
                  'Event'}
               </span>
@@ -113,7 +113,7 @@ function ItemDetail({ item, onApprove, onDecline, onClose, updating }) {
         {item.kind === 'review' && (
           <div className="mt-2">
             {item.revStatus === 'pending_client_review'
-              ? <p className="text-xs text-text-secondary">{item.isPhoto ? 'Your photos are ready' : 'Your video is ready'} — click below to leave feedback or approve.</p>
+              ? <p className="text-xs text-text-secondary">{item.isPhoto ? 'Your photos are ready' : 'Your video is ready'}. Click below to leave feedback or approve.</p>
               : <p className="text-xs text-text-secondary">Your editor is working on revisions. You'll be notified when a new version is ready.</p>
             }
           </div>
@@ -123,7 +123,7 @@ function ItemDetail({ item, onApprove, onDecline, onClose, updating }) {
         {item.kind === 'draftReview' && (
           <div className="mt-2">
             <p className="text-xs text-text-secondary mb-2">
-              {item.isPhoto ? 'Your photos are ready' : 'Your video is ready'} — review and leave feedback or approve.
+              {item.isPhoto ? 'Your photos are ready' : 'Your video is ready'}. Review and leave feedback or approve.
             </p>
           </div>
         )}
@@ -192,8 +192,8 @@ function ListView({ allItems, onApprove, onDecline, updating }) {
         <div className="flex-1 min-w-0">
           <p className={`text-xs font-semibold uppercase tracking-wide ${style.text} mb-0.5`}>
             {item.kind === 'shoot'    ? 'Shoot Day' :
-             item.kind === 'draft'    ? `${DRAFT_TYPE_LABELS[item.type] || 'Draft'} — Needs Approval` :
-             item.kind === 'approved' ? `${DRAFT_TYPE_LABELS[item.type] || 'Content'} — Approved` :
+             item.kind === 'draft'    ? `${DRAFT_TYPE_LABELS[item.type] || 'Draft'}. Needs Approval` :
+             item.kind === 'approved' ? `${DRAFT_TYPE_LABELS[item.type] || 'Content'}. Approved` :
              item.kind === 'review'   ? (item.isPhoto ? 'Photos Ready to Review' : 'Video Ready to Review') : 'Event'}
           </p>
           <p className="text-sm font-semibold text-text-primary">{item.title}</p>
@@ -220,7 +220,7 @@ function ListView({ allItems, onApprove, onDecline, updating }) {
                   {updating ? <Loader2 size={10} className="animate-spin" /> : <Check size={10} />} Approve
                 </button>
                 <button onClick={() => onDecline(item)} disabled={updating}
-                  className="text-xs px-3 py-1.5 rounded-lg border border-border text-text-muted hover:text-red-600 hover:border-red-200 transition-colors">
+                  className="text-xs px-3 py-1.5 rounded-lg border border-border text-text-muted hover:text-status-overdue-text hover:border-status-overdue/30 transition-colors">
                   Decline
                 </button>
               </>
@@ -316,7 +316,7 @@ export default function ContentCalendar() {
 
       if (cancelled) return
 
-      // Build shoot calendar items and put them directly in state — don't
+      // Build shoot calendar items and put them directly in state. Don't
       // wait for loadData, which may have other queries that fail or return stale data.
       const shootCalItems = (shootRows || [])
         .filter(s => s.shoot_date)
@@ -339,7 +339,7 @@ export default function ContentCalendar() {
         if (next) setMonth(startOfMonth(next.date))
       }
 
-      // Merge into allItems — keep any non-shoot items already there
+      // Merge into allItems. Keep any non-shoot items already there
       setAllItems(prev => {
         const nonShoots = prev.filter(i => !i.id.startsWith('shoot-'))
         return [...nonShoots, ...shootCalItems]
@@ -377,7 +377,7 @@ export default function ContentCalendar() {
         .select('id, title, description, shoot_date, shoot_time, location, status')
         .eq('client_id', clientId),
 
-      // Project-level shoots — filter by project IDs directly
+      // Project-level shoots. Filter by project IDs directly
       projectIds.length
         ? supabase
             .from('project_shoots')
@@ -426,7 +426,7 @@ export default function ContentCalendar() {
     ;(projectShootsRes.data || []).forEach((s) => {
       if (!s.shoot_date) return
       const proj = projectMap[s.project_id]
-      const displayTitle = s.title || `${proj?.name || 'Project'} — Shoot`
+      const displayTitle = s.title || `${proj?.name || 'Project'} Shoot`
       items.push({
         id:        `pshoot-${s.id}`,
         kind:      'shoot',
@@ -448,7 +448,7 @@ export default function ContentCalendar() {
       items.push({
         id:        `proj-shoot-${p.id}`,
         kind:      'shoot',
-        title:     `${p.name} — Shoot`,
+        title:     `${p.name} Shoot`,
         date:      parseISO(p.shoot_date),
         dateLabel: format(parseISO(p.shoot_date), 'EEE, MMM d yyyy'),
         location:  p.location,
@@ -470,7 +470,7 @@ export default function ContentCalendar() {
           rawId:      v.id,
           kind:       'draftReview',
           type:       d.type,
-          title:      `${d.title || DRAFT_TYPE_LABELS[d.type] || 'Draft'} — Draft ${v.version_number} Ready`,
+          title:      `${d.title || DRAFT_TYPE_LABELS[d.type] || 'Draft'}. Draft ${v.version_number} Ready`,
           date:       date || new Date(),
           dateLabel:  date ? format(date, 'MMM d, yyyy') : 'Review now',
           draftId:    d.id,
@@ -508,16 +508,16 @@ export default function ContentCalendar() {
       if (r.status === 'pending_client_review') {
         statusLabel = `${mediaWord} Ready to Review`
       } else if (r.status === 'pending_editor') {
-        statusLabel = `${mediaWord} — Editor Revising`
+        statusLabel = `${mediaWord}. Editor Revising`
       } else {
-        statusLabel = `${mediaWord} — In Review`
+        statusLabel = `${mediaWord}. In Review`
       }
 
       items.push({
         id:         `review-${r.id}`,
         rawId:      r.id,
         kind:       'review',
-        title:      `${proj?.name || 'Project'} — ${statusLabel}`,
+        title:      `${proj?.name || 'Project'}. ${statusLabel}`,
         date,
         dateLabel:  format(date, 'MMM d'),
         projectId:  r.project_id,
@@ -529,7 +529,7 @@ export default function ContentCalendar() {
 
       // Merge: use shoots from bootstrap (guaranteed correct via direct query)
       // and overlay non-shoot items from this run. If loadData also found shoots
-      // (shootsRes.data non-empty), those replace bootstrap's — otherwise bootstrap wins.
+      // (shootsRes.data non-empty), those replace bootstrap's. Otherwise bootstrap wins.
       const loadDataShootIds = new Set(items.filter(i => i.id.startsWith('shoot-')).map(i => i.id))
       const hasLoadDataShoots = loadDataShootIds.size > 0
       setAllItems(prev => {
@@ -670,12 +670,12 @@ export default function ContentCalendar() {
           <h1 className="text-xl font-bold text-text-primary">Content Calendar</h1>
           <div className="flex items-center gap-3 mt-1">
             {pendingCount > 0 && (
-              <span className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+              <span className="text-xs font-medium text-status-due-soon-text bg-status-due-soon-bg border border-status-due-soon/30 px-2 py-0.5 rounded-full flex items-center gap-1">
                 <AlertCircle size={10} /> {pendingCount} draft{pendingCount !== 1 ? 's' : ''} awaiting approval
               </span>
             )}
             {reviewCount > 0 && (
-              <span className="text-xs font-medium text-orange-700 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+              <span className="text-xs font-medium text-status-due-soon-text bg-status-due-soon-bg border border-status-due-soon/30 px-2 py-0.5 rounded-full flex items-center gap-1">
                 <Film size={10} /> {reviewCount} item{reviewCount !== 1 ? 's' : ''} to review
               </span>
             )}
@@ -698,11 +698,11 @@ export default function ContentCalendar() {
           {/* View toggle */}
           <div className="flex bg-surface-2 rounded-xl p-1 gap-0.5">
             <button onClick={() => setView('calendar')}
-              className={`p-2 rounded-lg transition-colors ${view === 'calendar' ? 'bg-white shadow-sm text-text-primary' : 'text-text-muted hover:text-text-primary'}`}>
+              className={`p-2 rounded-lg transition-colors ${view === 'calendar' ? 'bg-surface shadow-sm text-text-primary' : 'text-text-muted hover:text-text-primary'}`}>
               <LayoutGrid size={15} />
             </button>
             <button onClick={() => setView('list')}
-              className={`p-2 rounded-lg transition-colors ${view === 'list' ? 'bg-white shadow-sm text-text-primary' : 'text-text-muted hover:text-text-primary'}`}>
+              className={`p-2 rounded-lg transition-colors ${view === 'list' ? 'bg-surface shadow-sm text-text-primary' : 'text-text-muted hover:text-text-primary'}`}>
               <LayoutList size={15} />
             </button>
           </div>
@@ -722,7 +722,7 @@ export default function ContentCalendar() {
       ) : (
         <>
           {/* Calendar */}
-          <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+          <div className="card border border-border shadow-sm overflow-hidden">
             {/* Month nav */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-border">
               <button onClick={() => setMonth(subMonths(month, 1))} className="p-1.5 rounded-lg hover:bg-surface-2 text-text-muted transition-colors">
@@ -827,7 +827,7 @@ export default function ContentCalendar() {
 
           {selected && selectedDayItems.length === 0 && (
             <div className="mt-4 card p-5 text-center">
-              <p className="text-sm text-text-muted">{format(selected, 'MMMM d')} — nothing scheduled.</p>
+              <p className="text-sm text-text-muted">{format(selected, 'MMMM d')}. Nothing scheduled.</p>
             </div>
           )}
         </>
@@ -836,7 +836,7 @@ export default function ContentCalendar() {
       {/* Request Content Modal */}
       {showRequestModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden">
+          <div className="card shadow-xl w-full max-w-lg overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-border">
               <h2 className="text-base font-bold text-text-primary flex items-center gap-2">
                 <Plus size={15} className="text-accent" /> Request Content
@@ -917,9 +917,9 @@ export default function ContentCalendar() {
                 />
 
                 {footageFile ? (
-                  <div className="flex items-center gap-3 p-3 rounded-xl border border-green-200 bg-green-50">
-                    <div className="w-9 h-9 rounded-xl bg-green-100 flex items-center justify-center shrink-0">
-                      <FileVideo size={16} className="text-green-600" />
+                  <div className="flex items-center gap-3 p-3 rounded-xl border border-status-approved/30 bg-status-approved-bg">
+                    <div className="w-9 h-9 rounded-xl bg-status-approved-bg flex items-center justify-center shrink-0">
+                      <FileVideo size={16} className="text-status-approved-text" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-text-primary truncate">{footageFile.name}</p>
@@ -931,7 +931,7 @@ export default function ContentCalendar() {
                       <button
                         type="button"
                         onClick={() => { setFootageFile(null); setFootageProgress(0); setFootageStats(null) }}
-                        className="p-1.5 rounded-lg text-text-muted hover:text-red-500 hover:bg-red-50 transition-colors"
+                        className="p-1.5 rounded-lg text-text-muted hover:text-status-overdue-text hover:bg-status-overdue-bg transition-colors"
                       >
                         <X size={14} />
                       </button>

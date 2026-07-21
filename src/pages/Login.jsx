@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { Loader2, ArrowLeft, Mail, Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import LogoBadge from '../components/ui/Logo'
+import FallingDisks from '../components/ui/FallingDisks'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -45,7 +47,7 @@ export default function Login() {
     setResetLoading(true)
     setResetError('')
     try {
-      // Branded reset email (from C4C Lab) with a scanner-proof token link —
+      // Branded reset email (from C4C Lab) with a scanner-proof token link.
       // avoids Supabase's default sender and redirect-allowlist pitfalls.
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-user`, {
         method: 'POST',
@@ -56,7 +58,7 @@ export default function Login() {
         },
         body: JSON.stringify({ action: 'forgot_password', email: resetEmail.trim() }),
       })
-      if (!res.ok) throw new Error('Could not send the reset email — try again.')
+      if (!res.ok) throw new Error('Could not send the reset email. Try again.')
       setResetSent(true)
     } catch (err) {
       setResetError(err.message)
@@ -70,7 +72,7 @@ export default function Login() {
     setWaitlistLoading(true)
     setWaitlistStatus(null)
     try {
-      // Edge function stores the signup AND emails the team — one email per signup
+      // Edge function stores the signup AND emails the team. One email per signup
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/join-waitlist`, {
         method: 'POST',
         headers: {
@@ -99,27 +101,33 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-sidebar flex flex-col items-center justify-center p-4 gap-6">
-      {/* Brand */}
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-accent flex items-center justify-center shrink-0">
-          <span className="text-white font-bold text-base leading-none">C4</span>
+    <div className="app-ground min-h-screen flex items-center justify-center p-4">
+      <FallingDisks />
+      <div className="relative z-10 w-full max-w-4xl grid lg:grid-cols-[1.2fr_1fr] gap-10 lg:gap-16 items-center">
+        {/* Brand + display moment */}
+        <div className="space-y-6">
+          <div className="anim-rise flex items-center gap-3">
+            <div className="shrink-0"><LogoBadge size={40} /></div>
+            <div>
+              <p className="font-display text-text-primary font-semibold leading-tight">C4C Lab</p>
+              <p className="text-text-muted text-xs leading-tight">Connect Four Creative</p>
+            </div>
+          </div>
+          <h1 className="anim-rise d1 display max-w-md">Where your content gets made.</h1>
+          <p className="anim-rise d2 text-text-secondary text-sm max-w-sm leading-relaxed">
+            Shoots, edits, reviews, and approvals for your whole team, in one place.
+          </p>
         </div>
-        <div>
-          <p className="text-white font-semibold leading-tight">C4 Lab</p>
-          <p className="text-white/40 text-xs leading-tight">Connect Four Creative</p>
-        </div>
-      </div>
 
-      <div className="w-full max-w-sm space-y-4">
+        <div className="w-full max-w-sm space-y-4 justify-self-center lg:justify-self-end">
         {/* Login / Forgot card */}
-        <div className="bg-white rounded-2xl p-6 shadow-2xl">
+        <div className="anim-rise d2 card p-6">
 
           {/* ── LOGIN VIEW ── */}
           {mode === 'login' && (
             <>
-              <h1 className="text-lg font-bold text-text-primary mb-0.5">Sign in</h1>
-              <p className="text-sm text-text-muted mb-5">Access is by invitation only</p>
+              <h2 className="font-display text-xl text-text-primary mb-0.5">Sign in</h2>
+              <p className="text-sm text-text-muted mb-5">You're here by invite.</p>
 
               <form onSubmit={handleLogin} className="space-y-3">
                 <div>
@@ -167,7 +175,7 @@ export default function Login() {
                 </div>
 
                 {loginError && (
-                  <p className="text-xs text-red-500 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                  <p className="text-xs text-status-overdue-text bg-status-overdue-bg rounded-sm px-3 py-2">
                     {loginError}
                   </p>
                 )}
@@ -178,7 +186,7 @@ export default function Login() {
                   className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {loginLoading && <Loader2 size={14} className="animate-spin" />}
-                  Sign In
+                  Sign in
                 </button>
               </form>
             </>
@@ -196,13 +204,13 @@ export default function Login() {
 
               {resetSent ? (
                 <div className="text-center py-2">
-                  <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-3">
-                    <Mail size={20} className="text-green-600" />
+                  <div className="w-12 h-12 rounded-full bg-status-approved-bg flex items-center justify-center mx-auto mb-3">
+                    <Mail size={20} className="text-status-approved" />
                   </div>
-                  <h2 className="text-base font-semibold text-text-primary mb-1">Check your email</h2>
+                  <h2 className="font-display text-lg text-text-primary mb-1">Check your email</h2>
                   <p className="text-sm text-text-muted mb-4">
-                    We sent a reset link to <span className="font-medium text-text-primary">{resetEmail}</span>.
-                    Click it to set a new password.
+                    Your reset link is on its way to <span className="font-medium text-text-primary">{resetEmail}</span>.
+                    Open it to set a new password.
                   </p>
                   <button onClick={() => setMode('login')} className="btn-secondary w-full">
                     Back to sign in
@@ -210,9 +218,9 @@ export default function Login() {
                 </div>
               ) : (
                 <>
-                  <h2 className="text-lg font-bold text-text-primary mb-0.5">Reset password</h2>
+                  <h2 className="font-display text-xl text-text-primary mb-0.5">Reset password</h2>
                   <p className="text-sm text-text-muted mb-5">
-                    Enter your email and we'll send you a reset link.
+                    Enter your email and you'll get a reset link.
                   </p>
                   <form onSubmit={handleForgot} className="space-y-3">
                     <div>
@@ -228,7 +236,7 @@ export default function Login() {
                       />
                     </div>
                     {resetError && (
-                      <p className="text-xs text-red-500 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                      <p className="text-xs text-status-overdue-text bg-status-overdue-bg rounded-sm px-3 py-2">
                         {resetError}
                       </p>
                     )}
@@ -238,7 +246,7 @@ export default function Login() {
                       className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50"
                     >
                       {resetLoading && <Loader2 size={14} className="animate-spin" />}
-                      Send Reset Link
+                      Send reset link
                     </button>
                   </form>
                 </>
@@ -248,16 +256,15 @@ export default function Login() {
         </div>
 
         {/* Waitlist card */}
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-          <p className="text-white/80 text-sm leading-relaxed mb-4">
-            We're launching with a private system for our internal team and clients, while building a
-            curated waitlist of agencies and creatives for early access. This allows us to refine the
-            platform in real-time while generating a pipeline of high-quality users ahead of a full release.
+        <div className="anim-rise d3 rounded-lg border border-border bg-surface/40 p-6">
+          <p className="text-text-secondary text-sm leading-relaxed mb-4">
+            C4C Lab is private while we build with our own team and clients.
+            Want early access? Join the waitlist and you'll hear from us when a spot opens.
           </p>
 
           {waitlistStatus === 'success' ? (
-            <p className="text-sm font-medium text-green-400">
-              ✓ You're on the list — we'll be in touch.
+            <p className="text-sm font-medium text-status-approved-text">
+              ✓ You're on the list. We'll be in touch.
             </p>
           ) : (
             <form onSubmit={handleWaitlist} className="space-y-2">
@@ -267,7 +274,7 @@ export default function Login() {
                   value={waitlistName}
                   onChange={(e) => setWaitlistName(e.target.value)}
                   placeholder="Your name"
-                  className="flex-1 bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                  className="input flex-1"
                   required
                 />
                 <input
@@ -275,16 +282,16 @@ export default function Login() {
                   value={waitlistEmail}
                   onChange={(e) => setWaitlistEmail(e.target.value)}
                   placeholder="your@email.com"
-                  className="flex-1 bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                  className="input flex-1"
                   required
                 />
               </div>
               <textarea
                 value={waitlistNotes}
                 onChange={(e) => setWaitlistNotes(e.target.value)}
-                placeholder="Optional — tell us what area you work in (photography, video, agency…)"
+                placeholder="What do you shoot or edit? (optional)"
                 rows={2}
-                className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent resize-none"
+                className="input resize-none"
               />
               <button
                 type="submit"
@@ -292,17 +299,18 @@ export default function Login() {
                 className="btn-primary w-full flex items-center justify-center gap-1.5 disabled:opacity-50"
               >
                 {waitlistLoading ? <Loader2 size={13} className="animate-spin" /> : null}
-                Join the Waitlist
+                Join the waitlist
               </button>
             </form>
           )}
 
           {waitlistStatus === 'already' && (
-            <p className="text-xs text-white/50 mt-2">That email is already on the waitlist.</p>
+            <p className="text-xs text-text-muted mt-2">That email is already on the waitlist.</p>
           )}
           {waitlistStatus === 'error' && (
-            <p className="text-xs text-red-400 mt-2">Something went wrong — try again.</p>
+            <p className="text-xs text-status-overdue-text mt-2">Something went wrong. Try again.</p>
           )}
+        </div>
         </div>
       </div>
     </div>

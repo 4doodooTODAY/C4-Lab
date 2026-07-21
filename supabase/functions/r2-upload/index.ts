@@ -30,7 +30,7 @@ const s3 = new S3Client({
 })
 
 function sanitize(str: string): string {
-  // Keep the real name — just strip filesystem-unsafe chars
+  // Keep the real name. Just strip filesystem-unsafe chars
   return (str || 'Unknown').replace(/[<>:"/\\|?*\x00-\x1f]/g, '').trim() || 'Unknown'
 }
 
@@ -132,7 +132,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    // ── Multipart: init — create upload + return presigned URLs for all parts ─
+    // ── Multipart: init. Create upload + return presigned URLs for all parts ─
     if (action === 'multipart-init') {
       const { key: providedKey, contentType, partCount } = body
       const key       = providedKey || buildKey(body)
@@ -184,7 +184,7 @@ Deno.serve(async (req) => {
         partMarker = listRes.IsTruncated ? listRes.NextPartNumberMarker : undefined
       } while (partMarker)
 
-      if (parts.length === 0) throw new Error('No parts found — upload may have failed')
+      if (parts.length === 0) throw new Error('No parts found. Upload may have failed')
 
       parts.sort((a, b) => a.PartNumber - b.PartNumber)
 

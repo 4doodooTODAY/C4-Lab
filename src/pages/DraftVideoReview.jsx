@@ -318,7 +318,7 @@ export default function DraftVideoReview() {
   const status      = version?.status
   const versionNum  = version?.version_number
   // Only clients add timestamped comments (and admins for oversight).
-  // Editors can VIEW all comments but cannot add new ones — it's the client's turn to mark up.
+  // Editors can VIEW all comments but cannot add new ones. It's the client's turn to mark up.
   const canAddComments   = (isClient && status === 'pending_client_review') || isAdminOnly
   const canActOnComments = isCreativeOrAdmin && status === 'pending_editor'
 

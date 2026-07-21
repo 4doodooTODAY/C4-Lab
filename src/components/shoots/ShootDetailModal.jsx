@@ -15,9 +15,9 @@ import ShootUploadModal from './ShootUploadModal'
 // ── Status badge ──────────────────────────────────────────────────────────────
 function StatusBadge({ status }) {
   const cls =
-    status === 'completed' ? 'bg-green-50 text-green-700' :
-    status === 'cancelled' ? 'bg-red-50 text-red-600' :
-    'bg-blue-50 text-blue-700'
+    status === 'completed' ? 'bg-status-approved-bg text-status-approved-text' :
+    status === 'cancelled' ? 'bg-status-overdue-bg text-status-overdue-text' :
+    'bg-accent/10 text-status-review-text'
   return (
     <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full ${cls}`}>
       {status}
@@ -102,7 +102,7 @@ function NotesThread({ shootId }) {
         {notes.length === 0 ? (
           <div className="text-center py-6">
             <MessageSquare size={24} className="mx-auto text-text-muted/30 mb-2" />
-            <p className="text-xs text-text-muted">No notes yet — start the conversation.</p>
+            <p className="text-xs text-text-muted">No notes yet. Start the conversation.</p>
           </div>
         ) : (
           notes.map((n) => {
@@ -142,7 +142,7 @@ function NotesThread({ shootId }) {
       </div>
 
       {sendErr && (
-        <p className="text-xs text-red-500 flex items-center gap-1.5 bg-red-50 rounded-lg px-3 py-2">
+        <p className="text-xs text-status-overdue-text flex items-center gap-1.5 bg-status-overdue-bg rounded-lg px-3 py-2">
           <AlertCircle size={12} /> {sendErr}
         </p>
       )}
@@ -259,7 +259,7 @@ function ShootFiles({ shootId, refreshKey = 0 }) {
             <button
               onClick={removeSelected}
               disabled={bulkRemoving}
-              className="text-[11px] flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50">
+              className="text-[11px] flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-status-overdue/30 text-status-overdue-text hover:bg-status-overdue-bg transition-colors disabled:opacity-50">
               {bulkRemoving ? <Loader2 size={11} className="animate-spin" /> : <X size={11} />}
               Remove Selected ({selectedIds.size})
             </button>
@@ -304,7 +304,7 @@ function ShootFiles({ shootId, refreshKey = 0 }) {
               <button
                 onClick={(e) => { e.stopPropagation(); removeFile(f) }}
                 disabled={removingId === f.id}
-                className="p-1.5 text-text-muted hover:text-red-600 transition-colors rounded-lg hover:bg-red-50 disabled:opacity-40"
+                className="p-1.5 text-text-muted hover:text-status-overdue-text transition-colors rounded-lg hover:bg-status-overdue-bg disabled:opacity-40"
                 title="Remove file">
                 {removingId === f.id ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
               </button>
@@ -377,7 +377,7 @@ function InspirationLinks({ shoot, canEdit }) {
                 </a>
                 {canEdit && (
                   <button onClick={() => removeLink(i)}
-                    className="opacity-0 group-hover:opacity-100 p-0.5 text-text-muted hover:text-red-500 transition-all"
+                    className="opacity-0 group-hover:opacity-100 p-0.5 text-text-muted hover:text-status-overdue-text transition-all"
                     title="Remove link">
                     <X size={12} />
                   </button>
@@ -443,7 +443,7 @@ export default function ShootDetailModal({ shoot: initialShoot, clientId, client
   const canSeeCreativeNotes = profile?.role === 'admin' || profile?.role === 'creative' || profile?.role === 'editor'
   const canEdit            = profile?.role === 'admin'
 
-  // Load team members for the assignment dropdown when edit opens — the
+  // Load team members for the assignment dropdown when edit opens. The
   // client's team plus all admins (admins can shoot too)
   useEffect(() => {
     if (!editMode || !clientId) return
@@ -508,7 +508,7 @@ export default function ShootDetailModal({ shoot: initialShoot, clientId, client
           ? new Date(`${editForm.shoot_date}T${timeStr}:00`)
           : null
         const evtUpdate = {
-          title:    `${editForm.title.trim()} — Shoot`,
+          title:    `${editForm.title.trim()} Shoot`,
           location: editForm.location || null,
           all_day:  !editForm.shoot_time,
           ...(startAt ? {
@@ -558,7 +558,7 @@ export default function ShootDetailModal({ shoot: initialShoot, clientId, client
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
 
-        <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg z-10 flex flex-col max-h-[90vh]">
+        <div className="relative card shadow-2xl w-full max-w-lg z-10 flex flex-col max-h-[90vh]">
           {/* Header */}
           <div className="flex items-start justify-between px-6 pt-5 pb-4 border-b border-border shrink-0">
             <div className="flex items-center gap-3 min-w-0">
@@ -569,7 +569,7 @@ export default function ShootDetailModal({ shoot: initialShoot, clientId, client
                 <h2 className="text-base font-bold text-text-primary truncate">
                   {editMode ? 'Edit Shoot' : shoot.title}
                 </h2>
-                <p className="text-xs text-text-muted mt-0.5">{clientName || '—'}</p>
+                <p className="text-xs text-text-muted mt-0.5">{clientName || 'Not set'}</p>
               </div>
             </div>
             <div className="flex items-center gap-1 shrink-0">
@@ -623,14 +623,14 @@ export default function ShootDetailModal({ shoot: initialShoot, clientId, client
                   </select>
                 </div>
 
-                {/* Linked project — optional */}
+                {/* Linked project. Optional */}
                 <div>
                   <label className="label flex items-center gap-1.5"><FolderKanban size={11} /> Linked Project <span className="text-text-muted font-normal">(optional)</span></label>
                   {projects.length === 0 ? (
                     <p className="text-xs text-text-muted mt-1">No projects for this client yet.</p>
                   ) : (
                     <select className="input" value={editForm.project_id} onChange={set('project_id')}>
-                      <option value="">— Not linked to a project —</option>
+                      <option value="">Not linked to a project</option>
                       {projects.map((p) => (
                         <option key={p.id} value={p.id}>{p.name}</option>
                       ))}
@@ -645,7 +645,7 @@ export default function ShootDetailModal({ shoot: initialShoot, clientId, client
                     <p className="text-xs text-text-muted mt-1">No team members assigned to this client yet.</p>
                   ) : (
                     <select className="input" value={assignedMember} onChange={(e) => setAssignedMember(e.target.value)}>
-                      <option value="">— Unassigned —</option>
+                      <option value="">Unassigned</option>
                       {teamMembers.map((m) => (
                         <option key={m.id} value={m.id}>{m.full_name} ({m.role})</option>
                       ))}
@@ -660,7 +660,7 @@ export default function ShootDetailModal({ shoot: initialShoot, clientId, client
                 </div>
 
                 {saveError && (
-                  <p className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2 flex items-center gap-1.5">
+                  <p className="text-xs text-status-overdue-text bg-status-overdue-bg rounded-lg px-3 py-2 flex items-center gap-1.5">
                     <AlertCircle size={12} /> {saveError}
                   </p>
                 )}

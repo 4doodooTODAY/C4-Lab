@@ -56,7 +56,7 @@ export default function CalendarGrid({ currentDate, events, onDayClick, onEventC
                   onClick={() => onDayClick(day)}
                   className={`group relative p-1.5 cursor-pointer transition-colors flex flex-col ${
                     isCurrentMonth
-                      ? 'bg-white hover:bg-surface-2/60'
+                      ? 'bg-surface hover:bg-surface-2/60'
                       : 'bg-surface-2/30 hover:bg-surface-2/60'
                   }`}
                 >

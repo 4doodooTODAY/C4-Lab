@@ -27,10 +27,10 @@ function DeleteClientModal({ client, onClose, onDeleted }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 z-10">
+      <div className="relative card shadow-2xl w-full max-w-sm p-6 z-10">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
-            <AlertTriangle size={18} className="text-red-600" />
+          <div className="w-10 h-10 rounded-full bg-status-overdue-bg flex items-center justify-center shrink-0">
+            <AlertTriangle size={18} className="text-status-overdue-text" />
           </div>
           <div>
             <h2 className="text-base font-semibold text-text-primary">Delete client?</h2>
@@ -40,7 +40,7 @@ function DeleteClientModal({ client, onClose, onDeleted }) {
         <p className="text-sm text-text-secondary mb-5">
           <strong>{client.contact_name || client.name}</strong> and all their associated data (projects, shoots, concepts, files) will be permanently deleted.
         </p>
-        {error && <p className="text-xs text-red-500 bg-red-50 border border-red-100 rounded-lg px-3 py-2 mb-3">{error}</p>}
+        {error && <p className="text-xs text-status-overdue-text bg-status-overdue-bg border border-status-overdue/30 rounded-lg px-3 py-2 mb-3">{error}</p>}
         <div className="flex gap-2 justify-end">
           <button onClick={onClose} className="btn-secondary">Cancel</button>
           <button onClick={handleDelete} disabled={deleting} className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors disabled:opacity-50">
@@ -90,7 +90,7 @@ function InviteClientModal({ onClose, onCreated }) {
       if (!res.ok) throw new Error(data.error || 'Request failed')
       if (data?.emailed === false && data?.invite_link) {
         try { await navigator.clipboard.writeText(data.invite_link) } catch { /* ignore */ }
-        window.alert('Client created — the invite email could not send yet, so the setup link was copied to your clipboard. Send it to them directly.')
+        window.alert('Client created. The invite email could not send yet, so the setup link was copied to your clipboard. Send it to them directly.')
       }
       setSent(true)
       onCreated()
@@ -103,9 +103,9 @@ function InviteClientModal({ onClose, onCreated }) {
   if (sent) return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 z-10 text-center">
-        <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-          <Check size={22} className="text-green-600" />
+      <div className="relative card shadow-2xl w-full max-w-md p-8 z-10 text-center">
+        <div className="w-12 h-12 rounded-full bg-status-approved-bg flex items-center justify-center mx-auto mb-4">
+          <Check size={22} className="text-status-approved-text" />
         </div>
         <h2 className="text-base font-semibold text-text-primary mb-1">Invite sent!</h2>
         <p className="text-sm text-text-secondary mb-5">
@@ -119,7 +119,7 @@ function InviteClientModal({ onClose, onCreated }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 z-10">
+      <div className="relative card shadow-2xl w-full max-w-md p-6 z-10">
         <div className="flex items-center justify-between mb-5">
           <div>
             <h2 className="text-base font-semibold text-text-primary">Invite Client</h2>
@@ -150,7 +150,7 @@ function InviteClientModal({ onClose, onCreated }) {
             <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
               placeholder="(555) 000-0000" className="input" />
           </div>
-          {error && <p className="text-xs text-red-500 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p>}
+          {error && <p className="text-xs text-status-overdue-text bg-status-overdue-bg border border-status-overdue/30 rounded-lg px-3 py-2">{error}</p>}
           <div className="flex gap-2 justify-end pt-1">
             <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
             <button type="submit" disabled={saving} className="btn-primary disabled:opacity-50 flex items-center gap-1.5">
@@ -211,26 +211,26 @@ function ClientCard({ client, onClick, onDelete }) {
   return (
     <div
       onClick={onClick}
-      className="bg-white rounded-2xl border border-border p-5 hover:shadow-md hover:border-border-strong transition-all cursor-pointer flex flex-col gap-4"
+      className="card border border-border p-5 hover:shadow-md hover:border-border-strong transition-all cursor-pointer flex flex-col gap-4"
     >
       {/* Top: avatar + name + status */}
       <div className="flex items-start gap-3">
         <Avatar name={client.contact_name || client.name} size={10} />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-text-primary truncate">
-            {client.contact_name || '—'}
+            {client.contact_name || 'Not set'}
           </p>
           <p className="text-xs text-text-muted truncate">{client.name || ''}</p>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-            isPending ? 'bg-amber-50 text-amber-600' : 'bg-green-50 text-green-600'
+            isPending ? 'bg-status-due-soon-bg text-status-due-soon-text' : 'bg-status-approved-bg text-status-approved-text'
           }`}>
             {isPending ? 'Invite pending' : 'Active'}
           </span>
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(client) }}
-            className="p-1 rounded-lg text-text-muted hover:bg-red-50 hover:text-red-500 transition-colors"
+            className="p-1 rounded-lg text-text-muted hover:bg-status-overdue-bg hover:text-status-overdue-text transition-colors"
             title="Delete client"
           >
             <Trash2 size={13} />
@@ -260,13 +260,13 @@ function ClientCard({ client, onClick, onDelete }) {
             <button
               onClick={handleResend}
               disabled={resending || resent}
-              className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:underline disabled:opacity-60 disabled:no-underline"
+              className="flex items-center gap-1.5 text-xs font-medium text-status-review-text hover:underline disabled:opacity-60 disabled:no-underline"
               title="Resend the invitation email"
             >
               {resending ? <Loader2 size={11} className="animate-spin" /> : resent ? <Check size={11} /> : <Mail size={11} />}
               {resent ? 'Invite re-sent' : resending ? 'Sending…' : 'Resend invite'}
             </button>
-            {resendErr && <p className="text-[10px] text-red-500 mt-1">{resendErr}</p>}
+            {resendErr && <p className="text-[10px] text-status-overdue-text mt-1">{resendErr}</p>}
           </div>
         )}
       </div>

@@ -38,9 +38,9 @@ function getStatusInfo(stage, pendingRevision) {
   const revStatus = pendingRevision?.status
 
   if (stage === 'delivered')
-    return { text: 'Your project is complete!', sub: 'Posted online ✅', color: 'text-green-600', emoji: '🎉' }
+    return { text: 'Your project is complete!', sub: 'Posted online ✅', color: 'text-status-approved-text', emoji: '🎉' }
   if (stage === 'ready_to_post')
-    return { text: 'Approved — coming soon!', sub: "We're preparing to post this.", color: 'text-blue-600', emoji: '🚀' }
+    return { text: 'Approved. Coming soon!', sub: "We're preparing to post this.", color: 'text-status-review-text', emoji: '🚀' }
 
   if (stage === 'review' || stage === 'revisions') {
     if (revStatus === 'pending_client_review') {
@@ -48,22 +48,22 @@ function getStatusInfo(stage, pendingRevision) {
       return { text: n === 1 ? 'Your first cut is ready!' : `Revision ${n} is ready!`, sub: 'Watch and leave your feedback.', color: 'text-accent', emoji: '🎬' }
     }
     if (revStatus === 'pending_photographer_review' || revStatus === 'pending_creative_review')
-      return { text: 'Under review', sub: 'The photographer is reviewing before sending it to you.', color: 'text-purple-600', emoji: '🔍' }
+      return { text: 'Under review', sub: 'The photographer is reviewing before sending it to you.', color: 'text-status-review-text', emoji: '🔍' }
     if (revStatus === 'pending_editor')
-      return { text: 'Revisions in progress', sub: 'Your feedback is being addressed.', color: 'text-orange-600', emoji: '✂️' }
-    return { text: 'Under review', sub: 'Your team is reviewing.', color: 'text-gray-600', emoji: '' }
+      return { text: 'Revisions in progress', sub: 'Your feedback is being addressed.', color: 'text-status-due-soon-text', emoji: '✂️' }
+    return { text: 'Under review', sub: 'Your team is reviewing.', color: 'text-text-secondary', emoji: '' }
   }
 
   if (stage === 'post_production')
-    return { text: 'In the edit', sub: 'Your editor is cutting the footage.', color: 'text-purple-600', emoji: '✂️' }
+    return { text: 'In the edit', sub: 'Your editor is cutting the footage.', color: 'text-status-review-text', emoji: '✂️' }
   if (stage === 'production')
-    return { text: 'Footage being uploaded', sub: 'The photographer is submitting the shoot files.', color: 'text-amber-600', emoji: '🎥' }
+    return { text: 'Footage being uploaded', sub: 'The photographer is submitting the shoot files.', color: 'text-status-due-soon-text', emoji: '🎥' }
   if (stage === 'pre_production' || stage === 'briefing')
-    return { text: 'Shoot being planned', sub: "We're scheduling everything for your project.", color: 'text-blue-600', emoji: '📅' }
+    return { text: 'Shoot being planned', sub: "We're scheduling everything for your project.", color: 'text-status-review-text', emoji: '📅' }
   if (stage === 'pitch')
     return { text: 'Waiting for your approval', sub: 'Review the project brief and approve to get started.', color: 'text-accent', emoji: '✨' }
 
-  return { text: 'Getting set up', sub: "We're planning everything.", color: 'text-gray-500', emoji: '📋' }
+  return { text: 'Getting set up', sub: "We're planning everything.", color: 'text-text-secondary', emoji: '📋' }
 }
 
 // ── Progress bar ──────────────────────────────────────────────────────────────
@@ -79,15 +79,15 @@ function ProgressBar({ stage, pendingRevision }) {
           <div key={label} className="flex items-center flex-1 min-w-0">
             <div className="flex flex-col items-center flex-1 min-w-0">
               <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 transition-all ${
-                done ? 'bg-green-500 text-white' : current ? 'bg-accent text-white ring-4 ring-accent/20' : 'bg-gray-100 text-gray-400'
+                done ? 'bg-green-500 text-white' : current ? 'bg-accent text-white ring-4 ring-accent/20' : 'bg-surface-2 text-text-muted'
               }`}>
                 {done ? <Check size={10} /> : i + 1}
               </div>
               <p className={`text-[9px] mt-1 font-semibold text-center truncate w-full px-0.5 ${
-                done ? 'text-green-500' : current ? 'text-accent' : 'text-gray-300'
+                done ? 'text-green-500' : current ? 'text-accent' : 'text-text-muted'
               }`}>{label}</p>
             </div>
-            {!isLast && <div className={`h-0.5 flex-1 mx-0.5 mb-3 ${done ? 'bg-green-400' : 'bg-gray-100'}`} />}
+            {!isLast && <div className={`h-0.5 flex-1 mx-0.5 mb-3 ${done ? 'bg-green-400' : 'bg-surface-2'}`} />}
           </div>
         )
       })}
@@ -104,8 +104,8 @@ function TeamPill({ label, name, icon: Icon, color }) {
         <Icon size={9} className="text-white" />
       </div>
       <div>
-        <p className="text-[9px] text-gray-400 leading-none">{label}</p>
-        <p className="text-xs font-medium text-gray-700 leading-tight">{name}</p>
+        <p className="text-[9px] text-text-muted leading-none">{label}</p>
+        <p className="text-xs font-medium text-text-primary leading-tight">{name}</p>
       </div>
     </div>
   )
@@ -153,11 +153,11 @@ function FootageUploader({ project, clientName, onDone }) {
   }
 
   if (done) return (
-    <div className="mt-3 p-4 bg-green-50 border border-green-200 rounded-xl text-center">
+    <div className="mt-3 p-4 bg-status-approved-bg border border-status-approved/30 rounded-xl text-center">
       <CheckCircle2 size={20} className="mx-auto text-green-500 mb-1.5" />
-      <p className="text-sm font-semibold text-green-800">Footage sent to your team!</p>
+      <p className="text-sm font-semibold text-status-approved-text">Footage sent to your team!</p>
       <div className="flex gap-2 mt-2">
-        <button onClick={() => setDone(false)} className="flex-1 py-1.5 rounded-lg text-xs font-semibold border border-green-300 text-green-700 hover:bg-green-100 transition-colors">Upload more</button>
+        <button onClick={() => setDone(false)} className="flex-1 py-1.5 rounded-lg text-xs font-semibold border border-green-300 text-status-approved-text hover:bg-status-approved-bg transition-colors">Upload more</button>
         <button onClick={() => { setDone(false); onDone?.() }} className="flex-1 py-1.5 rounded-lg text-xs font-semibold bg-green-600 text-white hover:bg-green-700 transition-colors">Done</button>
       </div>
     </div>
@@ -168,11 +168,11 @@ function FootageUploader({ project, clientName, onDone }) {
       {files.length > 0 && (
         <div className="space-y-1">
           {files.map((f, i) => (
-            <div key={i} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
-              <Film size={11} className="text-gray-400 shrink-0" />
-              <span className="text-xs text-gray-700 truncate flex-1">{f.name}</span>
-              <span className="text-xs text-gray-400">{fmtBytes(f.size)}</span>
-              {!uploading && <button onClick={() => setFiles((p) => p.filter((_, j) => j !== i))}><X size={11} className="text-gray-300 hover:text-red-400" /></button>}
+            <div key={i} className="flex items-center gap-2 bg-surface-2 rounded-lg px-3 py-2">
+              <Film size={11} className="text-text-muted shrink-0" />
+              <span className="text-xs text-text-primary truncate flex-1">{f.name}</span>
+              <span className="text-xs text-text-muted">{fmtBytes(f.size)}</span>
+              {!uploading && <button onClick={() => setFiles((p) => p.filter((_, j) => j !== i))}><X size={11} className="text-text-muted hover:text-red-400" /></button>}
             </div>
           ))}
         </div>
@@ -183,32 +183,32 @@ function FootageUploader({ project, clientName, onDone }) {
           onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
           onDragLeave={() => setDragOver(false)}
           onDrop={(e) => { e.preventDefault(); setDragOver(false); addFiles(e.dataTransfer.files) }}
-          className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all ${dragOver ? 'border-accent bg-accent/5' : files.length ? 'border-gray-100 py-2.5 hover:border-accent/40' : 'border-gray-200 hover:border-accent/50'}`}
+          className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all ${dragOver ? 'border-accent bg-accent/5' : files.length ? 'border-border py-2.5 hover:border-accent/40' : 'border-border hover:border-accent/50'}`}
         >
-          <Upload size={files.length ? 13 : 18} className="mx-auto mb-1 text-gray-300" />
-          <p className={`text-gray-400 ${files.length ? 'text-xs' : 'text-sm'}`}>
+          <Upload size={files.length ? 13 : 18} className="mx-auto mb-1 text-text-muted" />
+          <p className={`text-text-muted ${files.length ? 'text-xs' : 'text-sm'}`}>
             {files.length ? 'Add more files' : <><span className="text-accent font-medium">Browse</span> or drop files here</>}
           </p>
-          {!files.length && <p className="text-xs text-gray-300 mt-0.5">Video, photo, ZIP</p>}
+          {!files.length && <p className="text-xs text-text-muted mt-0.5">Video, photo, ZIP</p>}
         </div>
       )}
       <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(e) => addFiles(e.target.files)} />
       {uploading && (
         <div>
-          <div className="flex justify-between text-xs text-gray-400 mb-1">
+          <div className="flex justify-between text-xs text-text-muted mb-1">
             <span>{files.length > 1 ? `File ${fileIdx + 1} of ${files.length}…` : 'Uploading…'}</span>
             <div className="flex gap-1.5">
-              {stats && <span className="font-medium text-gray-600">{fmtSpeed(stats.speed)}</span>}
+              {stats && <span className="font-medium text-text-secondary">{fmtSpeed(stats.speed)}</span>}
               {stats?.eta != null && <span>{fmtEta(stats.eta)}</span>}
               <span>{progress}%</span>
             </div>
           </div>
-          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+          <div className="h-1.5 bg-surface-2 rounded-full overflow-hidden">
             <div className="h-full bg-accent rounded-full transition-all duration-200" style={{ width: `${progress}%` }} />
           </div>
         </div>
       )}
-      {error && <p className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
+      {error && <p className="text-xs text-status-overdue-text bg-status-overdue-bg px-3 py-2 rounded-lg">{error}</p>}
       {files.length > 0 && (
         <button onClick={handleUpload} disabled={uploading} className="w-full py-2.5 rounded-xl bg-accent text-white text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50 hover:bg-accent/90 transition-colors">
           {uploading ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
@@ -275,7 +275,7 @@ function PitchPanel({ project, clientId, userId, onApproved }) {
 
       await notifyAdmins({
         actorId: userId, type: 'pitch_changes_requested',
-        title: `"${project.name}" — client requested changes`,
+        title: `"${project.name}". Client requested changes`,
         body: notes.trim(),
         link: `/projects/${project.id}`,
       })
@@ -292,60 +292,60 @@ function PitchPanel({ project, clientId, userId, onApproved }) {
     <div className="bg-gradient-to-br from-accent/5 to-purple-50 border border-accent/20 rounded-2xl p-5">
       <div className="flex items-center gap-2 mb-3">
         <Sparkles size={16} className="text-accent" />
-        <h3 className="text-sm font-bold text-gray-900">New Project Pitch</h3>
+        <h3 className="text-sm font-bold text-text-primary">New Project Pitch</h3>
       </div>
 
       {project.concept && (
-        <div className="bg-white rounded-xl px-4 py-3 mb-4 border border-accent/10">
-          <p className="text-xs text-gray-400 font-medium mb-1">Project Brief</p>
-          <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{project.concept}</p>
+        <div className="card px-4 py-3 mb-4 border border-accent/10">
+          <p className="text-xs text-text-muted font-medium mb-1">Project Brief</p>
+          <p className="text-sm text-text-primary leading-relaxed whitespace-pre-wrap">{project.concept}</p>
         </div>
       )}
 
       {project.notes && (
-        <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 mb-4">
+        <div className="bg-status-due-soon-bg border border-status-due-soon/30 rounded-xl px-4 py-3 mb-4">
           <p className="text-xs text-amber-500 font-medium mb-1">Note from your team</p>
-          <p className="text-sm text-gray-700 leading-relaxed">{project.notes}</p>
+          <p className="text-sm text-text-primary leading-relaxed">{project.notes}</p>
         </div>
       )}
 
       {/* Project details */}
       <div className="grid grid-cols-2 gap-2 mb-4">
-        <div className="bg-white rounded-xl px-3 py-2.5 border border-accent/10">
-          <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Deliverable</p>
-          <p className="text-sm font-semibold text-gray-800 capitalize">{project.media_type === 'photo' ? 'Photo set' : 'Video'}</p>
+        <div className="card px-3 py-2.5 border border-accent/10">
+          <p className="text-[10px] text-text-muted font-medium uppercase tracking-wide">Deliverable</p>
+          <p className="text-sm font-semibold text-text-primary capitalize">{project.media_type === 'photo' ? 'Photo set' : 'Video'}</p>
         </div>
-        <div className="bg-white rounded-xl px-3 py-2.5 border border-accent/10">
-          <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Revisions included</p>
-          <p className="text-sm font-semibold text-gray-800">{project.max_revisions || 3}</p>
+        <div className="card px-3 py-2.5 border border-accent/10">
+          <p className="text-[10px] text-text-muted font-medium uppercase tracking-wide">Revisions included</p>
+          <p className="text-sm font-semibold text-text-primary">{project.max_revisions || 3}</p>
         </div>
         {project.shoot_date && (
-          <div className="bg-white rounded-xl px-3 py-2.5 border border-accent/10">
-            <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Proposed shoot</p>
-            <p className="text-sm font-semibold text-gray-800">{format(parseISO(project.shoot_date), 'MMM d, yyyy')}</p>
-            {project.location && <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5"><MapPin size={9} /> {project.location}</p>}
+          <div className="card px-3 py-2.5 border border-accent/10">
+            <p className="text-[10px] text-text-muted font-medium uppercase tracking-wide">Proposed shoot</p>
+            <p className="text-sm font-semibold text-text-primary">{format(parseISO(project.shoot_date), 'MMM d, yyyy')}</p>
+            {project.location && <p className="text-xs text-text-secondary flex items-center gap-1 mt-0.5"><MapPin size={9} /> {project.location}</p>}
           </div>
         )}
         {project.target_date && (
-          <div className="bg-white rounded-xl px-3 py-2.5 border border-accent/10">
-            <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Target delivery</p>
-            <p className="text-sm font-semibold text-gray-800">{format(parseISO(project.target_date), 'MMM d, yyyy')}</p>
+          <div className="card px-3 py-2.5 border border-accent/10">
+            <p className="text-[10px] text-text-muted font-medium uppercase tracking-wide">Target delivery</p>
+            <p className="text-sm font-semibold text-text-primary">{format(parseISO(project.target_date), 'MMM d, yyyy')}</p>
           </div>
         )}
       </div>
 
       {project.pitch_notes && (
-        <div className="bg-orange-50 border border-orange-100 rounded-xl px-4 py-3 mb-4">
+        <div className="bg-status-due-soon-bg border border-status-due-soon/30 rounded-xl px-4 py-3 mb-4">
           <p className="text-xs text-orange-500 font-medium mb-1">Your previous feedback</p>
-          <p className="text-sm text-gray-700 leading-relaxed">{project.pitch_notes}</p>
+          <p className="text-sm text-text-primary leading-relaxed">{project.pitch_notes}</p>
         </div>
       )}
 
       {showNotes && (
         <div className="mb-3">
-          <label className="text-xs text-gray-500 font-medium mb-1 block">What needs to change?</label>
+          <label className="text-xs text-text-secondary font-medium mb-1 block">What needs to change?</label>
           <textarea
-            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 resize-none focus:outline-none focus:ring-2 focus:ring-accent/30 min-h-[80px]"
+            className="w-full border border-border rounded-xl px-3 py-2.5 text-sm text-text-primary resize-none focus:outline-none focus:ring-2 focus:ring-accent/30 min-h-[80px]"
             placeholder="Describe what you'd like changed…"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
@@ -354,7 +354,7 @@ function PitchPanel({ project, clientId, userId, onApproved }) {
         </div>
       )}
 
-      {error && <p className="text-xs text-red-500 mb-3">{error}</p>}
+      {error && <p className="text-xs text-status-overdue-text mb-3">{error}</p>}
 
       <div className="flex gap-2">
         <button
@@ -368,7 +368,7 @@ function PitchPanel({ project, clientId, userId, onApproved }) {
         <button
           onClick={showNotes ? handleRequestChanges : () => setShowNotes(true)}
           disabled={declining}
-          className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-medium hover:border-gray-300 hover:bg-gray-50 transition-all disabled:opacity-50"
+          className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border text-text-secondary text-sm font-medium hover:border-gray-300 hover:bg-surface-2 transition-all disabled:opacity-50"
         >
           {declining ? <Loader2 size={13} className="animate-spin" /> : <ThumbsDown size={13} />}
           {showNotes ? 'Send Feedback' : 'Request Changes'}
@@ -398,7 +398,7 @@ function ProjectCard({ project, revisions, clientId, userId, onRefresh }) {
   const revisionsLeft  = Math.max(0, revisionLimit - revisionCount)
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-all">
+    <div className="card border border-border shadow-sm overflow-hidden hover:shadow-md transition-all">
       {/* Stage color bar */}
       <div className={`h-1.5 ${
         isPitch             ? 'bg-accent' :
@@ -414,19 +414,19 @@ function ProjectCard({ project, revisions, clientId, userId, onRefresh }) {
         {/* Header */}
         <div className="flex items-start justify-between gap-3 mb-4">
           <div className="min-w-0">
-            <h2 className="text-xl font-bold text-gray-900 leading-tight">{project.name}</h2>
+            <h2 className="text-xl font-bold text-text-primary leading-tight">{project.name}</h2>
             <p className={`text-sm font-medium mt-0.5 ${color}`}>
               {emoji && <span className="mr-1">{emoji}</span>}{text}
             </p>
-            <p className="text-xs text-gray-400 mt-0.5">{sub}</p>
+            <p className="text-xs text-text-muted mt-0.5">{sub}</p>
           </div>
           {isDelivered && (
-            <span className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full bg-green-50 text-green-700 text-xs font-semibold border border-green-200">
+            <span className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full bg-status-approved-bg text-status-approved-text text-xs font-semibold border border-status-approved/30">
               <Check size={10} /> Delivered
             </span>
           )}
           {isReadyToPost && (
-            <span className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold border border-blue-200">
+            <span className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full bg-accent/10 text-status-review-text text-xs font-semibold border border-accent/30">
               🚀 Coming Soon
             </span>
           )}
@@ -456,15 +456,15 @@ function ProjectCard({ project, revisions, clientId, userId, onRefresh }) {
           <div className="grid grid-cols-1 gap-2 mb-4">
             {/* Shoot date */}
             {project.shoot_date && (
-              <div className="flex items-start gap-2.5 bg-gray-50 rounded-xl px-3 py-2.5">
-                <Camera size={13} className="text-gray-400 mt-0.5 shrink-0" />
+              <div className="flex items-start gap-2.5 bg-surface-2 rounded-xl px-3 py-2.5">
+                <Camera size={13} className="text-text-muted mt-0.5 shrink-0" />
                 <div>
-                  <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Shoot</p>
-                  <p className="text-sm font-semibold text-gray-800">
+                  <p className="text-[10px] text-text-muted font-medium uppercase tracking-wide">Shoot</p>
+                  <p className="text-sm font-semibold text-text-primary">
                     {format(parseISO(project.shoot_date), 'EEEE, MMMM d, yyyy')}
                   </p>
                   {project.location && (
-                    <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                    <p className="text-xs text-text-secondary flex items-center gap-1 mt-0.5">
                       <MapPin size={9} /> {project.location}
                     </p>
                   )}
@@ -474,14 +474,14 @@ function ProjectCard({ project, revisions, clientId, userId, onRefresh }) {
 
             {/* Target delivery */}
             {project.target_date && (
-              <div className="flex items-start gap-2.5 bg-gray-50 rounded-xl px-3 py-2.5">
-                <Clock size={13} className="text-gray-400 mt-0.5 shrink-0" />
+              <div className="flex items-start gap-2.5 bg-surface-2 rounded-xl px-3 py-2.5">
+                <Clock size={13} className="text-text-muted mt-0.5 shrink-0" />
                 <div>
-                  <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Target Delivery</p>
-                  <p className="text-sm font-semibold text-gray-800">
+                  <p className="text-[10px] text-text-muted font-medium uppercase tracking-wide">Target Delivery</p>
+                  <p className="text-sm font-semibold text-text-primary">
                     {format(parseISO(project.target_date), 'MMMM d, yyyy')}
                   </p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-text-secondary">
                     {isFuture(parseISO(project.target_date))
                       ? `In ${formatDistanceToNow(parseISO(project.target_date))}`
                       : 'Past due date'}
@@ -492,10 +492,10 @@ function ProjectCard({ project, revisions, clientId, userId, onRefresh }) {
 
             {/* Team */}
             {(project.creative?.full_name || project.editor?.full_name) && (
-              <div className="flex items-start gap-2.5 bg-gray-50 rounded-xl px-3 py-2.5">
-                <Users size={13} className="text-gray-400 mt-0.5 shrink-0" />
+              <div className="flex items-start gap-2.5 bg-surface-2 rounded-xl px-3 py-2.5">
+                <Users size={13} className="text-text-muted mt-0.5 shrink-0" />
                 <div>
-                  <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide mb-1.5">Your Team</p>
+                  <p className="text-[10px] text-text-muted font-medium uppercase tracking-wide mb-1.5">Your Team</p>
                   <div className="flex flex-wrap gap-3">
                     <TeamPill label="Photographer" name={project.creative?.full_name} icon={Camera}   color="bg-purple-400" />
                     <TeamPill label="Editor"       name={project.editor?.full_name}   icon={Scissors} color="bg-blue-400" />
@@ -506,11 +506,11 @@ function ProjectCard({ project, revisions, clientId, userId, onRefresh }) {
 
             {/* Notes from team */}
             {project.notes && (
-              <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2.5">
+              <div className="flex items-start gap-2.5 bg-status-due-soon-bg border border-status-due-soon/30 rounded-xl px-3 py-2.5">
                 <StickyNote size={13} className="text-amber-500 mt-0.5 shrink-0" />
                 <div>
-                  <p className="text-[10px] text-amber-600 font-medium uppercase tracking-wide">Note from your team</p>
-                  <p className="text-xs text-gray-700 mt-0.5 leading-relaxed">{project.notes}</p>
+                  <p className="text-[10px] text-status-due-soon-text font-medium uppercase tracking-wide">Note from your team</p>
+                  <p className="text-xs text-text-primary mt-0.5 leading-relaxed">{project.notes}</p>
                 </div>
               </div>
             )}
@@ -519,7 +519,7 @@ function ProjectCard({ project, revisions, clientId, userId, onRefresh }) {
 
         {/* Revision stats */}
         {!isPitch && revisions.length > 0 && (
-          <div className="flex items-center gap-4 text-xs text-gray-400 mb-4 pb-4 border-b border-gray-100">
+          <div className="flex items-center gap-4 text-xs text-text-muted mb-4 pb-4 border-b border-border">
             <span className="flex items-center gap-1">
               {project.media_type === 'photo'
                 ? <><Camera size={10} /> {revisions.length} photo set{revisions.length !== 1 ? 's' : ''} submitted</>
@@ -532,24 +532,24 @@ function ProjectCard({ project, revisions, clientId, userId, onRefresh }) {
           </div>
         )}
 
-        {/* Revision status — whose turn it is */}
+        {/* Revision status. Whose turn it is */}
         {!isPitch && !isDelivered && pendingRevision && (
           <div className={`w-full px-4 py-3 rounded-xl border mb-3 ${
             pendingRevision.status === 'pending_client_review'
-              ? 'bg-blue-50 border-blue-200'
+              ? 'bg-accent/10 border-accent/30'
               : pendingRevision.status === 'pending_editor'
-              ? 'bg-amber-50 border-amber-200'
-              : 'bg-gray-50 border-gray-100'
+              ? 'bg-status-due-soon-bg border-status-due-soon/30'
+              : 'bg-surface-2 border-border'
           }`}>
             {pendingRevision.status === 'pending_client_review' && (
               <div className="flex items-start gap-2">
                 <span className="text-base leading-none">📸</span>
                 <div>
-                  <p className="text-sm font-semibold text-blue-800">
+                  <p className="text-sm font-semibold text-status-review-text">
                     {project.editor?.full_name ? `${project.editor.full_name} sent you ` : 'Your editor sent '}
                     {project.media_type === 'photo' ? 'photos' : 'a video'} to review
                   </p>
-                  <p className="text-xs text-blue-600 mt-0.5">It's your turn — tap below to leave feedback or approve.</p>
+                  <p className="text-xs text-status-review-text mt-0.5">It's your turn. Tap below to leave feedback or approve.</p>
                 </div>
               </div>
             )}
@@ -557,10 +557,10 @@ function ProjectCard({ project, revisions, clientId, userId, onRefresh }) {
               <div className="flex items-start gap-2">
                 <span className="text-base leading-none">⏳</span>
                 <div>
-                  <p className="text-sm font-semibold text-amber-800">
+                  <p className="text-sm font-semibold text-status-due-soon-text">
                     Your feedback is with {project.editor?.full_name || 'your editor'}
                   </p>
-                  <p className="text-xs text-amber-600 mt-0.5">They're working on the changes. You'll be notified when a new version is ready.</p>
+                  <p className="text-xs text-status-due-soon-text mt-0.5">They're working on the changes. You'll be notified when a new version is ready.</p>
                 </div>
               </div>
             )}
@@ -584,7 +584,7 @@ function ProjectCard({ project, revisions, clientId, userId, onRefresh }) {
         )}
 
         {isDelivered && (
-          <div className="w-full py-3 px-5 rounded-xl bg-green-50 border border-green-200 text-green-700 text-sm font-semibold text-center flex items-center justify-center gap-2 mb-3">
+          <div className="w-full py-3 px-5 rounded-xl bg-status-approved-bg border border-status-approved/30 text-status-approved-text text-sm font-semibold text-center flex items-center justify-center gap-2 mb-3">
             <CheckCircle2 size={15} /> Project Complete 🎉
           </div>
         )}
@@ -598,7 +598,7 @@ function ProjectCard({ project, revisions, clientId, userId, onRefresh }) {
               </div>
               <div>
                 <p className="text-sm font-bold text-white leading-tight">Download Your Files</p>
-                <p className="text-[11px] text-gray-400">Original quality — no compression</p>
+                <p className="text-[11px] text-text-muted">Original quality. No compression</p>
               </div>
             </div>
 
@@ -622,8 +622,8 @@ function ProjectCard({ project, revisions, clientId, userId, onRefresh }) {
         )}
 
         {!isPitch && !canReview && !isDelivered && !isReadyToPost && !pendingRevision && (
-          <div className="w-full py-2.5 px-5 rounded-xl bg-gray-50 border border-gray-100 text-gray-400 text-sm text-center mb-3 flex items-center justify-center gap-2">
-            <Clock size={13} /> Your team is on it — we'll notify you when action is needed
+          <div className="w-full py-2.5 px-5 rounded-xl bg-surface-2 border border-border text-text-muted text-sm text-center mb-3 flex items-center justify-center gap-2">
+            <Clock size={13} /> Your team is on it. We'll notify you when action is needed
           </div>
         )}
 
@@ -631,7 +631,7 @@ function ProjectCard({ project, revisions, clientId, userId, onRefresh }) {
         {!isPitch && !isDelivered && (
           <button
             onClick={() => setShowUpload((v) => !v)}
-            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-accent font-medium transition-colors"
+            className="flex items-center gap-1.5 text-xs text-text-muted hover:text-accent font-medium transition-colors"
           >
             <Upload size={11} />
             {showUpload ? 'Hide uploader' : 'Send footage to your team'}
@@ -735,21 +735,21 @@ export default function MyProjects() {
   )
 
   if (fetchError) return (
-    <div className="min-h-screen bg-gray-50/40 flex items-center justify-center p-6">
+    <div className="min-h-screen bg-surface-2/40 flex items-center justify-center p-6">
       <div className="max-w-sm text-center">
-        <p className="text-sm font-semibold text-red-500 mb-2">Could not load projects</p>
-        <p className="text-xs text-gray-400">{fetchError}</p>
+        <p className="text-sm font-semibold text-status-overdue-text mb-2">Could not load projects</p>
+        <p className="text-xs text-text-muted">{fetchError}</p>
       </div>
     </div>
   )
 
   return (
-    <div className="min-h-screen bg-gray-50/40">
+    <div className="min-h-screen bg-surface-2/40">
       <div className="max-w-[640px] mx-auto px-6 py-12">
 
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Your Projects</h1>
-          <p className="text-gray-400 mt-1.5">Track the progress of your creative work.</p>
+          <h1 className="display">Your Projects</h1>
+          <p className="text-text-muted mt-1.5">Track the progress of your creative work.</p>
         </div>
 
         {/* Quick stats */}
@@ -758,21 +758,21 @@ export default function MyProjects() {
             {[
               { label: 'Active',     value: activeProjects.length, color: 'text-accent' },
               { label: 'Delivered',  value: doneProjects.length,   color: 'text-green-500' },
-              { label: 'Total',      value: projects.length,       color: 'text-gray-700' },
+              { label: 'Total',      value: projects.length,       color: 'text-text-primary' },
             ].map(({ label, value, color }) => (
-              <div key={label} className="bg-white rounded-2xl border border-gray-100 p-4 text-center shadow-sm">
+              <div key={label} className="card border border-border p-4 text-center shadow-sm">
                 <p className={`text-2xl font-bold ${color}`}>{value}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{label}</p>
+                <p className="text-xs text-text-muted mt-0.5">{label}</p>
               </div>
             ))}
           </div>
         )}
 
         {projects.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-gray-100 p-16 text-center shadow-sm">
+          <div className="card border border-border p-16 text-center shadow-sm">
             <FolderKanban size={40} className="mx-auto text-gray-200 mb-4" />
-            <h2 className="text-lg font-semibold text-gray-400 mb-1">No projects yet</h2>
-            <p className="text-sm text-gray-300">Your projects will appear here once your team creates them.</p>
+            <h2 className="text-lg font-semibold text-text-muted mb-1">No projects yet</h2>
+            <p className="text-sm text-text-muted">Your projects will appear here once your team creates them.</p>
           </div>
         ) : (
           <div className="space-y-10">
@@ -781,7 +781,7 @@ export default function MyProjects() {
               <div>
                 <div className="flex items-center gap-2 mb-4">
                   <Sparkles size={14} className="text-accent" />
-                  <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider">Awaiting Your Approval</h2>
+                  <h2 className="text-sm font-bold text-text-primary uppercase tracking-wider">Awaiting Your Approval</h2>
                 </div>
                 <div className="space-y-5">
                   {pitchProjects.map((p) => (
@@ -794,7 +794,7 @@ export default function MyProjects() {
             {/* Active projects */}
             {activeProjects.length > 0 && (
               <div>
-                {pitchProjects.length > 0 && <div className="flex items-center gap-2 mb-4"><h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider">In Progress</h2></div>}
+                {pitchProjects.length > 0 && <div className="flex items-center gap-2 mb-4"><h2 className="text-sm font-bold text-text-primary uppercase tracking-wider">In Progress</h2></div>}
                 <div className="space-y-5">
                   {activeProjects.map((p) => (
                     <ProjectCard key={p.id} project={p} revisions={revisions.filter((r) => r.project_id === p.id)} clientId={clientId} userId={user?.id} onRefresh={loadAll} />
@@ -807,9 +807,9 @@ export default function MyProjects() {
             {doneProjects.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-4">
-                  <div className="flex-1 h-px bg-gray-100" />
-                  <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Completed</span>
-                  <div className="flex-1 h-px bg-gray-100" />
+                  <div className="flex-1 h-px bg-surface-2" />
+                  <span className="text-xs font-semibold text-text-muted uppercase tracking-wider">Completed</span>
+                  <div className="flex-1 h-px bg-surface-2" />
                 </div>
                 <div className="space-y-5">
                   {doneProjects.map((p) => (
@@ -822,7 +822,7 @@ export default function MyProjects() {
         )}
 
         <div className="mt-8 flex gap-3 justify-center">
-          <Link to="/client/calendar" className="text-xs text-gray-400 hover:text-accent transition-colors">
+          <Link to="/client/calendar" className="text-xs text-text-muted hover:text-accent transition-colors">
             See calendar →
           </Link>
         </div>

@@ -11,7 +11,11 @@ function toDateInput(iso)  { return iso ? iso.slice(0, 10) : '' }
 function toTimeInput(iso)  { return iso ? format(new Date(iso), 'HH:mm') : '09:00' }
 function buildISO(date, time) { return new Date(`${date}T${time}:00`).toISOString() }
 
-const TYPE_BUTTONS = Object.entries(EVENT_TYPES)
+// Only the event types the calendar_events CHECK constraint allows are
+// user-selectable. The synthetic types (shoot / draft / project) are rendered
+// from other tables and would fail the insert, so they never appear here.
+const SELECTABLE_TYPES = ['in_person', 'virtual', 'travel', 'real_estate', 'personal']
+const TYPE_BUTTONS = Object.entries(EVENT_TYPES).filter(([key]) => SELECTABLE_TYPES.includes(key))
 
 export default function EventModal({ date, event, onSave, onDelete, onClose }) {
   const { profile } = useAuth()
@@ -139,12 +143,12 @@ export default function EventModal({ date, event, onSave, onDelete, onClose }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
 
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg z-10 flex flex-col max-h-[90vh]">
+      <div className="relative card shadow-2xl w-full max-w-lg z-10 flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="flex items-start justify-between px-6 pt-5 pb-4 border-b border-border shrink-0">
           <div>
-            <h2 className="text-base font-bold text-text-primary">
-              {isEdit ? 'Edit Event' : 'New Event'}
+            <h2 className="font-display text-base text-text-primary">
+              {isEdit ? 'Edit event' : 'New event'}
             </h2>
             <p className="text-xs text-text-muted mt-0.5">{format(date, 'EEEE, MMMM d, yyyy')}</p>
           </div>
@@ -188,12 +192,12 @@ export default function EventModal({ date, event, onSave, onDelete, onClose }) {
               ))}
             </div>
             {type === 'real_estate' && (
-              <p className="text-[10px] text-purple-600 mt-1.5 font-medium">
+              <p className="text-[10px] text-status-review-text mt-1.5 font-medium">
                 ⬡ Real Estate overrides all other colors
               </p>
             )}
             {type === 'personal' && (
-              <p className="text-[10px] text-orange-600 mt-1.5 font-medium">
+              <p className="text-[10px] text-status-due-soon-text mt-1.5 font-medium">
                 🔒 Only visible to admin and assigned people
               </p>
             )}
@@ -207,10 +211,10 @@ export default function EventModal({ date, event, onSave, onDelete, onClose }) {
               onChange={(e) => setClientId(e.target.value)}
               className="input"
             >
-              <option value="">— No client —</option>
+              <option value="">No client</option>
               {clients.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.name}{c.contact_name ? ` — ${c.contact_name}` : ''}
+                  {c.name}{c.contact_name ? ` · ${c.contact_name}` : ''}
                 </option>
               ))}
             </select>
@@ -226,7 +230,7 @@ export default function EventModal({ date, event, onSave, onDelete, onClose }) {
                   onClick={() => setAllDay((v) => !v)}
                   className={`w-8 h-4 rounded-full transition-colors relative cursor-pointer ${allDay ? 'bg-accent' : 'bg-surface-3'}`}
                 >
-                  <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-all ${allDay ? 'left-4' : 'left-0.5'}`} />
+                  <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-surface shadow transition-all ${allDay ? 'left-4' : 'left-0.5'}`} />
                 </div>
               </label>
             </div>
@@ -322,7 +326,7 @@ export default function EventModal({ date, event, onSave, onDelete, onClose }) {
             />
           </div>
 
-          {error && <p className="text-xs text-red-500">{error}</p>}
+          {error && <p className="text-xs text-status-overdue-text">{error}</p>}
         </form>
 
         {/* Footer */}
@@ -332,7 +336,7 @@ export default function EventModal({ date, event, onSave, onDelete, onClose }) {
               type="button"
               onClick={handleDelete}
               disabled={deleting}
-              className="flex items-center gap-1.5 text-sm text-red-500 hover:text-red-600 font-medium disabled:opacity-50"
+              className="flex items-center gap-1.5 text-sm text-status-overdue-text hover:text-status-overdue-text font-medium disabled:opacity-50"
             >
               <Trash2 size={14} />
               {deleting ? 'Deleting…' : 'Delete'}

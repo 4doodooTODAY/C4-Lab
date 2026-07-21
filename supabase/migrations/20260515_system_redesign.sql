@@ -1,5 +1,5 @@
 -- ╔══════════════════════════════════════════════════════════════════╗
--- ║  C4 Lab — System Redesign Migration                              ║
+-- ║  C4C Lab — System Redesign Migration                              ║
 -- ║  Run this in the Supabase SQL editor                             ║
 -- ╚══════════════════════════════════════════════════════════════════╝
 

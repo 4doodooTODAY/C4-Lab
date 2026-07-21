@@ -1,6 +1,6 @@
 self.addEventListener('push', (event) => {
   const data = event.data?.json() || {}
-  const { title = 'C4 Lab', body = '', url = '/', icon = '/favicon.ico' } = data
+  const { title = 'C4C Lab', body = '', url = '/', icon = '/favicon.ico' } = data
   event.waitUntil(
     self.registration.showNotification(title, {
       body,

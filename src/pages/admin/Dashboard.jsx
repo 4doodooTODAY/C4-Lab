@@ -32,7 +32,7 @@ function WeeklyChart({ weeks }) {
     ? [0, 1, 2]
     : [0, Math.round(maxCount / 2), maxCount]
 
-  const ACCENT = '#6C63FF'
+  const ACCENT = 'var(--violet)'
   const ACCENT_LIGHT = '#c4c1f7'
   const GRID = '#f1f0fe'
   const AXIS = '#e5e7eb'
@@ -117,7 +117,7 @@ function WeeklyChart({ weeks }) {
 
 // ─── Activity feed item ────────────────────────────────────────────────────────
 const ACTIVITY_META = {
-  media:    { icon: Film,          color: '#6C63FF', bg: '#ede9fe' },
+  media:    { icon: Film,          color: 'var(--violet)', bg: '#ede9fe' },
   comment:  { icon: MessageSquare, color: '#10b981', bg: '#d1fae5' },
   request:  { icon: FileText,      color: '#f59e0b', bg: '#fef3c7' },
   footage:  { icon: Camera,        color: '#ef4444', bg: '#fee2e2' },
@@ -155,7 +155,7 @@ function UpcomingList() {
     const nowIso = new Date().toISOString()
 
     Promise.all([
-      // Upcoming shoots — status may be null on older rows, or 'scheduled'
+      // Upcoming shoots. Status may be null on older rows, or 'scheduled'
       supabase
         .from('shoots')
         .select('id, title, shoot_date, shoot_time, client_id, clients(name, contact_name)')
@@ -176,7 +176,7 @@ function UpcomingList() {
         .order('due_date', { ascending: true })
         .limit(15),
 
-      // Upcoming calendar events (meetings, deadlines — not shoot-type)
+      // Upcoming calendar events (meetings, deadlines. Not shoot-type)
       supabase
         .from('calendar_events')
         .select('id, title, start_at, event_type, location')
@@ -189,7 +189,7 @@ function UpcomingList() {
       try {
 
       ;(shootsRes.data || []).forEach((s) => {
-        // shoot_time comes as "HH:MM:SS" from Postgres — slice to "HH:MM"
+        // shoot_time comes as "HH:MM:SS" from Postgres. Slice to "HH:MM"
         const timeStr = s.shoot_time ? s.shoot_time.slice(0, 5) : '09:00'
         merged.push({
           id:       `shoot-${s.id}`,
@@ -236,9 +236,9 @@ function UpcomingList() {
   }, [])
 
   const TYPE_META = {
-    shoot:   { icon: Camera,       color: 'text-violet-600', bg: 'bg-violet-50',  label: 'Shoot'    },
+    shoot:   { icon: Camera,       color: 'text-status-review-text', bg: 'bg-accent/10',  label: 'Shoot'    },
     project: { icon: FolderKanban, color: 'text-accent',     bg: 'bg-accent/10',  label: 'Due Date' },
-    event:   { icon: CalendarDays, color: 'text-blue-600',   bg: 'bg-blue-50',    label: 'Meeting'  },
+    event:   { icon: CalendarDays, color: 'text-status-review-text',   bg: 'bg-accent/10',    label: 'Meeting'  },
   }
 
   const fmtDate = (date, dateStr) => {
@@ -258,7 +258,7 @@ function UpcomingList() {
   if (items.length === 0) return (
     <div className="text-center py-8">
       <Clock size={28} className="mx-auto text-text-muted/30 mb-2" />
-      <p className="text-sm text-text-muted">Nothing coming up — you're clear.</p>
+      <p className="text-sm text-text-muted">Nothing coming up. You're clear.</p>
     </div>
   )
 
@@ -282,7 +282,7 @@ function UpcomingList() {
               )}
             </div>
             <div className="shrink-0 text-right">
-              <p className={`text-xs font-semibold ${isUrgent ? 'text-red-500' : 'text-text-muted'}`}>
+              <p className={`text-xs font-semibold ${isUrgent ? 'text-status-overdue-text' : 'text-text-muted'}`}>
                 {dateLabel}
               </p>
               <p className="text-[10px] text-text-muted">{meta.label}</p>
@@ -301,7 +301,7 @@ function UpcomingList() {
 }
 
 // ─── Team workload ────────────────────────────────────────────────────────────
-// Shoots per creative (photographers) and projects per editor — a live
+// Shoots per creative (photographers) and projects per editor. A live
 // workload snapshot so admins can see who's carrying what at a glance.
 function WorkloadList({ title, subtitle, rows, color, emptyLabel }) {
   const peak = Math.max(...rows.map((r) => r.count), 1)
@@ -319,7 +319,7 @@ function WorkloadList({ title, subtitle, rows, color, emptyLabel }) {
             <div key={r.id} className="flex items-center gap-2.5">
               <Avatar name={r.full_name} url={r.avatar_url} size={7} />
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-text-primary truncate">{r.full_name || '—'}</p>
+                <p className="text-xs font-medium text-text-primary truncate">{r.full_name || 'Not set'}</p>
                 <div className="mt-1 h-1.5 bg-surface-2 rounded-full overflow-hidden">
                   <div className="h-full rounded-full transition-all"
                     style={{ width: `${(r.count / peak) * 100}%`, backgroundColor: color }} />
@@ -360,7 +360,7 @@ function TeamWorkload() {
       const projBy = {}
       ;(projects || []).forEach((p) => { projBy[p.editor_id] = (projBy[p.editor_id] || 0) + 1 })
 
-      // Admins are creatives too — always in both lists, zero bar and all
+      // Admins are creatives too. Always in both lists, zero bar and all
       const creativeRows = (people || [])
         .filter((p) => p.role === 'creative' || p.role === 'admin')
         .map((p) => ({ ...p, count: shootBy[p.id] || 0 }))
@@ -392,7 +392,7 @@ function TeamWorkload() {
             title="Shoots per creative"
             subtitle="Active shoots assigned"
             rows={creatives}
-            color="#6C63FF"
+            color="var(--violet)"
             emptyLabel="No creatives yet."
           />
           <div className="hidden sm:block w-px bg-border" />
@@ -483,7 +483,7 @@ export default function AdminDashboard() {
           id: `media-${m.id}`,
           kind: 'media',
           actor: null,
-          description: `added a video — "${m.title || 'Untitled'}"`,
+          description: `added a video. "${m.title || 'Untitled'}"`,
           created_at: m.created_at,
         })
       })
@@ -505,8 +505,8 @@ export default function AdminDashboard() {
           kind: isFootage ? 'footage' : 'request',
           actor: r.profiles?.full_name || null,
           description: isFootage
-            ? `uploaded footage${r.file_name ? ` — "${r.file_name}"` : ''}`
-            : `submitted a post request${r.idea ? ` — "${r.idea.slice(0, 60)}${r.idea.length > 60 ? '…' : ''}"` : ''}`,
+            ? `uploaded footage${r.file_name ? `. "${r.file_name}"` : ''}`
+            : `submitted a post request${r.idea ? `. "${r.idea.slice(0, 60)}${r.idea.length > 60 ? '…' : ''}"` : ''}`,
           created_at: r.created_at,
         })
       })
@@ -524,20 +524,20 @@ export default function AdminDashboard() {
   const greeting = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening'
 
   const statCards = [
-    { label: 'Active Clients', value: stats?.clientCount ?? '—', icon: Building2, color: '#10b981', to: '/admin/clients' },
-    { label: 'Open Requests',  value: stats?.openCount   ?? '—', icon: Inbox,     color: '#f59e0b', to: '/admin/inbox'   },
-    { label: 'Team Members',   value: stats?.teamCount   ?? '—', icon: Users2,    color: '#6C63FF', to: '/admin/users'   },
+    { label: 'Active Clients', value: stats?.clientCount ?? 'Not set', icon: Building2, color: '#10b981', to: '/admin/clients' },
+    { label: 'Open Requests',  value: stats?.openCount   ?? 'Not set', icon: Inbox,     color: '#f59e0b', to: '/admin/inbox'   },
+    { label: 'Team Members',   value: stats?.teamCount   ?? 'Not set', icon: Users2,    color: 'var(--violet)', to: '/admin/users'   },
   ]
 
   return (
     <div className="p-8 max-w-5xl">
       {/* Header */}
-      <div className="mb-8">
+      <div className="anim-rise mb-8">
         <p className="text-sm text-text-muted">{format(new Date(), 'EEEE, MMMM d')}</p>
-        <h1 className="text-2xl font-bold text-text-primary">
+        <h1 className="display">
           Good {greeting}, {profile?.full_name?.split(' ')[0] || 'Admin'}
         </h1>
-        <p className="text-text-secondary mt-1">Here's what's happening across C4 Lab.</p>
+        <p className="text-text-secondary mt-1">Here's what's happening across C4C Lab.</p>
       </div>
 
       {loading ? (
@@ -552,7 +552,7 @@ export default function AdminDashboard() {
               <Link key={label} to={to}
                 className="card p-5 hover:shadow-md transition-shadow flex items-center gap-4">
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                  style={{ backgroundColor: color + '18' }}>
+                  style={{ backgroundColor: `color-mix(in srgb, ${color} 10%, transparent)` }}>
                   <Icon size={20} style={{ color }} />
                 </div>
                 <div>
@@ -588,7 +588,7 @@ export default function AdminDashboard() {
             {weeks.every((w) => w.count === 0) ? (
               <div className="flex flex-col items-center justify-center py-10 text-center">
                 <Film size={28} className="text-surface-3 mb-2" />
-                <p className="text-sm text-text-muted">No media uploaded yet — this will fill in as you add content.</p>
+                <p className="text-sm text-text-muted">No media uploaded yet. This will fill in as you add content.</p>
               </div>
             ) : (
               <WeeklyChart weeks={weeks} />

@@ -218,7 +218,7 @@ export default function VideoRevisionReview() {
       }))
       setComments(enriched)
 
-      // Video + comments are ready — render now. The editor lookup below only
+      // Video + comments are ready. Render now. The editor lookup below only
       // feeds the "who's up" banner copy, so it shouldn't block the player.
       setLoading(false)
 
@@ -282,7 +282,7 @@ export default function VideoRevisionReview() {
 
   // ── Post comment ──────────────────────────────────────────────────────────
   // Optimistic: the comment shows on the timeline and in the list immediately,
-  // then we reconcile with the saved row. No full page refetch — that's what
+  // then we reconcile with the saved row. No full page refetch. That's what
   // made posting feel slow / look like it timed out.
   const handlePostComment = async (timestamp, text) => {
     const tempId = `temp-${Date.now()}`
@@ -324,7 +324,7 @@ export default function VideoRevisionReview() {
   }
 
   // ── Accept / Decline comment ──────────────────────────────────────────────
-  // Optimistic update with rollback on failure — no refetch.
+  // Optimistic update with rollback on failure. No refetch.
   const setCommentStatus = async (commentId, status) => {
     setUpdatingComment(commentId)
     let prevStatus
@@ -344,7 +344,7 @@ export default function VideoRevisionReview() {
   const handleAccept  = (commentId) => setCommentStatus(commentId, 'accepted')
   const handleDecline = (commentId) => setCommentStatus(commentId, 'declined')
 
-  // ── Photographer: done reviewing — hand off to client ─────────────────────
+  // ── Photographer: done reviewing. Hand off to client ─────────────────────
   const handlePhotographerDone = async () => {
     setSubmittingAction(true)
     setActionError('')
@@ -376,7 +376,7 @@ export default function VideoRevisionReview() {
 
       fetchAll()
     } catch (err) {
-      setActionError(err.message || 'Failed — check permissions')
+      setActionError(err.message || 'Failed. Check permissions')
     } finally {
       setSubmittingAction(false)
     }
@@ -418,7 +418,7 @@ export default function VideoRevisionReview() {
 
       fetchAll()
     } catch (err) {
-      setActionError(err.message || 'Failed — check permissions')
+      setActionError(err.message || 'Failed. Check permissions')
     } finally {
       setSubmittingAction(false)
     }
@@ -435,7 +435,7 @@ export default function VideoRevisionReview() {
         .eq('id', revisionId)
       if (e1) throw new Error(e1.message)
 
-      // Move project to ready_to_post — admin must mark it posted before delivered
+      // Move project to ready_to_post. Admin must mark it posted before delivered
       const { error: e2 } = await supabase.from('projects')
         .update({ stage: 'ready_to_post' })
         .eq('id', project.id)
@@ -474,7 +474,7 @@ export default function VideoRevisionReview() {
 
       fetchAll()
     } catch (err) {
-      setActionError(err.message || 'Failed — check permissions (see console)')
+      setActionError(err.message || 'Failed. Check permissions (see console)')
       console.error('Approve failed:', err)
     } finally {
       setSubmittingAction(false)
@@ -497,7 +497,7 @@ export default function VideoRevisionReview() {
   const revStatus   = revision.status
   const revCount    = project?.revision_count || revNum
   const canRevise   = revCount < 3
-  const projectName = project?.name || '—'
+  const projectName = project?.name || 'Not set'
 
   const creativeComments = comments.filter((c) => c.author_role !== 'client')
   const clientComments   = comments.filter((c) => c.author_role === 'client')
@@ -523,7 +523,7 @@ export default function VideoRevisionReview() {
     if (revStatus === 'pending_client_review' && isClient) return {
       bg: 'bg-blue-900/40 border-blue-500/30', icon: '🎬', textColor: 'text-blue-200',
       title: `${editor} sent you a video to review`,
-      sub: 'Watch it through, then drop timestamped comments anywhere on the timeline — or approve if it looks great.',
+      sub: 'Watch it through, then drop timestamped comments anywhere on the timeline. Or approve if it looks great.',
     }
     if (revStatus === 'pending_editor' && isClient) return {
       bg: 'bg-amber-900/30 border-amber-500/30', icon: '⏳', textColor: 'text-amber-200',
@@ -537,7 +537,7 @@ export default function VideoRevisionReview() {
     }
     if (revStatus === 'pending_editor' && (isEditor || isAdmin)) return {
       bg: 'bg-orange-900/40 border-orange-500/30', icon: '🔔', textColor: 'text-orange-200',
-      title: "Client sent feedback — it's your turn",
+      title: "Client sent feedback. It's your turn",
       sub: 'Review their timestamped comments and upload a revised cut when ready.',
     }
     if ((revStatus === 'pending_photographer_review' || revStatus === 'pending_creative_review') && (isPhotographer || isAdmin) && !isClient) return {
@@ -598,7 +598,7 @@ export default function VideoRevisionReview() {
 
       {/* Main area */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Video area — 65% */}
+        {/* Video area. 65% */}
         <div className="flex-1 flex flex-col p-5 gap-4 min-w-0">
           {/* Video player */}
           <div className="bg-black rounded-xl overflow-hidden flex-1 flex items-center justify-center relative">
@@ -683,7 +683,7 @@ export default function VideoRevisionReview() {
           )}
         </div>
 
-        {/* Right panel — 35% */}
+        {/* Right panel. 35% */}
         <div className="w-[380px] shrink-0 border-l border-white/5 flex flex-col bg-[#111]">
           {/* Panel header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
@@ -744,7 +744,7 @@ export default function VideoRevisionReview() {
               <p className="text-xs text-red-400 mb-2">{actionError}</p>
             )}
 
-            {/* Photographer: done reviewing — hand off to client */}
+            {/* Photographer: done reviewing. Hand off to client */}
             {(isPhotographer || isAdmin) && (revStatus === 'pending_photographer_review' || revStatus === 'pending_creative_review') && (
               <>
                 <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 mb-1">
@@ -828,7 +828,7 @@ export default function VideoRevisionReview() {
               </div>
             )}
 
-            {/* Caption concept — directly under the download */}
+            {/* Caption concept. Directly under the download */}
             {project && (
               <CaptionConcept
                 projectId={project.id}

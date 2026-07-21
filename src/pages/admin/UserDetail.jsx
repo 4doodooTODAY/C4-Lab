@@ -176,9 +176,9 @@ export default function UserDetail() {
         <Avatar name={profile?.full_name} url={profile?.avatar_url} size={14} />
         <div>
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-2xl font-bold text-text-primary">{profile?.full_name || '—'}</h1>
+            <h1 className="display">{profile?.full_name || 'Not set'}</h1>
             {isLocked && (
-              <span className="text-xs font-medium text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">
+              <span className="text-xs font-medium text-status-overdue-text bg-status-overdue-bg border border-status-overdue/30 px-2 py-0.5 rounded-full">
                 Locked
               </span>
             )}
@@ -194,7 +194,7 @@ export default function UserDetail() {
 
       <div className="space-y-5">
         {error && (
-          <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>
+          <div className="text-xs text-status-overdue-text bg-status-overdue-bg border border-status-overdue/30 rounded-lg px-3 py-2">{error}</div>
         )}
 
         {/* Edit profile */}
@@ -270,12 +270,12 @@ export default function UserDetail() {
             <div className="flex justify-between text-sm">
               <span className="text-text-muted">Account created</span>
               <span className="text-text-primary font-medium">
-                {createdAt ? format(new Date(createdAt), 'MMM d, yyyy') : '—'}
+                {createdAt ? format(new Date(createdAt), 'MMM d, yyyy') : 'Not set'}
               </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-text-muted">Status</span>
-              <span className={`font-medium ${isLocked ? 'text-red-600' : profile?.must_change_password ? 'text-amber-600' : 'text-green-600'}`}>
+              <span className={`font-medium ${isLocked ? 'text-status-overdue-text' : profile?.must_change_password ? 'text-status-due-soon-text' : 'text-status-approved-text'}`}>
                 {isLocked
                   ? 'Locked'
                   : profile?.must_change_password
@@ -287,7 +287,7 @@ export default function UserDetail() {
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-text-muted">Email confirmed</span>
-              <span className={`font-medium ${authUser?.email_confirmed_at ? 'text-green-600' : 'text-amber-600'}`}>
+              <span className={`font-medium ${authUser?.email_confirmed_at ? 'text-status-approved-text' : 'text-status-due-soon-text'}`}>
                 {authUser?.email_confirmed_at ? 'Yes' : 'No'}
               </span>
             </div>
@@ -317,8 +317,8 @@ export default function UserDetail() {
 
         {/* Danger zone */}
         {currentUser?.id !== id && (
-          <div className="card p-6 border-red-100">
-            <h2 className="text-sm font-semibold text-red-600 mb-4">Danger Zone</h2>
+          <div className="card p-6 border-status-overdue/30">
+            <h2 className="text-sm font-semibold text-status-overdue-text mb-4">Danger Zone</h2>
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div>
@@ -327,7 +327,7 @@ export default function UserDetail() {
                 </div>
                 <button onClick={handleLockToggle} disabled={locking}
                   className={`flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border transition-all disabled:opacity-50 ${
-                    isLocked ? 'border-green-200 text-green-700 hover:bg-green-50' : 'border-amber-200 text-amber-700 hover:bg-amber-50'
+                    isLocked ? 'border-status-approved/30 text-status-approved-text hover:bg-status-approved-bg' : 'border-status-due-soon/30 text-status-due-soon-text hover:bg-status-due-soon-bg'
                   }`}>
                   {locking ? <Loader2 size={13} className="animate-spin" /> : isLocked ? <Unlock size={13} /> : <Lock size={13} />}
                   {isLocked ? 'Unlock' : 'Lock'}
@@ -342,7 +342,7 @@ export default function UserDetail() {
                       <p className="text-xs text-text-muted">Permanently remove this user</p>
                     </div>
                     <button onClick={() => setDeleteStep(1)}
-                      className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-all">
+                      className="flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border border-status-overdue/30 text-status-overdue-text hover:bg-status-overdue-bg transition-all">
                       <Trash2 size={13} /> Delete
                     </button>
                   </div>

@@ -1,5 +1,5 @@
 -- ============================================================
--- C4 Lab — Supabase Schema
+-- C4C Lab — Supabase Schema
 -- Run this in your Supabase project: SQL Editor → New query
 -- ============================================================
 

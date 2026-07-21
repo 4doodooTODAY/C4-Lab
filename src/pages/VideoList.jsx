@@ -48,7 +48,7 @@ function AddMediaModal({ projectId, onAdd, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 z-10">
+      <div className="relative card shadow-2xl w-full max-w-md p-6 z-10">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-base font-semibold text-text-primary">Add Video</h2>
           <button onClick={onClose} className="btn-ghost p-1.5"><X size={16} /></button>
@@ -96,7 +96,7 @@ function AddMediaModal({ projectId, onAdd, onClose }) {
             <input type="text" className="input" placeholder="Brief note for the reviewer" value={description} onChange={(e) => setDescription(e.target.value)} />
           </div>
 
-          {error && <p className="text-xs text-red-500">{error}</p>}
+          {error && <p className="text-xs text-status-overdue-text">{error}</p>}
           <div className="flex gap-2 justify-end">
             <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
             <button type="submit" disabled={!canSubmit || uploading}
@@ -114,7 +114,7 @@ function AddMediaModal({ projectId, onAdd, onClose }) {
 // ─── Single media row ─────────────────────────────────────────────────────────
 function MediaRow({ item, onDelete }) {
   return (
-    <div className="flex items-center gap-4 px-4 py-3 group hover:bg-surface-2/40 transition-colors rounded-xl border border-border bg-white">
+    <div className="flex items-center gap-4 px-4 py-3 group hover:bg-surface-2/40 transition-colors rounded-xl border border-border bg-surface">
       <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
         <Film size={18} className="text-accent" />
       </div>
@@ -127,15 +127,15 @@ function MediaRow({ item, onDelete }) {
       </div>
       <div className="flex items-center gap-2 shrink-0">
         <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize ${
-          item.status === 'approved'          ? 'bg-green-50 text-green-700' :
-          item.status === 'changes_requested' ? 'bg-amber-50 text-amber-700' :
+          item.status === 'approved'          ? 'bg-status-approved-bg text-status-approved-text' :
+          item.status === 'changes_requested' ? 'bg-status-due-soon-bg text-status-due-soon-text' :
           'bg-surface-2 text-text-muted'
         }`}>
           {item.status?.replace(/_/g, ' ') || 'pending'}
         </span>
         <button
           onClick={() => onDelete(item.id)}
-          className="opacity-0 group-hover:opacity-100 btn-ghost p-2 text-text-muted hover:text-red-500 transition-all"
+          className="opacity-0 group-hover:opacity-100 btn-ghost p-2 text-text-muted hover:text-status-overdue-text transition-all"
         >
           <Trash2 size={15} />
         </button>
@@ -187,7 +187,7 @@ function TabbedView() {
             className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
               p.id === activeProjectId
                 ? 'bg-accent text-white'
-                : 'bg-white border border-border text-text-secondary hover:text-text-primary'
+                : 'bg-surface border border-border text-text-secondary hover:text-text-primary'
             }`}
           >
             {p.title}
@@ -221,20 +221,20 @@ function TabbedView() {
   )
 }
 
-// ─── Admin "Projects in Review" — split by who's holding it ───────────────────
+// ─── Admin "Projects in Review". Split by who's holding it ───────────────────
 // A project sits in review until its latest revision is approved. We bucket by
 // the latest revision's status: waiting on admin approval vs. in the client's
 // hands. Anything still being edited internally shows in a muted third group so
 // nothing in flight disappears; approved/delivered projects drop off entirely.
 function ReviewProjectRow({ project, latest }) {
   const navigate = useNavigate()
-  const clientName = project.clients?.contact_name || project.clients?.name || '—'
+  const clientName = project.clients?.contact_name || project.clients?.name || 'Not set'
   const isPhoto = project.media_type === 'photo'
   const TypeIcon = isPhoto ? Camera : Film
 
   // Where to send the admin: if a cut has been uploaded, open the revision
   // review screen directly. If we're still waiting on the editor's first cut
-  // (pending_editor) there's nothing to review yet — open the project workflow.
+  // (pending_editor) there's nothing to review yet. Open the project workflow.
   const hasCut = latest && latest.status !== 'pending_editor'
   const open = () => {
     if (hasCut && project.stage !== 'delivered') {
@@ -249,10 +249,10 @@ function ReviewProjectRow({ project, latest }) {
   const isFirstCut = latest && latest.revision_number === 1
   const revLabel = latest
     ? (isFirstCut ? 'First Cut' : `Revision ${latest.revision_number}`)
-    : '—'
+    : 'Not set'
 
   return (
-    <div className="flex items-center gap-4 px-4 py-3 group hover:bg-surface-2/40 transition-colors rounded-xl border border-border bg-white">
+    <div className="flex items-center gap-4 px-4 py-3 group hover:bg-surface-2/40 transition-colors rounded-xl border border-border bg-surface">
       <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
         <TypeIcon size={18} className="text-accent" />
       </div>
@@ -262,7 +262,7 @@ function ReviewProjectRow({ project, latest }) {
       </div>
       {/* Prominent cut / revision indicator */}
       <span className={`shrink-0 text-sm font-bold px-3 py-1.5 rounded-lg ${
-        isFirstCut ? 'bg-amber-100 text-amber-700' : 'bg-purple-100 text-purple-700'
+        isFirstCut ? 'bg-status-due-soon-bg text-status-due-soon-text' : 'bg-accent/10 text-status-review-text'
       }`}>
         {revLabel}
       </span>
@@ -283,7 +283,7 @@ function ReviewSection({ icon: Icon, iconClass, title, subtitle, items, emptyTex
       </div>
       <p className="text-xs text-text-muted mb-4">{subtitle}</p>
       {items.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-border p-8 text-center">
+        <div className="card border border-border p-8 text-center">
           <p className="text-sm text-text-muted">{emptyText}</p>
         </div>
       ) : (
@@ -328,16 +328,16 @@ function AdminReviewView() {
         const latest = latestByProject[project.id]
         if (!latest) return
         switch (latest.status) {
-          // A cut has been uploaded and is not yet with the client — admin needs
+          // A cut has been uploaded and is not yet with the client. Admin needs
           // to check it before it goes out (includes internal creative review).
           case 'pending_admin_review':
           case 'pending_photographer_review':
           case 'pending_creative_review':
             admin.push({ project, latest }); break
-          // Sent to the client — waiting on their comments or approval.
+          // Sent to the client. Waiting on their comments or approval.
           case 'pending_client_review':
             client.push({ project, latest }); break
-          // In the editor's hands — waiting on an upload (first cut OR a new
+          // In the editor's hands. Waiting on an upload (first cut OR a new
           // revision after client feedback).
           case 'pending_editor':
             team.push({ project, latest }); break
@@ -374,7 +374,7 @@ function AdminReviewView() {
         icon={ShieldCheck}
         iconClass="text-orange-500"
         title="Needs your review before the client"
-        subtitle="A cut has been uploaded — check and approve it before it goes to the client."
+        subtitle="A cut has been uploaded. Check and approve it before it goes to the client."
         items={adminHands}
         emptyText="Nothing waiting on your approval."
       />
@@ -382,7 +382,7 @@ function AdminReviewView() {
         icon={UserCheck}
         iconClass="text-blue-500"
         title="In the client's hands"
-        subtitle="Sent to the client — waiting on their revision comments or approval."
+        subtitle="Sent to the client. Waiting on their revision comments or approval."
         items={clientHands}
         emptyText="Nothing with clients right now."
       />
@@ -391,7 +391,7 @@ function AdminReviewView() {
           icon={Clock}
           iconClass="text-text-muted"
           title="Waiting on the editor"
-          subtitle="In the editor's hands — waiting on a cut to be uploaded, whether it's the first cut or a new revision."
+          subtitle="In the editor's hands. Waiting on a cut to be uploaded, whether it's the first cut or a new revision."
           items={teamHands}
           emptyText="Nothing in progress."
         />
@@ -410,7 +410,7 @@ export default function VideoList() {
         <div>
           <h1 className="text-xl font-bold text-text-primary">Review</h1>
           <p className="text-sm text-text-secondary mt-0.5">
-            {isAdmin ? 'Every project currently in review — grouped by who needs to act next' : 'Upload videos and leave timestamped feedback'}
+            {isAdmin ? 'Every project currently in review. Grouped by who needs to act next' : 'Upload videos and leave timestamped feedback'}
           </p>
         </div>
       </div>

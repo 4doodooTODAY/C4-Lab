@@ -12,7 +12,7 @@ function fmtBytes(b) {
 }
 
 /**
- * BrandPackage — a simple per-client folder for logos + brand notes.
+ * BrandPackage. A simple per-client folder for logos + brand notes.
  * Visible/editable by any non-client team member assigned to the client
  * (and admins). RLS on client_brand_package / client_brand_assets enforces this.
  */
@@ -113,10 +113,10 @@ export default function BrandPackage({ clientId, clientName }) {
 
   return (
     <div className="space-y-6">
-      {error && <p className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
+      {error && <p className="text-xs text-status-overdue-text bg-status-overdue-bg rounded-lg px-3 py-2">{error}</p>}
 
       {/* ── Logos ── */}
-      <div className="bg-white rounded-2xl border border-border p-5">
+      <div className="card border border-border p-5">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
             <ImageIcon size={14} className="text-text-muted" /> Logos
@@ -142,7 +142,7 @@ export default function BrandPackage({ clientId, clientName }) {
           <p className="text-sm font-medium text-text-primary">
             {uploading ? 'Uploading…' : <>Drop logos here or <span className="text-accent">click to browse</span></>}
           </p>
-          <p className="text-xs text-text-muted mt-0.5">PNG, JPG, SVG, WEBP — images only</p>
+          <p className="text-xs text-text-muted mt-0.5">PNG, JPG, SVG, WEBP. Images only</p>
           <input
             ref={fileInputRef}
             type="file"
@@ -168,7 +168,7 @@ export default function BrandPackage({ clientId, clientName }) {
                     <Download size={12} />
                   </button>
                   <button onClick={() => removeLogo(logo)} disabled={removingId === logo.id} title="Remove"
-                    className="text-text-muted hover:text-red-600 transition-colors shrink-0 disabled:opacity-40">
+                    className="text-text-muted hover:text-status-overdue-text transition-colors shrink-0 disabled:opacity-40">
                     {removingId === logo.id ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
                   </button>
                 </div>
@@ -179,7 +179,7 @@ export default function BrandPackage({ clientId, clientName }) {
       </div>
 
       {/* ── Notes ── */}
-      <div className="bg-white rounded-2xl border border-border p-5">
+      <div className="card border border-border p-5">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
             <StickyNote size={14} className="text-text-muted" /> Brand Notes
@@ -191,7 +191,7 @@ export default function BrandPackage({ clientId, clientName }) {
             </button>
           )}
           {!notesDirty && notesDone && (
-            <span className="text-xs text-green-600 font-medium flex items-center gap-1"><Check size={12} /> Saved</span>
+            <span className="text-xs text-status-approved-text font-medium flex items-center gap-1"><Check size={12} /> Saved</span>
           )}
         </div>
         <textarea

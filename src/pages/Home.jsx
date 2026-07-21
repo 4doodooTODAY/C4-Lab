@@ -8,7 +8,7 @@ const features = [
     icon: Film,
     label: 'Video Review',
     description: 'Upload a Google Drive video, leave timestamped comments, and give precise feedback.',
-    color: '#6C63FF',
+    color: 'var(--violet)',
   },
   {
     to: '/calendar',
@@ -25,8 +25,8 @@ export default function Home() {
       {/* Header */}
       <div className="mb-8">
         <p className="text-sm text-text-muted mb-1">{format(new Date(), 'EEEE, MMMM d')}</p>
-        <h1 className="text-2xl font-bold text-text-primary">Welcome to C4 Lab</h1>
-        <p className="text-text-secondary mt-1">Your creative workflow hub — review, plan, deliver.</p>
+        <h1 className="display">Welcome to C4C Lab</h1>
+        <p className="text-text-secondary mt-1">Your creative workflow hub. Review, plan, deliver.</p>
       </div>
 
       {/* Feature cards */}
@@ -39,7 +39,7 @@ export default function Home() {
           >
             <div
               className="w-10 h-10 rounded-xl flex items-center justify-center"
-              style={{ backgroundColor: color + '18' }}
+              style={{ backgroundColor: `color-mix(in srgb, ${color} 10%, transparent)` }}
             >
               <Icon size={20} style={{ color }} />
             </div>

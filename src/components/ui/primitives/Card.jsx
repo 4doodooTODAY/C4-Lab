@@ -30,7 +30,7 @@ export default function Card({
 }) {
   return (
     <Tag
-      className={`bg-white rounded-xl border border-border
+      className={`card border border-border
         ${ELEVATION[elevation] ?? ELEVATION[1]} ${PADDING[padding] ?? PADDING.md} ${className}`}
       {...rest}
     >

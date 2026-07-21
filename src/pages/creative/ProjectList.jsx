@@ -10,10 +10,10 @@ import StatusBadge, { usePins, PinButton } from '../../components/projects/Statu
 import { computeProjectStatus, latestRevisionFor } from '../../lib/projectStatus'
 
 const STAGE_COLORS = {
-  post_production: 'bg-purple-50 text-purple-600',
-  review:          'bg-orange-50 text-orange-600',
-  revisions:       'bg-red-50 text-red-600',
-  delivered:       'bg-green-50 text-green-600',
+  post_production: 'bg-accent/10 text-status-review-text',
+  review:          'bg-status-due-soon-bg text-status-due-soon-text',
+  revisions:       'bg-status-overdue-bg text-status-overdue-text',
+  delivered:       'bg-status-approved-bg text-status-approved-text',
 }
 const STAGE_LABELS = {
   post_production: 'Editing',
@@ -25,18 +25,18 @@ const STAGE_LABELS = {
 // ── Shoot Card ────────────────────────────────────────────────────────────────
 function ShootCard({ shoot, onOpen, onMarkDone }) {
   return (
-    <div className="bg-white rounded-2xl border border-border p-5 hover:shadow-md hover:border-border-strong transition-all flex flex-col gap-3">
+    <div className="card border border-border p-5 hover:shadow-md hover:border-border-strong transition-all flex flex-col gap-3">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 cursor-pointer flex-1" onClick={() => onOpen(shoot)}>
           <p className="text-sm font-semibold text-text-primary truncate">{shoot.title}</p>
           <p className="text-xs text-text-muted mt-0.5 truncate">
-            {shoot.clients?.contact_name || shoot.clients?.name || '—'}
+            {shoot.clients?.contact_name || shoot.clients?.name || 'Not set'}
           </p>
         </div>
         <span className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-          shoot.status === 'completed' ? 'bg-green-50 text-green-700' :
-          shoot.status === 'cancelled' ? 'bg-red-50 text-red-600' :
-          'bg-blue-50 text-blue-700'
+          shoot.status === 'completed' ? 'bg-status-approved-bg text-status-approved-text' :
+          shoot.status === 'cancelled' ? 'bg-status-overdue-bg text-status-overdue-text' :
+          'bg-accent/10 text-status-review-text'
         }`}>
           {shoot.status}
         </span>
@@ -70,7 +70,7 @@ function ShootCard({ shoot, onOpen, onMarkDone }) {
         {shoot.status !== 'completed' && (
           <button
             onClick={() => onMarkDone(shoot.id)}
-            className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-green-50 text-green-700 hover:bg-green-100 transition-colors flex items-center gap-1 shrink-0"
+            className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-status-approved-bg text-status-approved-text hover:bg-status-approved-bg transition-colors flex items-center gap-1 shrink-0"
           >
             <Check size={12} /> Mark Done
           </button>
@@ -89,12 +89,12 @@ function EditCard({ project, revisions, myId, onClick, onMarkDone, isPinned, onT
   const stage = project.stage
 
   return (
-    <div className="bg-white rounded-2xl border border-border p-5 hover:shadow-md hover:border-border-strong transition-all">
+    <div className="card border border-border p-5 hover:shadow-md hover:border-border-strong transition-all">
       <div className="flex items-start justify-between gap-2 mb-2 cursor-pointer" onClick={onClick}>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-text-primary truncate">{project.name}</p>
           <p className="text-xs text-text-muted mt-0.5 truncate">
-            {project.clients?.contact_name || project.clients?.name || '—'}
+            {project.clients?.contact_name || project.clients?.name || 'Not set'}
           </p>
         </div>
         {onTogglePin && <PinButton pinned={isPinned} onToggle={onTogglePin} />}
@@ -111,7 +111,7 @@ function EditCard({ project, revisions, myId, onClick, onMarkDone, isPinned, onT
         <p className="text-xs text-text-muted mb-3 cursor-pointer" onClick={onClick}>
           {latest.revision_number === 1 ? 'Initial Cut' : `Revision ${latest.revision_number}`}
           {' · '}
-          <span className={hasPendingUpload ? 'text-amber-600 font-medium' : ''}>
+          <span className={hasPendingUpload ? 'text-status-due-soon-text font-medium' : ''}>
             {hasPendingUpload ? 'Upload requested' : latest.status.replace(/_/g, ' ')}
           </span>
         </p>
@@ -125,7 +125,7 @@ function EditCard({ project, revisions, myId, onClick, onMarkDone, isPinned, onT
           {hasPendingUpload ? 'Upload Revision' : 'Open Project'} <ArrowRight size={13} />
         </button>
         {stage === 'ready_to_post' && (
-          <span className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-blue-50 text-blue-700 flex items-center gap-1 shrink-0">
+          <span className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-accent/10 text-status-review-text flex items-center gap-1 shrink-0">
             <Send size={11} strokeWidth={2} /> Awaiting post
           </span>
         )}
@@ -156,7 +156,7 @@ export default function CreativeProjectList() {
     setLoading(true)
 
     Promise.all([
-      // My Shoots — creatives only, editors skip this
+      // My Shoots. Creatives only, editors skip this
       // Admin in creative-view mode bypasses client_creatives and sees all shoots
       isEditor
         ? Promise.resolve([])
@@ -175,7 +175,7 @@ export default function CreativeProjectList() {
               .order('shoot_date', { ascending: true })
               .then(({ data }) => data || []),
 
-      // My Edits — projects scoped to assigned clients (admin sees all)
+      // My Edits. Projects scoped to assigned clients (admin sees all)
       isAdmin
         ? supabase
             .from('projects')
@@ -230,13 +230,13 @@ export default function CreativeProjectList() {
   return (
     <div className="p-8 max-w-4xl">
       <div className="mb-8">
-        <h1 className="font-display text-2xl font-bold text-text-primary">My Work</h1>
+        <h1 className="display">My Work</h1>
         <p className="text-sm text-text-muted mt-1">
           {isEditor ? 'Your editing projects' : 'Your shoots and editing assignments'}
         </p>
       </div>
 
-      {/* My Shoots — creatives only */}
+      {/* My Shoots. Creatives only */}
       {!isEditor && (
         <>
           <section className="mb-10">
@@ -246,7 +246,7 @@ export default function CreativeProjectList() {
               <span className="text-xs text-text-muted bg-surface-2 px-2 py-0.5 rounded-full">{activeShots.length}</span>
             </div>
             {activeShots.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-border p-8 text-center">
+              <div className="card border border-border p-8 text-center">
                 <Camera size={32} className="mx-auto text-text-muted/30 mb-3" />
                 <p className="text-sm text-text-muted">No shoots scheduled for your clients yet.</p>
               </div>
@@ -271,16 +271,16 @@ export default function CreativeProjectList() {
         </>
       )}
 
-      {/* Assigned to Me — projects where I'm the editor */}
+      {/* Assigned to Me. Projects where I'm the editor */}
       <section className="mb-10">
         <div className="flex items-center gap-2 mb-1">
           <Scissors size={16} className="text-text-muted" />
           <h2 className="text-base font-semibold text-text-primary">Assigned to Me</h2>
           <span className="text-xs text-text-muted bg-surface-2 px-2 py-0.5 rounded-full">{myAssignedEdits.length}</span>
         </div>
-        <p className="text-xs text-text-muted mb-4">Projects you're set as the editor on — your job to edit.</p>
+        <p className="text-xs text-text-muted mb-4">Projects you're set as the editor on. Your job to edit.</p>
         {myAssignedEdits.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-border p-8 text-center">
+          <div className="card border border-border p-8 text-center">
             <Scissors size={32} className="mx-auto text-text-muted/30 mb-3" />
             <p className="text-sm text-text-muted">No active editing projects assigned to you.</p>
           </div>
@@ -305,7 +305,7 @@ export default function CreativeProjectList() {
         )}
       </section>
 
-      {/* My Clients' Projects — everything else for my clients (not assigned to me) */}
+      {/* My Clients' Projects. Everything else for my clients (not assigned to me) */}
       {clientEdits.length > 0 && (
         <section className="mb-10">
           <div className="flex items-center gap-2 mb-1">
@@ -313,7 +313,7 @@ export default function CreativeProjectList() {
             <h2 className="text-base font-semibold text-text-primary">My Clients' Projects</h2>
             <span className="text-xs text-text-muted bg-surface-2 px-2 py-0.5 rounded-full">{clientEdits.length}</span>
           </div>
-          <p className="text-xs text-text-muted mb-4">Other active projects for your clients — not assigned to you to edit.</p>
+          <p className="text-xs text-text-muted mb-4">Other active projects for your clients. Not assigned to you to edit.</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {sortPinned(clientEdits).map((p) => (
               <EditCard

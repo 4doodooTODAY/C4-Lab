@@ -31,9 +31,9 @@ function Pin({ pin, index, selected, onClick, status }) {
 // ── Comment card ──────────────────────────────────────────────────────────────
 function CommentCard({ comment, index, selected, onSelect, canAct, onAccept, onDecline, updating }) {
   const statusColors = {
-    pending:  'border-amber-200 bg-amber-50',
-    accepted: 'border-green-200 bg-green-50',
-    declined: 'border-red-200 bg-red-50',
+    pending:  'border-status-due-soon/30 bg-status-due-soon-bg',
+    accepted: 'border-status-approved/30 bg-status-approved-bg',
+    declined: 'border-status-overdue/30 bg-status-overdue-bg',
   }
   const statusLabel = { pending: 'Pending', accepted: 'Accepted', declined: 'Declined' }
 
@@ -43,14 +43,14 @@ function CommentCard({ comment, index, selected, onSelect, canAct, onAccept, onD
       className={`p-3 rounded-xl border cursor-pointer transition-all ${selected ? 'ring-2 ring-blue-400 ' : ''}${statusColors[comment.status] || statusColors.pending}`}
     >
       <div className="flex items-start gap-2">
-        <span className="w-5 h-5 rounded-full bg-white border border-current flex items-center justify-center text-[9px] font-bold shrink-0 mt-0.5">
+        <span className="w-5 h-5 rounded-full bg-surface border border-current flex items-center justify-center text-[9px] font-bold shrink-0 mt-0.5">
           {index + 1}
         </span>
         <div className="flex-1 min-w-0">
           <p className="text-xs font-semibold text-text-primary">{comment.profiles?.full_name || 'Unknown'}</p>
           <p className="text-xs text-text-secondary mt-0.5 leading-relaxed">{comment.content}</p>
           <div className="flex items-center justify-between mt-1.5">
-            <span className={`text-[10px] font-semibold ${comment.status === 'accepted' ? 'text-green-600' : comment.status === 'declined' ? 'text-red-600' : 'text-amber-600'}`}>
+            <span className={`text-[10px] font-semibold ${comment.status === 'accepted' ? 'text-status-approved-text' : comment.status === 'declined' ? 'text-status-overdue-text' : 'text-status-due-soon-text'}`}>
               {statusLabel[comment.status] || 'Pending'}
             </span>
             <span className="text-[10px] text-text-muted">
@@ -64,14 +64,14 @@ function CommentCard({ comment, index, selected, onSelect, canAct, onAccept, onD
           <button
             onClick={(e) => { e.stopPropagation(); onAccept(comment.id) }}
             disabled={updating === comment.id}
-            className="flex-1 flex items-center justify-center gap-1 py-1 rounded-lg bg-green-100 hover:bg-green-200 text-green-700 text-[11px] font-semibold transition-colors disabled:opacity-50"
+            className="flex-1 flex items-center justify-center gap-1 py-1 rounded-lg bg-status-approved-bg hover:bg-green-200 text-status-approved-text text-[11px] font-semibold transition-colors disabled:opacity-50"
           >
             {updating === comment.id ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />} Accept
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onDecline(comment.id) }}
             disabled={updating === comment.id}
-            className="flex-1 flex items-center justify-center gap-1 py-1 rounded-lg bg-red-100 hover:bg-red-200 text-red-700 text-[11px] font-semibold transition-colors disabled:opacity-50"
+            className="flex-1 flex items-center justify-center gap-1 py-1 rounded-lg bg-status-overdue-bg hover:bg-red-200 text-status-overdue-text text-[11px] font-semibold transition-colors disabled:opacity-50"
           >
             <X size={11} /> Decline
           </button>
@@ -233,7 +233,7 @@ export default function DraftPhotoReview() {
     </div>
   )
   if (error) return (
-    <div className="p-8"><p className="text-red-500">{error}</p></div>
+    <div className="p-8"><p className="text-status-overdue-text">{error}</p></div>
   )
 
   const draft      = version?.content_drafts
@@ -241,15 +241,15 @@ export default function DraftPhotoReview() {
   const versionNum = version?.version_number
 
   const statusBadge = {
-    pending_client_review: { label: 'Awaiting Client Review', cls: 'bg-blue-50 text-blue-700' },
-    pending_editor:        { label: 'Client Reviewed',        cls: 'bg-amber-50 text-amber-700' },
-    approved:              { label: 'Approved',               cls: 'bg-green-50 text-green-700' },
-  }[status] || { label: status, cls: 'bg-gray-100 text-gray-600' }
+    pending_client_review: { label: 'Awaiting Client Review', cls: 'bg-accent/10 text-status-review-text' },
+    pending_editor:        { label: 'Client Reviewed',        cls: 'bg-status-due-soon-bg text-status-due-soon-text' },
+    approved:              { label: 'Approved',               cls: 'bg-status-approved-bg text-status-approved-text' },
+  }[status] || { label: status, cls: 'bg-surface-2 text-text-secondary' }
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-gray-50">
+    <div className="flex flex-col h-screen overflow-hidden bg-surface-2">
       {/* Header */}
-      <div className="flex items-center gap-3 px-6 py-3.5 bg-white border-b border-border shrink-0">
+      <div className="flex items-center gap-3 px-6 py-3.5 bg-surface border-b border-border shrink-0">
         <button
           onClick={() => navigate(`/drafts/${draftId}`)}
           className="text-text-muted hover:text-text-primary transition-colors"
@@ -275,7 +275,7 @@ export default function DraftPhotoReview() {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Photo area */}
-        <div className="flex-1 flex flex-col items-center justify-center p-6 overflow-hidden bg-gray-100">
+        <div className="flex-1 flex flex-col items-center justify-center p-6 overflow-hidden bg-surface-2">
           {photoUrls.length === 0 ? (
             <div className="text-center">
               <Image size={48} className="mx-auto text-text-muted/30 mb-3" />
@@ -320,7 +320,7 @@ export default function DraftPhotoReview() {
                   <button
                     onClick={() => { setPhotoIndex((i) => Math.max(0, i - 1)); setPendingPin(null); setSelectedPin(null) }}
                     disabled={photoIndex === 0}
-                    className="p-1.5 rounded-lg hover:bg-white border border-border disabled:opacity-30 transition-colors"
+                    className="p-1.5 rounded-lg hover:bg-surface border border-border disabled:opacity-30 transition-colors"
                   >
                     <ChevronLeft size={16} className="text-text-secondary" />
                   </button>
@@ -330,7 +330,7 @@ export default function DraftPhotoReview() {
                   <button
                     onClick={() => { setPhotoIndex((i) => Math.min(photoUrls.length - 1, i + 1)); setPendingPin(null); setSelectedPin(null) }}
                     disabled={photoIndex === photoUrls.length - 1}
-                    className="p-1.5 rounded-lg hover:bg-white border border-border disabled:opacity-30 transition-colors"
+                    className="p-1.5 rounded-lg hover:bg-surface border border-border disabled:opacity-30 transition-colors"
                   >
                     <ChevronRight size={16} className="text-text-secondary" />
                   </button>
@@ -345,10 +345,10 @@ export default function DraftPhotoReview() {
         </div>
 
         {/* Sidebar */}
-        <div className="w-80 bg-white border-l border-border flex flex-col shrink-0 overflow-hidden">
+        <div className="w-80 bg-surface border-l border-border flex flex-col shrink-0 overflow-hidden">
           <div className="px-4 py-3 border-b border-border shrink-0">
             <p className="text-xs font-semibold text-text-muted uppercase tracking-wide">
-              Comments — Photo {photoIndex + 1}
+              Comments. Photo {photoIndex + 1}
               {commentsOnCurrentPhoto.length > 0 && (
                 <span className="ml-1.5 bg-surface-2 text-text-muted px-1.5 py-0.5 rounded-full text-[10px]">
                   {commentsOnCurrentPhoto.length}
@@ -358,8 +358,8 @@ export default function DraftPhotoReview() {
           </div>
 
           {actionError && (
-            <div className="mx-3 mt-2 p-2 rounded-lg bg-red-50 border border-red-200 shrink-0">
-              <p className="text-xs text-red-600">{actionError}</p>
+            <div className="mx-3 mt-2 p-2 rounded-lg bg-status-overdue-bg border border-status-overdue/30 shrink-0">
+              <p className="text-xs text-status-overdue-text">{actionError}</p>
             </div>
           )}
 

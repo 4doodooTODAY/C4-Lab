@@ -1,9 +1,14 @@
-/* Design system: self-hosted Poppins (body/UI) + tokens (type/space/status) */
+/* Design system: Horizon-style display (Orbitron until licensed Horizon files
+   land in public/fonts/horizon/) + Poppins body + plum-ground theme */
 @import '@fontsource/poppins/400.css';
 @import '@fontsource/poppins/500.css';
 @import '@fontsource/poppins/600.css';
 @import '@fontsource/poppins/700.css';
+@import '@fontsource/orbitron/500.css';
+@import '@fontsource/orbitron/600.css';
+@import '@fontsource/orbitron/700.css';
 @import './styles/tokens.css';
+@import './styles/theme.css';
 
 @tailwind base;
 @tailwind components;
@@ -16,36 +21,10 @@
 
   body {
     margin: 0;
-    background: #f4f5f7;
-    color: #111827;
-    font-family: var(--font-body, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+    background: var(--ground-1);
+    color: var(--ink-hi);
+    font-family: var(--font-body);
     -webkit-font-smoothing: antialiased;
-  }
-}
-
-@layer components {
-  .btn-primary {
-    @apply bg-accent hover:bg-accent-hover text-white font-medium px-4 py-2 rounded-lg transition-colors duration-150 text-sm;
-  }
-
-  .btn-secondary {
-    @apply bg-surface border border-border hover:bg-surface-2 text-text-primary font-medium px-4 py-2 rounded-lg transition-colors duration-150 text-sm;
-  }
-
-  .btn-ghost {
-    @apply text-text-secondary hover:text-text-primary hover:bg-surface-2 px-3 py-2 rounded-lg transition-colors duration-150 text-sm;
-  }
-
-  .card {
-    @apply bg-white rounded-xl border border-border shadow-sm;
-  }
-
-  .input {
-    @apply w-full border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition;
-  }
-
-  .label {
-    @apply block text-sm font-medium text-text-primary mb-1;
   }
 }
 
@@ -70,11 +49,11 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #d1d5db;
+  background: var(--ground-4);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
+  background: rgb(var(--ink-low-rgb) / 0.5);
 }
 
 /* Video player */

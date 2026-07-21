@@ -76,7 +76,7 @@ function WeeklyUserStats() {
         revCounts[uploaded_by] = (revCounts[uploaded_by] || 0) + 1
       })
 
-      // Admins are creatives too — always shown in both sections, ring at 0
+      // Admins are creatives too. Always shown in both sections, ring at 0
       // like everyone else when they had a quiet week
       const creativeList = profiles
         .filter((p) => p.role === 'creative' || p.role === 'admin')
@@ -103,7 +103,7 @@ function WeeklyUserStats() {
   const isCurrent = weekOffset === 0
   const weekLabel = isCurrent
     ? 'This Week'
-    : `${format(wkStart, 'MMM d')} – ${format(wkEnd, 'MMM d')}`
+    : `${format(wkStart, 'MMM d')} to ${format(wkEnd, 'MMM d')}`
 
   const UserCard = ({ user, color, sublabel }) => (
     <div className="flex flex-col items-center gap-2 min-w-0">
@@ -115,7 +115,7 @@ function WeeklyUserStats() {
       </div>
       <div className="text-center">
         <p className="text-xs font-medium text-text-primary truncate max-w-[72px]">
-          {user.full_name?.split(' ')[0] || '—'}
+          {user.full_name?.split(' ')[0] || 'Not set'}
         </p>
         <p className="text-[10px] text-text-muted">{sublabel}</p>
       </div>
@@ -151,7 +151,7 @@ function WeeklyUserStats() {
             <div>
               <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wide mb-3">Photographers · shoots</p>
               <div className="flex gap-6 flex-wrap">
-                {creatives.map((u) => <UserCard key={u.id} user={u} color="#6C63FF" sublabel="shoots" />)}
+                {creatives.map((u) => <UserCard key={u.id} user={u} color="var(--violet)" sublabel="shoots" />)}
               </div>
             </div>
           )}
@@ -220,9 +220,9 @@ function InviteModal({ onClose, onCreated }) {
   if (sent) return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 z-10 text-center">
-        <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-          <Check size={22} className="text-green-600" />
+      <div className="relative card shadow-2xl w-full max-w-md p-8 z-10 text-center">
+        <div className="w-12 h-12 rounded-full bg-status-approved-bg flex items-center justify-center mx-auto mb-4">
+          <Check size={22} className="text-status-approved-text" />
         </div>
         <h2 className="text-base font-semibold text-text-primary mb-1">
           {inviteInfo?.emailed ? 'Invite sent!' : 'Account created'}
@@ -230,7 +230,7 @@ function InviteModal({ onClose, onCreated }) {
         <p className="text-sm text-text-secondary mb-4">
           {inviteInfo?.emailed
             ? `${email} will receive an email with a link to set their password.`
-            : `The email couldn't send yet — copy the setup link below and send it to ${email} yourself.`}
+            : `The email couldn't send yet. Copy the setup link below and send it to ${email} yourself.`}
         </p>
         {inviteInfo?.invite_link && (
           <button
@@ -249,7 +249,7 @@ function InviteModal({ onClose, onCreated }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 z-10">
+      <div className="relative card shadow-2xl w-full max-w-md p-6 z-10">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-base font-semibold text-text-primary">Invite User</h2>
           <button onClick={onClose} className="btn-ghost p-1.5"><X size={16} /></button>
@@ -281,7 +281,7 @@ function InviteModal({ onClose, onCreated }) {
           <p className="text-xs text-text-muted bg-surface-2 rounded-lg px-3 py-2">
             They'll get an email with a link to set their own password.
           </p>
-          {error && <p className="text-xs text-red-500 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p>}
+          {error && <p className="text-xs text-status-overdue-text bg-status-overdue-bg border border-status-overdue/30 rounded-lg px-3 py-2">{error}</p>}
           <div className="flex gap-2 justify-end pt-1">
             <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
             <button type="submit" disabled={saving} className="btn-primary disabled:opacity-50 flex items-center gap-1.5">
@@ -316,12 +316,12 @@ function DeleteModal({ user, onClose, onDeleted }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={step !== 3 ? onClose : undefined} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 z-10">
+      <div className="relative card shadow-2xl w-full max-w-md p-6 z-10">
         {step === 1 && (
           <>
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
-                <AlertTriangle size={18} className="text-red-600" />
+              <div className="w-10 h-10 rounded-full bg-status-overdue-bg flex items-center justify-center shrink-0">
+                <AlertTriangle size={18} className="text-status-overdue-text" />
               </div>
               <div>
                 <h2 className="text-base font-semibold text-text-primary">Remove user?</h2>
@@ -340,8 +340,8 @@ function DeleteModal({ user, onClose, onDeleted }) {
         {step === 2 && (
           <>
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
-                <Trash2 size={18} className="text-red-600" />
+              <div className="w-10 h-10 rounded-full bg-status-overdue-bg flex items-center justify-center shrink-0">
+                <Trash2 size={18} className="text-status-overdue-text" />
               </div>
               <div>
                 <h2 className="text-base font-semibold text-text-primary">Are you sure?</h2>
@@ -353,7 +353,7 @@ function DeleteModal({ user, onClose, onDeleted }) {
             </p>
             <input className="input w-full mb-4" placeholder={user.full_name}
               value={typed} onChange={(e) => setTyped(e.target.value)} autoFocus />
-            {error && <p className="text-xs text-red-500 mb-3">{error}</p>}
+            {error && <p className="text-xs text-status-overdue-text mb-3">{error}</p>}
             <div className="flex gap-2">
               <button onClick={onClose} className="btn-secondary flex-1">Cancel</button>
               <button onClick={handleDelete} disabled={typed !== user.full_name}
@@ -376,9 +376,9 @@ function DeleteModal({ user, onClose, onDeleted }) {
 
 // ── Section config ───────────────────────────────────────────────────────────
 const SECTIONS = [
-  { role: 'admin',    label: 'Admins',    icon: Shield,   color: 'text-purple-600', bg: 'bg-purple-50' },
-  { role: 'creative', label: 'Creatives', icon: Palette,  color: 'text-blue-600',   bg: 'bg-blue-50'   },
-  { role: 'editor',   label: 'Editors',   icon: Briefcase, color: 'text-green-600',  bg: 'bg-green-50'  },
+  { role: 'admin',    label: 'Admins',    icon: Shield,   color: 'text-status-review-text', bg: 'bg-accent/10' },
+  { role: 'creative', label: 'Creatives', icon: Palette,  color: 'text-status-review-text',   bg: 'bg-accent/10'   },
+  { role: 'editor',   label: 'Editors',   icon: Briefcase, color: 'text-status-approved-text',  bg: 'bg-status-approved-bg'  },
 ]
 
 function UserRow({ u, onDelete, onNavigate, onResend, resending, resent }) {
@@ -392,7 +392,7 @@ function UserRow({ u, onDelete, onNavigate, onResend, resending, resent }) {
         <div className="flex items-center gap-3">
           <Avatar name={u.full_name} url={u.avatar_url} size={8} />
           <div className="min-w-0">
-            <p className="text-sm font-medium text-text-primary leading-tight">{u.full_name || '—'}</p>
+            <p className="text-sm font-medium text-text-primary leading-tight">{u.full_name || 'Not set'}</p>
             {u.tags?.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-0.5">
                 {u.tags.map((tag) => <TagBadge key={tag} tag={tag} />)}
@@ -403,9 +403,9 @@ function UserRow({ u, onDelete, onNavigate, onResend, resending, resent }) {
       </td>
       <td className="px-4 py-3">
         {isPending ? (
-          <span className="text-xs font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">Invite pending</span>
+          <span className="text-xs font-medium text-status-due-soon-text bg-status-due-soon-bg px-2 py-0.5 rounded-full">Invite pending</span>
         ) : (
-          <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full">Active</span>
+          <span className="text-xs font-medium text-status-approved-text bg-status-approved-bg px-2 py-0.5 rounded-full">Active</span>
         )}
       </td>
       <td className="px-4 py-3 text-xs text-text-muted">
@@ -422,7 +422,7 @@ function UserRow({ u, onDelete, onNavigate, onResend, resending, resent }) {
             </button>
           )}
           <button onClick={() => onDelete(u)}
-            className="p-1.5 rounded-lg text-text-muted hover:text-red-500 hover:bg-red-50 transition-colors">
+            className="p-1.5 rounded-lg text-text-muted hover:text-status-overdue-text hover:bg-status-overdue-bg transition-colors">
             <Trash2 size={14} />
           </button>
           <ChevronRight size={14} className="text-text-muted" />

@@ -63,7 +63,7 @@ export default function CreativeClients() {
                   <Building2 size={18} className="text-accent" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-text-primary truncate">{client?.name || '—'}</p>
+                  <p className="text-sm font-semibold text-text-primary truncate">{client?.name || 'Not set'}</p>
                   <p className="text-xs text-text-muted mt-0.5">{client?.contact_name || ''}</p>
                 </div>
                 <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-accent/10 text-accent capitalize">
@@ -89,9 +89,9 @@ export default function CreativeClients() {
 
               {/* Next shoot */}
               {nextShoot ? (
-                <div className="flex items-center gap-2 text-xs text-text-muted bg-blue-50 rounded-lg px-3 py-2">
+                <div className="flex items-center gap-2 text-xs text-text-muted bg-accent/10 rounded-lg px-3 py-2">
                   <Camera size={11} className="text-blue-500 shrink-0" />
-                  <span className="font-medium text-blue-700 truncate">{nextShoot.title}</span>
+                  <span className="font-medium text-status-review-text truncate">{nextShoot.title}</span>
                   <span className="text-blue-500 shrink-0">{format(parseISO(nextShoot.shoot_date), 'MMM d')}</span>
                 </div>
               ) : (

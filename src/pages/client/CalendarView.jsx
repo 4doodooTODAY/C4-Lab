@@ -58,7 +58,7 @@ export default function ClientCalendarView() {
         .gte('calendar_events.start_at', rangeStart)
         .lte('calendar_events.start_at', rangeEnd),
 
-      // Shoots for this client — query client row first, then their shoots
+      // Shoots for this client. Query client row first, then their shoots
       getMyClient(user.id, 'id')
         .then((clientRow) => {
           if (!clientRow?.id) return Promise.resolve({ data: [] })
@@ -110,32 +110,32 @@ export default function ClientCalendarView() {
   return (
     <div className="p-6 max-w-3xl">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Calendar</h1>
-        <p className="text-gray-400 mt-1">Your shoot dates and meetings.</p>
+        <h1 className="display">Calendar</h1>
+        <p className="text-text-muted mt-1">Your shoot dates and meetings.</p>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="card border border-border shadow-sm overflow-hidden">
         {/* Month nav */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <button onClick={() => setMonth(subMonths(month, 1))} className="p-1.5 rounded-lg hover:bg-gray-50 text-gray-400 transition-colors">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <button onClick={() => setMonth(subMonths(month, 1))} className="p-1.5 rounded-lg hover:bg-surface-2 text-text-muted transition-colors">
             <ChevronLeft size={16} />
           </button>
-          <h2 className="text-sm font-bold text-gray-800">{format(month, 'MMMM yyyy')}</h2>
-          <button onClick={() => setMonth(addMonths(month, 1))} className="p-1.5 rounded-lg hover:bg-gray-50 text-gray-400 transition-colors">
+          <h2 className="text-sm font-bold text-text-primary">{format(month, 'MMMM yyyy')}</h2>
+          <button onClick={() => setMonth(addMonths(month, 1))} className="p-1.5 rounded-lg hover:bg-surface-2 text-text-muted transition-colors">
             <ChevronRight size={16} />
           </button>
         </div>
 
         {/* Day headers */}
-        <div className="grid grid-cols-7 border-b border-gray-100">
+        <div className="grid grid-cols-7 border-b border-border">
           {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d) => (
-            <div key={d} className="py-2.5 text-center text-[11px] font-semibold text-gray-400 uppercase tracking-wide">{d}</div>
+            <div key={d} className="py-2.5 text-center text-[11px] font-semibold text-text-muted uppercase tracking-wide">{d}</div>
           ))}
         </div>
 
         {loading ? (
           <div className="flex items-center justify-center h-48">
-            <Loader2 size={20} className="animate-spin text-gray-300" />
+            <Loader2 size={20} className="animate-spin text-text-muted" />
           </div>
         ) : (
           <div className="grid grid-cols-7 divide-x divide-y divide-gray-100">
@@ -151,11 +151,11 @@ export default function ClientCalendarView() {
                   key={i}
                   onClick={() => setSelected(isSel ? null : day)}
                   className={`min-h-[80px] p-2 cursor-pointer transition-colors ${
-                    isSel ? 'bg-accent/5' : inMonth ? 'hover:bg-gray-50' : 'bg-gray-50/50'
+                    isSel ? 'bg-accent/5' : inMonth ? 'hover:bg-surface-2' : 'bg-surface-2/50'
                   }`}
                 >
                   <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold mb-1 ${
-                    today ? 'bg-accent text-white' : inMonth ? 'text-gray-700' : 'text-gray-300'
+                    today ? 'bg-accent text-white' : inMonth ? 'text-text-primary' : 'text-text-muted'
                   }`}>
                     {format(day, 'd')}
                   </div>
@@ -164,16 +164,16 @@ export default function ClientCalendarView() {
                     {shootItems.slice(0, 2).map((s) => (
                       <div key={s.id} className="flex items-center gap-1">
                         <div className="w-1.5 h-1.5 rounded-full bg-violet-500 shrink-0" />
-                        <p className="text-[10px] text-violet-700 truncate font-medium">{s.title}</p>
+                        <p className="text-[10px] text-status-review-text truncate font-medium">{s.title}</p>
                       </div>
                     ))}
                     {calItems.slice(0, 2 - shootItems.length).map((e) => (
                       <div key={e.id} className="flex items-center gap-1">
                         <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: TYPE_COLORS[e.event_type] || '#3b82f6' }} />
-                        <p className="text-[10px] text-gray-600 truncate">{e.title}</p>
+                        <p className="text-[10px] text-text-secondary truncate">{e.title}</p>
                       </div>
                     ))}
-                    {total > 2 && <p className="text-[10px] text-gray-400">+{total - 2} more</p>}
+                    {total > 2 && <p className="text-[10px] text-text-muted">+{total - 2} more</p>}
                   </div>
                 </div>
               )
@@ -184,27 +184,27 @@ export default function ClientCalendarView() {
 
       {/* Selected day detail */}
       {selected && (
-        <div className="mt-4 bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-          <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
-            <CalendarDays size={14} className="text-gray-400" />
+        <div className="mt-4 card border border-border shadow-sm p-5">
+          <h3 className="text-sm font-bold text-text-primary mb-3 flex items-center gap-2">
+            <CalendarDays size={14} className="text-text-muted" />
             {format(selected, 'EEEE, MMMM d')}
           </h3>
 
           {!hasSelected ? (
-            <p className="text-sm text-gray-400">Nothing scheduled for this day.</p>
+            <p className="text-sm text-text-muted">Nothing scheduled for this day.</p>
           ) : (
             <div className="space-y-2">
               {selectedItems.shootItems.map((s) => (
-                <div key={s.id} className="flex items-start gap-3 px-3 py-3 rounded-xl bg-violet-50 border border-violet-100">
+                <div key={s.id} className="flex items-start gap-3 px-3 py-3 rounded-xl bg-accent/10 border border-accent/30">
                   <div className="w-2 h-2 rounded-full bg-violet-500 mt-1.5 shrink-0" />
                   <div>
-                    <p className="text-sm font-bold text-gray-900">{s.title}</p>
-                    <p className="text-xs text-violet-600 font-medium mt-0.5">Shoot</p>
+                    <p className="text-sm font-bold text-text-primary">{s.title}</p>
+                    <p className="text-xs text-status-review-text font-medium mt-0.5">Shoot</p>
                     {s.time && (
-                      <p className="text-xs text-gray-400 mt-0.5">{s.time.slice(0, 5)}</p>
+                      <p className="text-xs text-text-muted mt-0.5">{s.time.slice(0, 5)}</p>
                     )}
                     {s.location && (
-                      <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
+                      <p className="text-xs text-text-muted mt-0.5 flex items-center gap-1">
                         <MapPin size={10} /> {s.location}
                       </p>
                     )}
@@ -218,15 +218,15 @@ export default function ClientCalendarView() {
                   <div key={e.id} className="flex items-start gap-3 px-3 py-3 rounded-xl border" style={{ borderColor: color + '30', backgroundColor: color + '08' }}>
                     <div className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ backgroundColor: color }} />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-gray-900">{e.title}</p>
+                      <p className="text-sm font-bold text-text-primary">{e.title}</p>
                       <p className="text-xs mt-0.5" style={{ color }}>{TYPE_LABELS[e.event_type] || e.event_type}</p>
                       {!e.all_day && (
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          {format(new Date(e.start_at), 'h:mm a')} – {format(new Date(e.end_at), 'h:mm a')}
+                        <p className="text-xs text-text-muted mt-0.5">
+                          {format(new Date(e.start_at), 'h:mm a')} to {format(new Date(e.end_at), 'h:mm a')}
                         </p>
                       )}
                       {e.location && (
-                        <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                        <p className="text-xs text-text-secondary mt-1 flex items-center gap-1">
                           <MapPin size={10} /> {e.location}
                         </p>
                       )}
@@ -237,7 +237,7 @@ export default function ClientCalendarView() {
                         </a>
                       )}
                       {e.description && (
-                        <p className="text-xs text-gray-500 mt-1">{e.description}</p>
+                        <p className="text-xs text-text-secondary mt-1">{e.description}</p>
                       )}
                     </div>
                   </div>

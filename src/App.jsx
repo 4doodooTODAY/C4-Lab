@@ -26,7 +26,7 @@ class ErrorBoundary extends Component {
   render() {
     if (!this.state.failed) return this.props.children
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-white p-6 text-center">
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-surface p-6 text-center">
         <p className="text-base font-semibold text-text-primary">This page didn't load correctly</p>
         <p className="text-sm text-text-muted max-w-sm">A new version may have just been released. Reloading usually fixes it.</p>
         <button
@@ -49,7 +49,7 @@ function lazyWithRetry(importer) {
     const KEY = 'c4lab_chunk_reload_ts'
     try {
       const mod = await importer()
-      sessionStorage.removeItem(KEY) // healthy load — re-arm for the next deploy
+      sessionStorage.removeItem(KEY) // healthy load. Re-arm for the next deploy
       return mod
     } catch (err) {
       const last = Number(sessionStorage.getItem(KEY) || 0)
@@ -65,7 +65,7 @@ function lazyWithRetry(importer) {
   })
 }
 
-// Lazy load all pages — only load what's needed for the current route
+// Lazy load all pages. Only load what's needed for the current route
 const AppShell        = lazyWithRetry(() => import('./components/layout/AppShell'))
 const Login           = lazyWithRetry(() => import('./pages/Login'))
 const ChangePassword  = lazyWithRetry(() => import('./pages/ChangePassword'))
@@ -94,7 +94,7 @@ const Messages               = lazyWithRetry(() => import('./pages/Messages'))
 const CreativeProjectList    = lazyWithRetry(() => import('./pages/creative/ProjectList'))
 const CreativeProjectWorkflow = lazyWithRetry(() => import('./pages/creative/ProjectWorkflow'))
 const ClientMyProjects       = lazyWithRetry(() => import('./pages/client/MyProjects'))
-// ClientMyConcepts removed — concepts no longer exist in the system
+// ClientMyConcepts removed. Concepts no longer exist in the system
 const VideoRevisionReview    = lazyWithRetry(() => import('./pages/VideoRevisionReview'))
 const PhotoRevisionReview    = lazyWithRetry(() => import('./pages/PhotoRevisionReview'))
 const AdminFileSystem        = lazyWithRetry(() => import('./pages/admin/FileSystem'))
@@ -107,7 +107,7 @@ const DraftPhotoReview       = lazyWithRetry(() => import('./pages/DraftPhotoRev
 
 function PageLoader() {
   return (
-    <div className="flex items-center justify-center min-h-screen bg-white">
+    <div className="flex items-center justify-center min-h-screen bg-surface">
       <Loader2 size={20} className="animate-spin text-text-muted" />
     </div>
   )
@@ -117,7 +117,7 @@ function AppLoader() {
   return (
     <div className="min-h-screen bg-sidebar flex flex-col items-center justify-center gap-3">
       <Loader2 size={24} className="animate-spin text-white/40" />
-      <p className="text-white/30 text-xs">Loading C4 Lab...</p>
+      <p className="text-white/30 text-xs">Loading C4C Lab...</p>
     </div>
   )
 }
@@ -126,7 +126,7 @@ function RoleSwitch({ admin, creative, client }) {
   const { profile, viewMode } = useAuth()
   const role = profile?.role
   if (role === 'admin') {
-    // Admins can flip into "Creative View" — honour it so they see the same
+    // Admins can flip into "Creative View". Honour it so they see the same
     // creative screens (with the assigned-vs-client split) the team sees.
     if (viewMode === 'creative' && creative) return creative
     if (admin) return admin
@@ -200,10 +200,10 @@ function AppRoutes() {
     <Suspense fallback={<PageLoader />}>
       <Routes>
         <Route path="/login" element={<Login />} />
-        {/* Public one-off shoot gallery — no auth, viewable by anyone with the link */}
+        {/* Public one-off shoot gallery. No auth, viewable by anyone with the link */}
         <Route path="/s/:slug" element={<ShootGallery />} />
         {/* Public: invite/recovery links land here with a token_hash and no
-            session yet — the page redeems the token itself. */}
+            session yet. The page redeems the token itself. */}
         <Route path="/change-password" element={<ChangePassword />} />
 
         <Route element={
@@ -243,7 +243,7 @@ function AppRoutes() {
           <Route path="/files" element={
             <ProtectedRoute roles={['admin', 'creative', 'editor']}><AdminFileSystem /></ProtectedRoute>
           } />
-          {/* Referral pool — team only, never clients */}
+          {/* Referral pool. Team only, never clients */}
           <Route path="/referrals" element={
             <ProtectedRoute roles={['admin', 'creative', 'editor']}><Referrals /></ProtectedRoute>
           } />
@@ -300,7 +300,7 @@ function AppRoutes() {
           <Route path="/client/calendar" element={
             <ProtectedRoute roles={['client']}><ContentCalendar /></ProtectedRoute>
           } />
-          {/* /client/concepts removed — concepts no longer exist */}
+          {/* /client/concepts removed. Concepts no longer exist */}
           <Route path="/client/request" element={
             <ProtectedRoute roles={['client']}><RequestPost /></ProtectedRoute>
           } />

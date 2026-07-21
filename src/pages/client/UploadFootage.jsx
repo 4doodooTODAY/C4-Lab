@@ -98,8 +98,8 @@ export default function UploadFootage() {
     return (
       <div className="p-8 max-w-lg">
         <div className="card p-12 text-center">
-          <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-            <CheckCircle size={28} className="text-green-600" />
+          <div className="w-14 h-14 rounded-full bg-status-approved-bg flex items-center justify-center mx-auto mb-4">
+            <CheckCircle size={28} className="text-status-approved-text" />
           </div>
           <h2 className="text-lg font-bold text-text-primary mb-1">Footage uploaded!</h2>
           <p className="text-sm text-text-secondary mb-6">
@@ -124,7 +124,7 @@ export default function UploadFootage() {
   return (
     <div className="p-8 max-w-lg">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-text-primary">Upload Footage</h1>
+        <h1 className="display">Upload Footage</h1>
         <p className="text-text-secondary mt-1">Drop your raw footage and we'll take it from there.</p>
       </div>
 
@@ -139,7 +139,7 @@ export default function UploadFootage() {
             dragOver
               ? 'border-accent bg-accent/5'
               : file
-              ? 'border-green-400 bg-green-50/50 cursor-default'
+              ? 'border-green-400 bg-status-approved-bg/50 cursor-default'
               : 'border-border hover:border-accent/50 hover:bg-surface-2'
           } p-8 text-center`}
         >
@@ -152,8 +152,8 @@ export default function UploadFootage() {
 
           {file ? (
             <div className="flex items-center gap-3 justify-center">
-              <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center shrink-0">
-                <FileVideo size={20} className="text-green-600" />
+              <div className="w-10 h-10 rounded-xl bg-status-approved-bg flex items-center justify-center shrink-0">
+                <FileVideo size={20} className="text-status-approved-text" />
               </div>
               <div className="text-left">
                 <p className="text-sm font-semibold text-text-primary truncate max-w-[240px]">{file.name}</p>
@@ -236,7 +236,7 @@ export default function UploadFootage() {
         </div>
 
         {error && (
-          <div className="flex items-start gap-2 text-xs text-red-600 bg-red-50 px-3 py-2.5 rounded-lg">
+          <div className="flex items-start gap-2 text-xs text-status-overdue-text bg-status-overdue-bg px-3 py-2.5 rounded-lg">
             <AlertCircle size={13} className="mt-0.5 shrink-0" />
             {error}
           </div>
