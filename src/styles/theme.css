@@ -234,7 +234,7 @@ a:focus-visible {
   .disk { animation: none; top: auto; bottom: 20%; }
 }
 
-/* ═══ Live / active — the rare amber moment ══════════════════════════════ */
+/* ═══ Live / active. The rare amber moment ═══════════════════════════════ */
 
 .live-dot {
   display: inline-block;
@@ -243,4 +243,41 @@ a:focus-visible {
   border-radius: var(--radius-pill);
   background: var(--amber);
   box-shadow: 0 0 8px rgb(var(--amber-rgb) / 0.6);
+}
+
+/* ═══ Light surface scope (calendar) ═════════════════════════════════════
+   The calendar renders on white by request. Redefining the ground / ink /
+   line tokens on this wrapper flips every token-based class inside it to
+   light mode automatically, while the violet accent and status colors stay
+   exactly as they are elsewhere. Nothing else in the app is affected. */
+.calendar-light {
+  --ground-0-rgb: 244 245 247;
+  --ground-1-rgb: 255 255 255;
+  --ground-2-rgb: 255 255 255;
+  --ground-3-rgb: 244 245 247;
+  --ground-4-rgb: 226 229 234;
+  --ink-hi-rgb:  17 24 39;
+  --ink-mid-rgb: 75 85 99;
+  --ink-low-rgb: 148 163 184;
+  --line-rgb:    226 229 234;
+
+  --ground-0: #f4f5f7;
+  --ground-1: #ffffff;
+  --ground-2: #ffffff;
+  --ground-3: #f4f5f7;
+  --ground-4: #e2e5ea;
+  --ink-hi:   #111827;
+  --ink-mid:  #4b5563;
+  --ink-low:  #94a3b8;
+  --line:     #e2e5ea;
+
+  background: #ffffff;
+  color: #111827;
+}
+
+/* Cards inside the light calendar (panels, event modal) get a clean white
+   fill and a soft shadow instead of the dark plum treatment. */
+.calendar-light .card {
+  background: #ffffff;
+  box-shadow: 0 8px 28px rgb(15 17 23 / 0.10);
 }
