@@ -420,7 +420,7 @@ export default function PhotoRevisionReview() {
   })()
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-surface-2">
+    <div className="flex flex-col h-full overflow-hidden bg-surface-2">
       {/* Header */}
       <div className="flex items-center gap-3 px-6 py-3.5 bg-surface border-b border-border shrink-0">
         <Link to={`/projects/${project?.id}/creative`} className="text-text-muted hover:text-text-primary transition-colors">

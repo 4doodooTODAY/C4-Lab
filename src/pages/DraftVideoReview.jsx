@@ -304,12 +304,12 @@ export default function DraftVideoReview() {
   }
 
   if (loading) return (
-    <div className="flex h-screen items-center justify-center bg-gray-950">
+    <div className="flex h-full items-center justify-center bg-gray-950">
       <Loader2 size={24} className="animate-spin text-white/30" />
     </div>
   )
   if (error) return (
-    <div className="flex h-screen items-center justify-center bg-gray-950">
+    <div className="flex h-full items-center justify-center bg-gray-950">
       <p className="text-red-400 text-sm">{error}</p>
     </div>
   )
@@ -329,7 +329,7 @@ export default function DraftVideoReview() {
   }[status] || { label: status, cls: 'bg-white/10 text-white/50' }
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-gray-950 text-white">
+    <div className="flex flex-col h-full overflow-hidden bg-gray-950 text-white">
       {/* Header */}
       <div className="flex items-center gap-3 px-5 py-3.5 bg-gray-900/80 border-b border-white/10 shrink-0 backdrop-blur">
         <button

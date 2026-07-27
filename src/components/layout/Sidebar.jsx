@@ -2,7 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Film, CalendarDays, Settings,
   LogOut, Users, Building2, Inbox, Home, MessageSquare, Bell, FolderKanban, HardDrive,
-  ShieldCheck, Scissors, Clapperboard, Camera, Megaphone
+  ShieldCheck, Scissors, Clapperboard, Camera, Megaphone, X
 } from 'lucide-react'
 
 import { useAuth } from '../../contexts/AuthContext'
@@ -53,7 +53,7 @@ const NAV = {
 
 const ROLE_LABELS = { admin: 'Admin', creative: 'Creative', editor: 'Editor', client: 'Client' }
 
-export default function Sidebar() {
+export default function Sidebar({ open = false, onClose = () => {} }) {
   const { profile, user, signOut, viewMode, setViewMode } = useAuth()
   const { unreadCount, setPanelOpen } = useNotifications()
   const navigate = useNavigate()
@@ -70,18 +70,42 @@ export default function Sidebar() {
     const next = viewMode === 'admin' ? 'creative' : 'admin'
     setViewMode(next)
     navigate(next === 'creative' ? '/calendar' : '/admin')
+    onClose()
   }
 
   return (
-    <aside className="w-[220px] min-h-screen bg-sidebar flex flex-col shrink-0">
+    <>
+      {/* Mobile backdrop. Tap to dismiss the drawer. */}
+      {open && (
+        <div
+          onClick={onClose}
+          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          aria-hidden="true"
+        />
+      )}
+
+      <aside
+        className={`bg-sidebar flex flex-col z-50 w-[264px] max-w-[82vw]
+          fixed inset-y-0 left-0 transform transition-transform duration-300 ease-out shadow-2xl
+          ${open ? 'translate-x-0' : '-translate-x-full'}
+          md:static md:translate-x-0 md:w-[220px] md:max-w-none md:shrink-0 md:shadow-none`}
+      >
       {/* Brand */}
       <div className="px-5 py-5 border-b border-white/5">
         <div className="flex items-center gap-2.5">
           <div className="shrink-0"><LogoBadge size={32} /></div>
-          <div>
+          <div className="min-w-0">
             <p className="font-display text-white font-semibold text-sm leading-tight">C4C Lab</p>
-            <p className="text-white/40 text-xs leading-tight">Connect Four Creative</p>
+            <p className="text-white/40 text-xs leading-tight truncate">Connect Four Creative</p>
           </div>
+          {/* Close button. Mobile only */}
+          <button
+            onClick={onClose}
+            aria-label="Close menu"
+            className="md:hidden ml-auto -mr-1 p-1.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+          >
+            <X size={18} />
+          </button>
         </div>
       </div>
 
@@ -107,12 +131,13 @@ export default function Sidebar() {
       )}
 
       {/* Nav */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5">
+      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
         {navItems.map(({ to, icon: Icon, label, end }) => (
           <NavLink
             key={to}
             to={to}
             end={end}
+            onClick={onClose}
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors duration-100 ${
                 isActive
@@ -150,6 +175,7 @@ export default function Sidebar() {
 
         <NavLink
           to="/settings"
+          onClick={onClose}
           className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-white/40 hover:text-white hover:bg-sidebar-hover transition-colors duration-100"
         >
           <Settings size={16} strokeWidth={1.75} />
@@ -176,6 +202,7 @@ export default function Sidebar() {
           </button>
         </div>
       </div>
-    </aside>
+      </aside>
+    </>
   )
 }

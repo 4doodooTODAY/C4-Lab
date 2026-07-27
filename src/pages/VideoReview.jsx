@@ -40,7 +40,7 @@ export default function VideoReview() {
   }
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden">
       {/* Top bar */}
       <header className="flex items-center gap-3 px-5 py-3 bg-surface border-b border-border shrink-0">
         <Link to="/videos" className="btn-ghost p-1.5 -ml-1.5 text-text-muted">

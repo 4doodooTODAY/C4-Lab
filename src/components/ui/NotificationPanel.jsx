@@ -33,8 +33,8 @@ export default function NotificationPanel() {
       {/* Backdrop */}
       <div className="fixed inset-0 z-40" onClick={() => setPanelOpen(false)} />
 
-      {/* Panel */}
-      <div className="fixed left-[220px] top-0 bottom-0 z-50 w-80 bg-surface border-r border-border flex flex-col shadow-xl">
+      {/* Panel. Full width on phones; docked beside the sidebar on desktop. */}
+      <div className="fixed left-0 right-0 md:left-[220px] md:right-auto top-0 bottom-0 z-50 w-full md:w-80 bg-surface border-r border-border flex flex-col shadow-xl">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
           <div>

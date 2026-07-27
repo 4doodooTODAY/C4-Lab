@@ -291,7 +291,7 @@ export default function CalendarPage() {
   }
 
   return (
-    <div className="calendar-light flex flex-col h-screen overflow-hidden bg-surface">
+    <div className="calendar-light flex flex-col h-full overflow-hidden bg-surface">
       {/* Header row 1. Nav + actions */}
       <div className="flex items-center gap-2 px-6 py-3.5 border-b border-border shrink-0">
         <div className="flex items-center gap-1">
