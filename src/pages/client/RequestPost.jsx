@@ -56,15 +56,30 @@ export default function RequestPost() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!form.idea.trim()) return
-    setSaving(true)
     setError('')
+
+    // Resolve the client now if the initial lookup has not landed yet, so a
+    // request never saves against a null client the team would never see.
+    let cid = clientId
+    if (!cid) {
+      try {
+        const c = await getMyClient(user.id, 'id')
+        if (c?.id) { cid = c.id; setClientId(cid) }
+      } catch { /* falls through to the guard below */ }
+    }
+    if (!cid) {
+      setError("We couldn't find your workspace. Please refresh the page and try again.")
+      return
+    }
+
+    setSaving(true)
     try {
       const allLinks = [form.inspiration_url, ...form.inspiration_links_extra.split(/[\n,]+/)]
         .map((l) => l.trim()).filter(Boolean)
       await submitRequest({
         ...form,
         type: 'post_request',
-        client_id: clientId,
+        client_id: cid,
         inspiration_links: allLinks.length ? allLinks : null,
         target_date: form.target_date || null,
       })

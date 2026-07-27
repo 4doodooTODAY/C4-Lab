@@ -95,6 +95,11 @@ export default function ClientDashboard() {
         setActions(actionItems)
         setLoading(false)
       })
+      .catch((err) => {
+        // Never leave the client stuck on a spinner if a query fails.
+        console.error('[ClientDashboard] load error:', err)
+        setLoading(false)
+      })
   }, [user])
 
   const firstName      = profile?.full_name?.split(' ')[0] || 'there'

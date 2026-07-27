@@ -56,8 +56,25 @@ export default function UploadFootage() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!file) return
-    setUploading(true)
     setError('')
+
+    // Make sure we know which client this upload belongs to before sending a
+    // single byte. If the lookup has not resolved yet, or failed, resolve it
+    // now so footage never lands in an orphaned record the team can't see.
+    let cid = clientId
+    let cname = clientName
+    if (!cid) {
+      try {
+        const c = await getMyClient(user.id, 'id, name')
+        if (c?.id) { cid = c.id; cname = c.name || ''; setClientId(cid); setClientName(cname) }
+      } catch { /* falls through to the guard below */ }
+    }
+    if (!cid) {
+      setError("We couldn't find your workspace. Please refresh the page and try again.")
+      return
+    }
+
+    setUploading(true)
     setProgress(0)
 
     try {
@@ -65,7 +82,7 @@ export default function UploadFootage() {
       const { publicUrl } = await uploadToR2({
         file,
         category:    'footage',
-        clientName:  clientName || '',
+        clientName:  cname || '',
         projectName: form.title || 'upload',
         folderType:  'shoots',
         shootDate:   null,
@@ -79,7 +96,7 @@ export default function UploadFootage() {
       await submitFootage({
         title: form.title || file.name,
         notes: form.notes,
-        client_id: clientId,
+        client_id: cid,
         file_url: publicUrl,
         file_name: file.name,
         file_size: file.size,

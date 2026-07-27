@@ -89,6 +89,10 @@ export default function ClientCalendarView() {
       setShoots(shootDates)
 
       setLoading(false)
+    }).catch((err) => {
+      // Never leave the client stuck on a spinner if a query fails.
+      console.error('[CalendarView] load error:', err)
+      setLoading(false)
     })
   }, [user, month])
 
