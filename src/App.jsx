@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, Component } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { ThemeProvider } from './contexts/ThemeContext'
 import { Loader2 } from 'lucide-react'
 import UpdatePrompt from './components/ui/UpdatePrompt'
 
@@ -332,13 +333,15 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <ErrorBoundary>
-          <AppRoutes />
-          <UpdatePrompt />
-        </ErrorBoundary>
-      </AuthProvider>
-    </BrowserRouter>
+    <ThemeProvider>
+      <BrowserRouter>
+        <AuthProvider>
+          <ErrorBoundary>
+            <AppRoutes />
+            <UpdatePrompt />
+          </ErrorBoundary>
+        </AuthProvider>
+      </BrowserRouter>
+    </ThemeProvider>
   )
 }

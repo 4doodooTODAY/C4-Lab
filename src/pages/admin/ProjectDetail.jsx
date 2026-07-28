@@ -1539,7 +1539,7 @@ export default function ProjectDetail() {
             )}
 
             {/* Caption concept. The copy that ships with this content */}
-            <CaptionConcept projectId={id} initialValue={project?.caption_concept} canEdit plain />
+            <CaptionConcept projectId={id} projectName={project?.name} initialValue={project?.caption_concept} canEdit plain />
 
             {/* Admin-only: add an extra revision once the 3 client revisions are used up */}
             {(() => {

@@ -832,6 +832,7 @@ export default function VideoRevisionReview() {
             {project && (
               <CaptionConcept
                 projectId={project.id}
+                projectName={project.name}
                 initialValue={project.caption_concept}
                 canEdit={myRole !== 'client'}
                 dark

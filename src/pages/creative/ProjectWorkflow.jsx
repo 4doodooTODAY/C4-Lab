@@ -2258,7 +2258,7 @@ function RevisionsCard({ project, revisions, commentCounts, navigate }) {
       )}
 
       {/* Caption concept. The copy that ships with this content */}
-      <CaptionConcept projectId={project.id} initialValue={project.caption_concept} canEdit plain />
+      <CaptionConcept projectId={project.id} projectName={project.name} initialValue={project.caption_concept} canEdit plain />
 
       <p className="text-xs text-text-muted mt-4 pt-3 border-t border-border">
         Client gets up to 3 revisions total.

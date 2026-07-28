@@ -622,6 +622,7 @@ export default function PhotoRevisionReview() {
                 <div className="pt-2">
                   <CaptionConcept
                     projectId={project.id}
+                    projectName={project.name}
                     initialValue={project.caption_concept}
                     canEdit={myRole !== 'client'}
                   />

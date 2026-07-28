@@ -18,11 +18,17 @@
   --amber-rgb:         255 180 84;
 
   /* ── Plum ground ramp (dark → raised) ─────────────────────────────────── */
-  --ground-0:     #160530;  --ground-0-rgb: 22 5 48;    /* sidebar, wells   */
+  --ground-0:     #160530;  --ground-0-rgb: 22 5 48;    /* wells            */
   --ground-1:     #1E0740;  --ground-1-rgb: 30 7 64;    /* page base        */
   --ground-2:     #2A0B52;  --ground-2-rgb: 42 11 82;   /* cards (brand)    */
   --ground-3:     #371566;  --ground-3-rgb: 55 21 102;  /* hover, elevated  */
   --ground-4:     #452080;  --ground-4-rgb: 69 32 128;  /* active           */
+
+  /* Sidebar keeps its own dark plum in BOTH themes, so a light content area
+     never turns the nav white and hides its text. Fixed, not theme-flipped. */
+  --sidebar-rgb:        22 5 48;
+  --sidebar-hover-rgb:  30 7 64;
+  --sidebar-active-rgb: 42 11 82;
 
   /* ── Ink (text on plum) ───────────────────────────────────────────────── */
   --ink-hi:       #F5F1FB;  --ink-hi-rgb:  245 241 251;
@@ -35,10 +41,10 @@
   /* ── Focus ────────────────────────────────────────────────────────────── */
   --focus-ring:   #A05CFF;
 
-  /* ── Radius scale — never one uniform radius ──────────────────────────── */
-  --radius-sm:    0.5rem;     /*  8px — chips, tags */
-  --radius-md:    0.75rem;    /* 12px — buttons, inputs */
-  --radius-lg:    1.125rem;   /* 18px — cards, modals */
+  /* ── Radius scale. Kept tighter so it reads crafted, not default ──────── */
+  --radius-sm:    0.375rem;   /*  6px — chips, tags */
+  --radius-md:    0.5rem;     /*  8px — buttons, inputs */
+  --radius-lg:    0.75rem;    /* 12px — cards, modals */
   --radius-pill:  9999px;
 
   /* ── Type ─────────────────────────────────────────────────────────────── */
@@ -68,6 +74,49 @@
   /* Legacy aliases so older token consumers pick up the rebrand */
   --color-accent:       var(--violet);
   --color-accent-hover: var(--violet-bright);
+}
+
+/* ═══ Light theme ════════════════════════════════════════════════════════
+   Toggled by data-theme="light" on the root element. Flips the ground, ink,
+   line and status text tokens to light values. The violet accent, the focus
+   ring, and the sidebar (its own vars) stay put, so the brand reads the same
+   and the nav never washes out. */
+:root[data-theme="light"] {
+  --ground-0: #edeff4;  --ground-0-rgb: 237 239 244;
+  --ground-1: #f6f7fa;  --ground-1-rgb: 246 247 250;
+  --ground-2: #ffffff;  --ground-2-rgb: 255 255 255;
+  --ground-3: #f0f1f6;  --ground-3-rgb: 240 241 246;
+  --ground-4: #e3e6ee;  --ground-4-rgb: 227 230 238;
+
+  --ink-hi:  #1b1530;  --ink-hi-rgb:  27 21 48;
+  --ink-mid: #4a4560;  --ink-mid-rgb: 74 69 96;
+  --ink-low: #837c98;  --ink-low-rgb: 131 124 152;
+
+  --line: #e4e2ec;  --line-rgb: 228 226 236;
+
+  /* Status text darkened for contrast on white; tints already read fine. */
+  --status-due-soon-text: #b45309;
+  --status-overdue-text:  #dc2626;
+  --status-review-text:   #7c3aed;
+  --status-approved-text: #047857;
+  --status-idle-bg:       rgba(27, 21, 48, 0.05);
+  --status-idle-text:     #6b7280;
+}
+
+/* Light ground: clean, with just a hint of the violet wash, no dark grain. */
+:root[data-theme="light"] .app-ground {
+  background-color: var(--ground-1);
+  background-image:
+    radial-gradient(56rem 38rem at 88% -12%, rgb(var(--violet-rgb) / 0.06), transparent 62%),
+    radial-gradient(44rem 32rem at -8% 104%, rgb(var(--violet-rgb) / 0.04), transparent 55%),
+    linear-gradient(175deg, #ffffff 0%, var(--ground-1) 100%);
+}
+:root[data-theme="light"] .app-ground::after { opacity: 0.02; }
+
+/* Cards read as clean white with a soft shadow instead of the plum treatment. */
+:root[data-theme="light"] .card {
+  background: #ffffff;
+  box-shadow: 0 8px 28px rgb(15 17 23 / 0.08);
 }
 
 /* ═══ Ground treatment — gradient mesh + grain, never a flat fill ════════ */

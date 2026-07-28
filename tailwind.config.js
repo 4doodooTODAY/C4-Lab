@@ -7,9 +7,9 @@ export default {
   theme: {
     extend: {
       colors: {
-        sidebar: 'rgb(var(--ground-0-rgb) / <alpha-value>)',
-        'sidebar-hover': 'rgb(var(--ground-1-rgb) / <alpha-value>)',
-        'sidebar-active': 'rgb(var(--ground-2-rgb) / <alpha-value>)',
+        sidebar: 'rgb(var(--sidebar-rgb) / <alpha-value>)',
+        'sidebar-hover': 'rgb(var(--sidebar-hover-rgb) / <alpha-value>)',
+        'sidebar-active': 'rgb(var(--sidebar-active-rgb) / <alpha-value>)',
         accent: 'rgb(var(--violet-rgb) / <alpha-value>)',
         'accent-hover': 'rgb(var(--violet-bright-rgb) / <alpha-value>)',
         'accent-warm': 'rgb(var(--amber-rgb) / <alpha-value>)',

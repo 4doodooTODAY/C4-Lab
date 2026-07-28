@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
-import { Menu, Bell } from 'lucide-react'
+import { Menu, Bell, Sun, Moon } from 'lucide-react'
 import Sidebar from './Sidebar'
 import { NotificationProvider, useNotifications } from '../../contexts/NotificationContext'
+import { useTheme } from '../../contexts/ThemeContext'
 import NotificationPanel from '../ui/NotificationPanel'
 import UploadProgressBar from '../UploadProgressBar'
 import LogoBadge from '../ui/Logo'
@@ -12,8 +13,9 @@ import LogoBadge from '../ui/Logo'
 // static sidebar is always visible.
 function MobileTopBar({ onMenu }) {
   const { unreadCount, setPanelOpen } = useNotifications()
+  const { theme, toggleTheme } = useTheme()
   return (
-    <header className="md:hidden sticky top-0 z-30 flex items-center gap-3 h-14 px-4 bg-sidebar border-b border-white/5">
+    <header className="md:hidden sticky top-0 z-30 flex items-center gap-2 h-14 px-4 bg-sidebar border-b border-white/5">
       <button
         onClick={onMenu}
         aria-label="Open menu"
@@ -25,6 +27,13 @@ function MobileTopBar({ onMenu }) {
         <LogoBadge size={26} />
         <span className="font-display text-white font-semibold text-sm truncate">C4C Lab</span>
       </div>
+      <button
+        onClick={toggleTheme}
+        aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+      >
+        {theme === 'dark' ? <Sun size={19} /> : <Moon size={19} />}
+      </button>
       <button
         onClick={() => setPanelOpen((v) => !v)}
         aria-label="Notifications"

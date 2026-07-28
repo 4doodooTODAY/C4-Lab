@@ -2,10 +2,11 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Film, CalendarDays, Settings,
   LogOut, Users, Building2, Inbox, Home, MessageSquare, Bell, FolderKanban, HardDrive,
-  ShieldCheck, Scissors, Clapperboard, Camera, Megaphone, X
+  ShieldCheck, Scissors, Clapperboard, Camera, Megaphone, X, Sun, Moon
 } from 'lucide-react'
 
 import { useAuth } from '../../contexts/AuthContext'
+import { useTheme } from '../../contexts/ThemeContext'
 import { useNotifications } from '../../contexts/NotificationContext'
 import Avatar from '../ui/Avatar'
 import LogoBadge from '../ui/Logo'
@@ -55,6 +56,7 @@ const ROLE_LABELS = { admin: 'Admin', creative: 'Creative', editor: 'Editor', cl
 
 export default function Sidebar({ open = false, onClose = () => {} }) {
   const { profile, user, signOut, viewMode, setViewMode } = useAuth()
+  const { theme, toggleTheme } = useTheme()
   const { unreadCount, setPanelOpen } = useNotifications()
   const navigate = useNavigate()
   const role = profile?.role || 'creative'
@@ -171,6 +173,14 @@ export default function Sidebar({ open = false, onClose = () => {} }) {
           {unreadCount > 0 && (
             <span className="ml-auto text-xs font-bold text-accent">{unreadCount}</span>
           )}
+        </button>
+
+        <button
+          onClick={toggleTheme}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-white/40 hover:text-white hover:bg-sidebar-hover transition-colors duration-100"
+        >
+          {theme === 'dark' ? <Sun size={16} strokeWidth={1.75} /> : <Moon size={16} strokeWidth={1.75} />}
+          {theme === 'dark' ? 'Light mode' : 'Dark mode'}
         </button>
 
         <NavLink
