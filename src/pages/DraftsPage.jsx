@@ -105,6 +105,7 @@ function UploadModal({ draftId, clientName, projectName, onClose, onUploaded }) 
       abortCtrlRef.current.abort()
       setUploading(false)
       setProgress(0)
+      setConverting(null)
       setSpeed('')
       setEta('')
       setError('')
@@ -143,7 +144,11 @@ function UploadModal({ draftId, clientName, projectName, onClose, onUploaded }) 
           projectName: projectName || 'project',
           folderType:  'video',
           signal:      ctrl.signal,
-          onProgress:  (pct) => setProgress(pct),
+          // Guarantee a web-playable codec so clients never get sound with a
+          // black screen (HEVC). H.264 files pass through untouched.
+          normalizeVideo: true,
+          onConvert:   (info) => setConverting(info.stage === 'done' ? null : info),
+          onProgress:  (pct) => { setConverting(null); setProgress(pct) },
           onStats:     ({ speed: spd, eta: remaining }) => {
             setSpeed(fmtSpeed(spd))
             setEta(fmtEta(remaining))
@@ -194,8 +199,9 @@ function UploadModal({ draftId, clientName, projectName, onClose, onUploaded }) 
       if (e.name === 'AbortError') return // user cancelled. Just close
       setError(e.message)
       setUploading(false)
+      setConverting(null)
     } finally {
-      if (!ctrl.signal.aborted) setUploading(false)
+      if (!ctrl.signal.aborted) { setUploading(false); setConverting(null) }
     }
   }
 

@@ -1972,7 +1972,11 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
         projectName: project.name,
         folderType:  'shoots',
         shootDate:   project.shoot_date || null,
-        onProgress:  setUploadPct,
+        // Guarantee a web-playable codec so clients never get sound with a
+        // black screen (HEVC). H.264 files pass through untouched.
+        normalizeVideo: true,
+        onConvert:   (info) => setConvertState(info.stage === 'done' ? null : info),
+        onProgress:  (pct) => { setConvertState(null); setUploadPct(pct) },
         onStats:     setUploadStats,
       })
 
@@ -2020,6 +2024,7 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
       setUploadError(err.message)
     } finally {
       setUploading(false)
+      setConvertState(null)
     }
   }
 

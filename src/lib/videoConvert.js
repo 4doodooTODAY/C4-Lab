@@ -88,12 +88,13 @@ export async function ensureWebPlayableVideo(file, { onProgress, onStage } = {})
       '-i', inName,
       '-c:v', 'libx264',
       '-preset', 'ultrafast',   // fastest single-thread encode (ffmpeg.wasm has no MT)
-      '-crf', '24',
+      '-crf', '20',             // near visually lossless; preserves delivery quality
       '-pix_fmt', 'yuv420p',
-      // Cap the long edge at 1920 (1080p) — standard for social delivery and a
-      // huge speed/size win when the source is 4K. Smaller sources are untouched.
-      '-vf', "scale='if(gt(iw,ih),min(1920,iw),-2)':'if(gt(iw,ih),-2,min(1920,ih))'",
-      '-c:a', 'aac', '-b:a', '160k',
+      // Preserve the source resolution (no downscale) so quality is kept. Only
+      // cap absurdly large sources at 4K (3840 long edge) to stay feasible in
+      // the browser; anything 4K or under passes through at full resolution.
+      '-vf', "scale='if(gt(iw,ih),min(3840,iw),-2)':'if(gt(iw,ih),-2,min(3840,ih))'",
+      '-c:a', 'aac', '-b:a', '192k',
       '-movflags', '+faststart',
       outName,
     ])
