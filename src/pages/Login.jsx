@@ -144,7 +144,7 @@ export default function Login() {
               <p className="text-text-muted text-xs leading-tight">Connect Four Creative</p>
             </div>
           </div>
-          <h1 className="anim-rise d1 display max-w-md">Where your content gets made.</h1>
+          <h1 className="anim-rise d1 display max-w-md">Four Moves Ahead</h1>
           <p className="anim-rise d2 text-text-secondary text-sm max-w-sm leading-relaxed">
             Shoots, edits, reviews, and approvals for your whole team, in one place.
           </p>
