@@ -43,6 +43,7 @@ export default function Login() {
   const [applyRole, setApplyRole] = useState(null) // 'creative' | 'visionary'
   const [applyEmail, setApplyEmail] = useState('')
   const [applyName, setApplyName] = useState('')
+  const [applyPhone, setApplyPhone] = useState('')
   const [applyNotes, setApplyNotes] = useState('')
   const [applyLoading, setApplyLoading] = useState(false)
   const [applyStatus, setApplyStatus] = useState(null) // 'success' | 'already' | 'error' | null
@@ -117,7 +118,8 @@ export default function Login() {
           name: applyName.trim(),
           email: applyEmail.trim(),
           role: applyRole,
-          notes: `[Applying as: ${roleNote}] ${applyNotes.trim()}`.trim(),
+          phone: applyPhone.trim(),
+          notes: `[Applying as: ${roleNote} | Phone: ${applyPhone.trim() || 'not given'}] ${applyNotes.trim()}`.trim(),
         }),
       })
       const data = await res.json()
@@ -328,6 +330,11 @@ export default function Login() {
                         <label className="label">Email</label>
                         <input type="email" value={applyEmail} onChange={(e) => setApplyEmail(e.target.value)}
                           placeholder="you@email.com" className="input" required />
+                      </div>
+                      <div>
+                        <label className="label">Phone number</label>
+                        <input type="tel" value={applyPhone} onChange={(e) => setApplyPhone(e.target.value)}
+                          placeholder="(555) 555-5555" className="input" required />
                       </div>
                       <div>
                         <label className="label">
