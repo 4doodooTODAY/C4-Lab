@@ -101,6 +101,7 @@ const PhotoRevisionReview    = lazyWithRetry(() => import('./pages/PhotoRevision
 const AdminFileSystem        = lazyWithRetry(() => import('./pages/admin/FileSystem'))
 const AdminOneOffShoots      = lazyWithRetry(() => import('./pages/admin/OneOffShoots'))
 const ShootGallery           = lazyWithRetry(() => import('./pages/public/ShootGallery'))
+const Privacy                = lazyWithRetry(() => import('./pages/public/Privacy'))
 const Referrals              = lazyWithRetry(() => import('./pages/creative/Referrals'))
 const DraftsPage             = lazyWithRetry(() => import('./pages/DraftsPage'))
 const DraftVideoReview       = lazyWithRetry(() => import('./pages/DraftVideoReview'))
@@ -201,6 +202,8 @@ function AppRoutes() {
     <Suspense fallback={<PageLoader />}>
       <Routes>
         <Route path="/login" element={<Login />} />
+        {/* Public privacy policy for the App Store / Play Store listings */}
+        <Route path="/privacy" element={<Privacy />} />
         {/* Public one-off shoot gallery. No auth, viewable by anyone with the link */}
         <Route path="/s/:slug" element={<ShootGallery />} />
         {/* Public: invite/recovery links land here with a token_hash and no

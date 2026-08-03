@@ -87,6 +87,7 @@ export default function Sidebar({ open = false, onClose = () => {} }) {
       )}
 
       <aside
+        style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
         className={`bg-sidebar flex flex-col z-50 w-[264px] max-w-[82vw]
           fixed inset-y-0 left-0 transform transition-transform duration-300 ease-out shadow-2xl
           ${open ? 'translate-x-0' : '-translate-x-full'}

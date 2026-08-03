@@ -1,6 +1,12 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { Capacitor } from '@capacitor/core'
 import { supabase } from '../lib/supabase'
 import { useAuth } from './AuthContext'
+
+// Web push (service worker + PushManager) does not work inside the native iOS
+// webview. In-app notifications (the Supabase-backed list) still work. Native
+// push, if wanted later, needs a Capacitor push plugin wired to APNs.
+const IS_NATIVE = Capacitor.isNativePlatform()
 
 // Notification types that are internal to the team. Clients should never see these
 const TEAM_ONLY_TYPES = ['message']
@@ -65,6 +71,7 @@ export function NotificationProvider({ children }) {
   // if an existing subscription was created with a different applicationServerKey,
   // drop it and re-subscribe with the current key, then upsert to the DB.
   useEffect(() => {
+    if (IS_NATIVE) return
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
     if (!user?.id) return
     navigator.serviceWorker.ready.then(async (reg) => {
@@ -114,6 +121,7 @@ export function NotificationProvider({ children }) {
   }, [user?.id])
 
   const enablePush = useCallback(async () => {
+    if (IS_NATIVE) return
     if (!('serviceWorker' in navigator) || !user?.id) return
     setPushLoading(true)
     try {
@@ -139,8 +147,9 @@ export function NotificationProvider({ children }) {
     setPushLoading(false)
   }, [user?.id])
 
-  // Register service worker on mount
+  // Register service worker on mount (web only; not in the native webview)
   useEffect(() => {
+    if (IS_NATIVE) return
     if (!('serviceWorker' in navigator)) return
     navigator.serviceWorker.register('/sw.js').catch(() => {})
   }, [])

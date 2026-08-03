@@ -2,7 +2,10 @@ import { useState, useEffect } from 'react'
 import { Bell, Loader2, Check, Send } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
+import { Capacitor } from '@capacitor/core'
 import { useNotifications } from '../../contexts/NotificationContext'
+
+const IS_NATIVE = Capacitor.isNativePlatform()
 
 const CADENCES = [
   { value: 'daily',    label: 'Daily',     desc: 'Every morning' },
@@ -92,26 +95,29 @@ export default function NotificationSettings() {
         <div className="flex justify-center py-4"><Loader2 size={16} className="animate-spin text-text-muted" /></div>
       ) : (
         <div className="space-y-5">
-          {/* Push enable */}
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-medium text-text-primary">Push notifications</p>
-              <p className="text-[11px] text-text-muted">
-                {pushEnabled ? 'Enabled on this device' : 'Get digests even when the app is closed'}
-              </p>
+          {/* Push enable. Web push only; hidden in the native app (no web push
+              in the iOS webview) so it never shows a control that can't work. */}
+          {!IS_NATIVE && (
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-medium text-text-primary">Push notifications</p>
+                <p className="text-[11px] text-text-muted">
+                  {pushEnabled ? 'Enabled on this device' : 'Get digests even when the app is closed'}
+                </p>
+              </div>
+              {pushEnabled ? (
+                <span className="text-xs font-medium text-status-approved-text bg-status-approved-bg px-2.5 py-1 rounded-full flex items-center gap-1">
+                  <Check size={11} /> On
+                </span>
+              ) : (
+                <button onClick={enablePush} disabled={pushLoading}
+                  className="btn-primary text-xs disabled:opacity-50 flex items-center gap-1.5">
+                  {pushLoading && <Loader2 size={11} className="animate-spin" />}
+                  Enable
+                </button>
+              )}
             </div>
-            {pushEnabled ? (
-              <span className="text-xs font-medium text-status-approved-text bg-status-approved-bg px-2.5 py-1 rounded-full flex items-center gap-1">
-                <Check size={11} /> On
-              </span>
-            ) : (
-              <button onClick={enablePush} disabled={pushLoading}
-                className="btn-primary text-xs disabled:opacity-50 flex items-center gap-1.5">
-                {pushLoading && <Loader2 size={11} className="animate-spin" />}
-                Enable
-              </button>
-            )}
-          </div>
+          )}
 
           {/* Cadence */}
           <div>

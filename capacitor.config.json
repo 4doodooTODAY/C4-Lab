@@ -1,0 +1,9 @@
+{
+  "appId": "com.connectfourcreative.c4clab",
+  "appName": "C4C Lab",
+  "webDir": "dist",
+  "ios": {
+    "contentInset": "always"
+  },
+  "backgroundColor": "#1E0740"
+}

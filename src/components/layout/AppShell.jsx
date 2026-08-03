@@ -15,37 +15,42 @@ function MobileTopBar({ onMenu }) {
   const { unreadCount, setPanelOpen } = useNotifications()
   const { theme, toggleTheme } = useTheme()
   return (
-    <header className="md:hidden sticky top-0 z-30 flex items-center gap-2 h-14 px-4 bg-sidebar border-b border-white/5">
-      <button
-        onClick={onMenu}
-        aria-label="Open menu"
-        className="-ml-1.5 p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors"
-      >
-        <Menu size={22} />
-      </button>
-      <div className="flex items-center gap-2 flex-1 min-w-0">
-        <LogoBadge size={26} />
-        <span className="font-display text-white font-semibold text-sm truncate">C4C Lab</span>
+    <header
+      className="md:hidden sticky top-0 z-30 bg-sidebar border-b border-white/5"
+      style={{ paddingTop: 'env(safe-area-inset-top)' }}
+    >
+      <div className="flex items-center gap-2 h-14 px-4">
+        <button
+          onClick={onMenu}
+          aria-label="Open menu"
+          className="-ml-1.5 p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+        >
+          <Menu size={22} />
+        </button>
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <LogoBadge size={26} />
+          <span className="font-display text-white font-semibold text-sm truncate">C4C Lab</span>
+        </div>
+        <button
+          onClick={toggleTheme}
+          aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+        >
+          {theme === 'dark' ? <Sun size={19} /> : <Moon size={19} />}
+        </button>
+        <button
+          onClick={() => setPanelOpen((v) => !v)}
+          aria-label="Notifications"
+          className="relative -mr-1.5 p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+        >
+          <Bell size={20} />
+          {unreadCount > 0 && (
+            <span className="absolute top-0 right-0 min-w-[15px] h-[15px] px-0.5 flex items-center justify-center rounded-full bg-accent text-white text-[9px] font-bold leading-none">
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          )}
+        </button>
       </div>
-      <button
-        onClick={toggleTheme}
-        aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-        className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors"
-      >
-        {theme === 'dark' ? <Sun size={19} /> : <Moon size={19} />}
-      </button>
-      <button
-        onClick={() => setPanelOpen((v) => !v)}
-        aria-label="Notifications"
-        className="relative -mr-1.5 p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors"
-      >
-        <Bell size={20} />
-        {unreadCount > 0 && (
-          <span className="absolute top-0 right-0 min-w-[15px] h-[15px] px-0.5 flex items-center justify-center rounded-full bg-accent text-white text-[9px] font-bold leading-none">
-            {unreadCount > 99 ? '99+' : unreadCount}
-          </span>
-        )}
-      </button>
     </header>
   )
 }
