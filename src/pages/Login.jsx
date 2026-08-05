@@ -6,8 +6,13 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import { Capacitor } from '@capacitor/core'
 import LogoBadge from '../components/ui/Logo'
 import FallingDisks from '../components/ui/FallingDisks'
+
+// On a phone, auto-focusing a field pops the keyboard the instant the app
+// opens, covering the screen. Only autofocus on the web.
+const AUTOFOCUS = !Capacitor.isNativePlatform()
 
 // The two paths people can apply through. Clients don't self-apply; they get an
 // invite link by text and email, so they're intentionally not an option here.
@@ -132,7 +137,13 @@ export default function Login() {
   }
 
   return (
-    <div className="app-ground min-h-screen flex items-center justify-center p-4">
+    <div
+      className="app-ground min-h-screen flex items-center justify-center p-4"
+      style={{
+        paddingTop: 'max(1rem, env(safe-area-inset-top))',
+        paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
+      }}
+    >
       <FallingDisks />
       <div className="relative z-10 w-full max-w-4xl grid lg:grid-cols-[1.2fr_1fr] gap-10 lg:gap-16 items-center">
         {/* Brand + display moment */}
@@ -163,7 +174,7 @@ export default function Login() {
                   <div>
                     <label className="label">Email</label>
                     <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                      placeholder="you@example.com" className="input" required autoFocus />
+                      placeholder="you@example.com" className="input" required autoFocus={AUTOFOCUS} />
                   </div>
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
@@ -237,7 +248,7 @@ export default function Login() {
                       <div>
                         <label className="label">Email</label>
                         <input type="email" value={resetEmail} onChange={(e) => setResetEmail(e.target.value)}
-                          placeholder="you@example.com" className="input" required autoFocus />
+                          placeholder="you@example.com" className="input" required autoFocus={AUTOFOCUS} />
                       </div>
                       {resetError && (
                         <p className="text-xs text-status-overdue-text bg-status-overdue-bg rounded-sm px-3 py-2">{resetError}</p>
@@ -324,7 +335,7 @@ export default function Login() {
                       <div>
                         <label className="label">Your name</label>
                         <input type="text" value={applyName} onChange={(e) => setApplyName(e.target.value)}
-                          placeholder="Full name" className="input" required autoFocus />
+                          placeholder="Full name" className="input" required autoFocus={AUTOFOCUS} />
                       </div>
                       <div>
                         <label className="label">Email</label>
