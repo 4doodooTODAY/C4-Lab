@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Loader2, ArrowLeft, ArrowRight, Mail, Eye, EyeOff,
-  Camera, Scissors, Sparkles, Check, MessageSquareText,
+  Camera, Scissors, Sparkles, Check, MessageSquareText, Clock,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -313,13 +313,32 @@ export default function Login() {
                 </button>
 
                 {applyStatus === 'success' ? (
+                  /* Pending approval. No account exists yet; the team reviews
+                     first and sends an invite only if it's a fit. */
                   <div className="text-center py-2">
-                    <div className="w-12 h-12 rounded-full bg-status-approved-bg flex items-center justify-center mx-auto mb-3">
-                      <Check size={20} className="text-status-approved" />
+                    <div className="w-12 h-12 rounded-full bg-status-due-soon-bg flex items-center justify-center mx-auto mb-3">
+                      <Clock size={20} className="text-status-due-soon-text" />
                     </div>
-                    <h2 className="font-display text-lg text-text-primary mb-1">You're on the four-cast</h2>
-                    <p className="text-sm text-text-muted mb-4">
-                      Application in. If it's a fit, we'll connect and send your invite. Keep an eye on your inbox.
+                    <h2 className="font-display text-lg text-text-primary mb-1">Pending approval</h2>
+                    <p className="text-sm text-text-muted mb-3">
+                      You're on the four-cast. Our team reviews every application by hand.
+                    </p>
+                    <div className="text-left rounded-lg border border-border bg-surface/40 p-3 mb-4 space-y-2">
+                      <p className="text-xs text-text-secondary flex items-start gap-2">
+                        <span className="text-accent font-bold shrink-0">1.</span>
+                        We review your application, usually within a few days.
+                      </p>
+                      <p className="text-xs text-text-secondary flex items-start gap-2">
+                        <span className="text-accent font-bold shrink-0">2.</span>
+                        If it's a fit, we send an invite to <span className="font-medium text-text-primary">{applyEmail || 'your email'}</span>.
+                      </p>
+                      <p className="text-xs text-text-secondary flex items-start gap-2">
+                        <span className="text-accent font-bold shrink-0">3.</span>
+                        That invite link is what sets up your account and gets you in.
+                      </p>
+                    </div>
+                    <p className="text-[11px] text-text-muted mb-4">
+                      You can't sign in until you're approved, so keep an eye on your inbox and texts.
                     </p>
                     <button onClick={() => setMode('login')} className="btn-secondary w-full">Back to sign in</button>
                   </div>
