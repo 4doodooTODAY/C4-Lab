@@ -14,6 +14,15 @@ if (window.location.hostname === 'c4-lab.vercel.app') {
   )
 }
 
+// Register the service worker on every visit, not just after sign-in, so the
+// app is installable ("Add to Home Screen") from the login screen. Skipped in
+// the native iOS app, which serves its own bundled files.
+if ('serviceWorker' in navigator && !window.Capacitor?.isNativePlatform?.()) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {})
+  })
+}
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <App />
