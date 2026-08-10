@@ -1,6 +1,6 @@
 {
   "name": "C4C Lab",
-  "short_name": "C4C Lab",
+  "short_name": "C4C",
   "description": "Shoots, edits, reviews, and approvals for your whole team, in one place.",
   "id": "/",
   "start_url": "/",
@@ -9,7 +9,10 @@
   "orientation": "portrait",
   "background_color": "#1E0740",
   "theme_color": "#160530",
-  "categories": ["business", "productivity"],
+  "categories": [
+    "business",
+    "productivity"
+  ],
   "icons": [
     {
       "src": "/icons/icon-192.png",
