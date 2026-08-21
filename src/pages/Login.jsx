@@ -141,44 +141,37 @@ export default function Login() {
   }
 
   return (
-    <div
-      className="app-ground min-h-screen flex items-center justify-center p-4"
-      style={{
-        paddingTop: 'max(1rem, env(safe-area-inset-top))',
-        paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
-      }}
-    >
+    <div className="app-ground min-h-screen flex flex-col">
       <FallingDisks />
 
-      {/* App Store launch announcement, the first thing anyone signed out sees.
-          Centered by a flex wrapper, not -translate-x-1/2: the anim-rise
-          keyframes animate `transform` with fill-mode both, which overrode the
-          centering transform and pushed the pill off the right edge. */}
-      <div
-        className="absolute inset-x-0 z-20 flex justify-center px-3 pointer-events-none"
-        style={{ top: 'max(1.25rem, env(safe-area-inset-top))' }}
+      {/* Launch announcement. A real bar in normal flow, full bleed across the
+          top. It used to float absolutely over the layout, which meant the
+          content underneath needed a magic top margin to dodge it and the pill
+          could run off a narrow screen. In flow, it simply takes its own space. */}
+      <Link
+        to="/waitlist"
+        className="group relative z-20 block border-b border-white/10 bg-[rgb(var(--violet-rgb)/0.14)] transition-colors hover:bg-[rgb(var(--violet-rgb)/0.24)]"
+        style={{ paddingTop: 'env(safe-area-inset-top)' }}
       >
-        <Link
-          to="/waitlist"
-          className="anim-rise pointer-events-auto flex items-center justify-center gap-2 rounded-full pl-3 pr-1.5 py-1.5 text-xs font-semibold shadow-lg transition-transform hover:scale-[1.03] max-w-full"
-          style={{
-            background: 'linear-gradient(135deg, var(--violet), var(--violet-bright))',
-            color: '#fff',
-            boxShadow: '0 8px 24px rgb(var(--violet-rgb) / 0.45)',
-          }}
-        >
-          <Rocket size={13} className="shrink-0" />
-          <span className="hidden sm:inline whitespace-nowrap">Going in the App Store September 4th!</span>
-          <span className="sm:hidden whitespace-nowrap">In the App Store Sept 4th!</span>
-          <span className="flex items-center gap-1 rounded-full bg-white/20 px-2.5 py-1 whitespace-nowrap shrink-0">
-            Join waitlist <ArrowRight size={11} />
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-x-2.5 gap-y-1 px-4 py-2.5">
+          <Rocket size={13} className="shrink-0 text-[#C9A6FF]" />
+          <span className="text-xs text-text-secondary">
+            In the App Store <span className="font-semibold text-text-primary">September 4th</span>
           </span>
-        </Link>
-      </div>
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#C9A6FF] transition-colors group-hover:text-text-primary">
+            Join the waitlist
+            <ArrowRight size={12} className="transition-transform group-hover:translate-x-0.5" />
+          </span>
+        </div>
+      </Link>
 
-      <div className="relative z-10 w-full max-w-4xl grid lg:grid-cols-[1.2fr_1fr] gap-10 lg:gap-16 items-center mt-14 sm:mt-10">
+      <div
+        className="relative z-10 flex flex-1 items-center justify-center px-4 py-8 sm:py-10"
+        style={{ paddingBottom: 'max(2rem, env(safe-area-inset-bottom))' }}
+      >
+      <div className="w-full max-w-4xl grid lg:grid-cols-[1.2fr_1fr] gap-8 sm:gap-10 lg:gap-16 items-center">
         {/* Brand + display moment */}
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           <div className="anim-rise flex items-center gap-3">
             <div className="shrink-0"><LogoBadge size={40} /></div>
             <div>
@@ -460,6 +453,7 @@ export default function Login() {
 
           </div>
         </div>
+      </div>
       </div>
     </div>
   )
