@@ -104,7 +104,9 @@ export default function Waitlist() {
         <ArrowLeft size={13} /> Back to sign in
       </Link>
 
-      <div className="relative z-10 w-full max-w-md">
+      {/* pt clears the absolutely positioned back link above, which otherwise
+          crowds the logo on a narrow phone. */}
+      <div className="relative z-10 w-full max-w-md pt-8 sm:pt-0">
         {/* Headline moment */}
         <div className="text-center mb-6">
           <div className="anim-rise flex justify-center mb-4">
@@ -193,7 +195,7 @@ export default function Waitlist() {
                     className="waitlist-input"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-1 xs:grid-cols-2 gap-2.5">
                   <div>
                     <label className="block text-xs font-medium text-white/60 mb-1.5">Phone</label>
                     <input

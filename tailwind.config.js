@@ -6,6 +6,12 @@ export default {
   content: ['./index.html', './src/**/*.{js,jsx}'],
   theme: {
     extend: {
+      // Tailwind's smallest default breakpoint is 640px, which leaves nothing
+      // between a 320px phone and a tablet. Two-column form rows need to
+      // collapse well before 640 or the fields clip.
+      screens: {
+        xs: '400px',
+      },
       colors: {
         sidebar: 'rgb(var(--sidebar-rgb) / <alpha-value>)',
         'sidebar-hover': 'rgb(var(--sidebar-hover-rgb) / <alpha-value>)',
