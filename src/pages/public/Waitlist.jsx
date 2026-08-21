@@ -114,7 +114,9 @@ export default function Waitlist() {
           </div>
           <div className="anim-rise d1 inline-flex items-center gap-1.5 mb-3 px-3 py-1 rounded-full text-[11px] font-semibold tracking-wide"
             style={{ background: 'rgb(var(--violet-bright-rgb) / 0.18)', color: '#E7D6FF', border: '1px solid rgb(var(--violet-bright-rgb) / 0.4)' }}>
-            <Rocket size={12} /> LANDING IN THE APP STORE SEPTEMBER 4TH
+            <Rocket size={12} className="shrink-0" />
+            <span className="hidden xs:inline">LANDING IN THE APP STORE SEPTEMBER 4TH</span>
+            <span className="xs:hidden">IN THE APP STORE SEPT 4TH</span>
           </div>
           <h1 className="anim-rise d2 font-display text-3xl sm:text-4xl font-bold text-white leading-tight">
             Get on the list
@@ -182,7 +184,7 @@ export default function Waitlist() {
                   style={{ background: 'rgb(var(--violet-bright-rgb) / 0.22)' }}>
                   {RoleIcon && <RoleIcon size={15} style={{ color: '#D8B9FF' }} />}
                 </div>
-                <h2 className="font-display text-lg text-white">{ROLES[role]?.label}, joining the list</h2>
+                <h2 className="font-display text-base xs:text-lg text-white">{ROLES[role]?.label}, joining the list</h2>
               </div>
               <p className="text-sm text-white/50 mb-5 ml-[42px]">Just a few details and you're in.</p>
 
