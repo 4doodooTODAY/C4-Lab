@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Plus, X, Loader2, Check, Copy, ChevronDown, ChevronUp,
   Camera, Link as LinkIcon, Users, ToggleLeft, ToggleRight,
-  Upload, Image as ImageIcon, Trash2, Heart, MessageCircle, Play,
+  Upload, Image as ImageIcon, Trash2, Heart, MessageCircle, Play, Pencil,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -723,8 +723,83 @@ function LeadsDrawer({ shoot }) {
   )
 }
 
+// ── Editable title ─────────────────────────────────────────────────────────────
+function EditableTitle({ shoot, isAdmin, onTitleChange }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(shoot.title)
+  const [saving, setSaving] = useState(false)
+  const inputRef = useRef(null)
+
+  const startEditing = (e) => {
+    e.stopPropagation()
+    setDraft(shoot.title)
+    setEditing(true)
+  }
+
+  const cancel = () => { setEditing(false); setDraft(shoot.title) }
+
+  const save = async () => {
+    const trimmed = draft.trim()
+    if (!trimmed || trimmed === shoot.title) { cancel(); return }
+    setSaving(true)
+    const { error } = await supabase
+      .from('one_off_shoots')
+      .update({ title: trimmed })
+      .eq('id', shoot.id)
+    setSaving(false)
+    if (error) { window.alert(error.message); return }
+    onTitleChange(shoot.id, trimmed)
+    setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1.5 flex-1 min-w-0" onClick={(e) => e.stopPropagation()}>
+        <input
+          ref={inputRef}
+          className="input py-1 text-sm font-semibold h-auto min-w-0"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') save()
+            if (e.key === 'Escape') cancel()
+          }}
+          disabled={saving}
+          autoFocus
+        />
+        <button
+          onClick={save}
+          disabled={saving || !draft.trim()}
+          className="p-1 text-status-approved-text hover:opacity-70 disabled:opacity-40 shrink-0"
+          title="Save"
+        >
+          {saving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+        </button>
+        <button onClick={cancel} disabled={saving} className="p-1 text-text-muted hover:text-text-primary shrink-0" title="Cancel">
+          <X size={13} />
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <span className="flex items-center gap-1.5 min-w-0 group/title">
+      <p className="text-sm font-semibold text-text-primary truncate">{shoot.title}</p>
+      {isAdmin && (
+        <button
+          onClick={startEditing}
+          className="p-0.5 text-text-muted hover:text-text-primary opacity-70 sm:opacity-0 sm:group-hover/title:opacity-100 transition-opacity shrink-0"
+          title="Rename gallery"
+        >
+          <Pencil size={11} />
+        </button>
+      )}
+    </span>
+  )
+}
+
 // ── Shoot row ──────────────────────────────────────────────────────────────────
-function ShootRow({ shoot, onToggleActive, isAdmin, team, onAssign }) {
+function ShootRow({ shoot, onToggleActive, isAdmin, team, onAssign, onTitleChange }) {
   const [expanded, setExpanded] = useState(false)
   const [toggling, setToggling] = useState(false)
   const link = publicLink(shoot.slug)
@@ -764,7 +839,7 @@ function ShootRow({ shoot, onToggleActive, isAdmin, team, onAssign }) {
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-sm font-semibold text-text-primary truncate">{shoot.title}</p>
+            <EditableTitle shoot={shoot} isAdmin={isAdmin} onTitleChange={onTitleChange} />
             <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${shoot.active ? 'bg-status-approved-bg text-status-approved-text' : 'bg-surface-2 text-text-muted'}`}>
               {shoot.active ? 'Active' : 'Inactive'}
             </span>
@@ -878,6 +953,10 @@ export default function OneOffShoots() {
     setShoots((prev) => prev.map((s) => s.id === id ? { ...s, assigned_profile_id: profileId } : s))
   }
 
+  const handleTitleChange = (id, title) => {
+    setShoots((prev) => prev.map((s) => s.id === id ? { ...s, title } : s))
+  }
+
   return (
     <div className="p-6 max-w-3xl mx-auto w-full">
       {/* Header */}
@@ -929,6 +1008,7 @@ export default function OneOffShoots() {
               isAdmin={isAdmin}
               team={team}
               onAssign={handleAssign}
+              onTitleChange={handleTitleChange}
             />
           ))}
         </div>

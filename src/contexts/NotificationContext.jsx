@@ -1,7 +1,9 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { Capacitor } from '@capacitor/core'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from './AuthContext'
+import { registerNativePush, onNativePushOpened } from '../lib/nativePush'
 
 // Web push (service worker + PushManager) does not work inside the native iOS
 // webview. In-app notifications (the Supabase-backed list) still work. Native
@@ -26,6 +28,7 @@ const NotificationContext = createContext(null)
 
 export function NotificationProvider({ children }) {
   const { user, profile } = useAuth()
+  const navigate = useNavigate()
   const isClient = profile?.role === 'client'
   const [notifications, setNotifications] = useState([])
   const [unreadCount, setUnreadCount]     = useState(0)
@@ -153,6 +156,23 @@ export function NotificationProvider({ children }) {
     if (!('serviceWorker' in navigator)) return
     navigator.serviceWorker.register('/sw.js').catch(() => {})
   }, [])
+
+  // Native push: register this device's token once signed in. No-ops on web.
+  // Delivery isn't wired up server-side yet (see nativePush.js) — this just
+  // gets the token saved so there's nothing left to do here once it is.
+  useEffect(() => {
+    if (!IS_NATIVE || !user?.id) return
+    registerNativePush(user.id)
+  }, [user?.id])
+
+  // Native push: tapping a notification opens its link, same as the web
+  // service worker's notificationclick handler does.
+  useEffect(() => {
+    if (!IS_NATIVE) return
+    return onNativePushOpened((data) => {
+      if (data?.url) navigate(data.url)
+    })
+  }, [navigate])
 
   return (
     <NotificationContext.Provider value={{

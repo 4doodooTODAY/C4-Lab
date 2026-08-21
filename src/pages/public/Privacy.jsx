@@ -5,7 +5,7 @@
 // data, but it is a template, not legal advice. Review the company details,
 // contact address, and retention terms with counsel before you rely on it.
 
-const UPDATED = 'August 3, 2026'
+const UPDATED = 'August 20, 2026'
 const CONTACT = 'privacy@connectfourcreative.com' // confirm this inbox exists
 
 export default function Privacy() {
@@ -53,18 +53,58 @@ export default function Privacy() {
           <Section title="Data retention">
             <p>
               We keep your account and content for as long as your account is
-              active. When an account is closed, we remove its personal data and
-              uploaded content within a reasonable period, except where we must
-              retain records to meet legal obligations.
+              active, because that is what lets you and your clients get back to
+              past projects. We do not keep personal data longer than we need it
+              for the purpose it was collected.
+            </p>
+            <ul className="list-disc pl-5 space-y-1 mt-2">
+              <li><strong className="text-text-primary">Account data</strong> (name, email, phone, photo, role) is kept while the account is active.</li>
+              <li><strong className="text-text-primary">Uploaded content</strong> (footage, photos, video, captions, comments, messages) is kept while the account or the client project it belongs to is active.</li>
+              <li><strong className="text-text-primary">Applications</strong> submitted through the sign-in screen are kept for up to 12 months from the date of the application if they are not approved, then deleted.</li>
+              <li><strong className="text-text-primary">Backups</strong> roll off automatically within 30 days.</li>
+            </ul>
+          </Section>
+
+          <Section title="Deleting your data">
+            <p>
+              You can ask us to delete your profile and your content at any time.
+              Email{' '}
+              <a href={`mailto:${CONTACT}`} className="text-accent-hover underline underline-offset-2">{CONTACT}</a>{' '}
+              from the address on your account, or ask any C4C Lab admin to
+              delete the account for you. We may ask you to confirm your identity
+              before we act on a deletion request, so that nobody else can delete
+              your work.
+            </p>
+            <p className="mt-2">
+              <strong className="text-text-primary">
+                Once a deletion request is confirmed, we erase your personal data
+                and uploaded content from our live systems and from backups
+                within 30 days,
+              </strong>{' '}
+              except where we are required to retain records by law. Where an
+              exception applies we keep only the records the law requires, for
+              only as long as it requires, and we delete the rest on the same 30
+              day schedule. Reasons we may need to retain something include tax
+              and accounting rules, resolving a dispute or legal claim,
+              preventing fraud or abuse, or complying with a lawful request.
+            </p>
+            <p className="mt-2">
+              Two things to know before you ask. Deletion is permanent and we
+              cannot undo it, so export anything you want to keep first. And
+              content you shared into a client project may remain visible to that
+              client where they hold their own rights to it, for example footage
+              delivered to them under a contract. Tell us if you want that
+              handled differently and we will work it out with you.
             </p>
           </Section>
 
           <Section title="Your choices">
             <p>
-              You can request access to, correction of, or deletion of your
-              personal data by contacting us at{' '}
-              <a href={`mailto:${CONTACT}`} className="text-accent hover:underline">{CONTACT}</a>.
-              You can update your name and photo in the app at any time.
+              You can request access to, or correction of, your personal data by
+              contacting us at{' '}
+              <a href={`mailto:${CONTACT}`} className="text-accent-hover underline underline-offset-2">{CONTACT}</a>.
+              You can update your name and photo in the app at any time. To have
+              your data erased, see "Deleting your data" above.
             </p>
           </Section>
 
@@ -75,7 +115,7 @@ export default function Privacy() {
           <Section title="Contact">
             <p>
               Questions about this policy? Email{' '}
-              <a href={`mailto:${CONTACT}`} className="text-accent hover:underline">{CONTACT}</a>.
+              <a href={`mailto:${CONTACT}`} className="text-accent-hover underline underline-offset-2">{CONTACT}</a>.
             </p>
           </Section>
         </div>

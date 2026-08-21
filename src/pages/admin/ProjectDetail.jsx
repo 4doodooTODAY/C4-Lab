@@ -126,25 +126,33 @@ function InlineField({ label, value, displayValue, type = 'text', onSave, icon: 
   const [editing, setEditing]   = useState(false)
   const [draft, setDraft]       = useState(value || '')
   const [saving, setSaving]     = useState(false)
+  const [error, setError]       = useState('')
 
   const handleEdit = () => {
     if (readOnly) return
     setDraft(value || '')
+    setError('')
     setEditing(true)
   }
 
   const handleSave = async () => {
     setSaving(true)
+    setError('')
     try {
       await onSave(draft)
+      setEditing(false)
+    } catch (err) {
+      // Keep the field open with the typed value so a failed save doesn't
+      // look like it succeeded (and doesn't force retyping to retry).
+      setError(err.message || 'Save failed. Try again')
     } finally {
       setSaving(false)
-      setEditing(false)
     }
   }
 
   const handleCancel = () => {
     setDraft(value || '')
+    setError('')
     setEditing(false)
   }
 
@@ -159,28 +167,31 @@ function InlineField({ label, value, displayValue, type = 'text', onSave, icon: 
         {Icon && <Icon size={11} />} {label}
       </p>
       {editing ? (
-        <div className="flex items-center gap-2">
-          <input
-            type={type}
-            className="input flex-1 text-sm py-1"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={handleKeyDown}
-            autoFocus
-          />
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="w-7 h-7 rounded-lg bg-accent text-white flex items-center justify-center shrink-0 hover:bg-accent/90 disabled:opacity-50"
-          >
-            {saving ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />}
-          </button>
-          <button
-            onClick={handleCancel}
-            className="w-7 h-7 rounded-lg border border-border text-text-muted flex items-center justify-center shrink-0 hover:bg-surface-2"
-          >
-            <X size={11} />
-          </button>
+        <div>
+          <div className="flex items-center gap-2">
+            <input
+              type={type}
+              className="input flex-1 text-sm py-1"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={handleKeyDown}
+              autoFocus
+            />
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="w-7 h-7 rounded-lg bg-accent text-white flex items-center justify-center shrink-0 hover:bg-accent/90 disabled:opacity-50"
+            >
+              {saving ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />}
+            </button>
+            <button
+              onClick={handleCancel}
+              className="w-7 h-7 rounded-lg border border-border text-text-muted flex items-center justify-center shrink-0 hover:bg-surface-2"
+            >
+              <X size={11} />
+            </button>
+          </div>
+          {error && <p className="text-[11px] text-status-overdue-text mt-1">{error}</p>}
         </div>
       ) : (
         <div
@@ -531,8 +542,11 @@ export default function ProjectDetail() {
     if (!selectedEditor) return
     setAssigningEditor(true)
     try {
-      // Upsert into junction table
-      await supabase.from('project_editors').upsert({ project_id: id, profile_id: selectedEditor })
+      // Upsert into junction table. Supabase calls don't throw on their own,
+      // so an unchecked error here would leave the UI showing "assigned"
+      // while the row was never written, forcing a second attempt.
+      const { error: upsertErr } = await supabase.from('project_editors').upsert({ project_id: id, profile_id: selectedEditor })
+      if (upsertErr) throw upsertErr
       // Keep editor_id in sync (use first editor as primary for backward compat)
       if (editorProfiles.length === 0) {
         await updateProject(id, { editor_id: selectedEditor })
@@ -552,7 +566,8 @@ export default function ProjectDetail() {
   const handleRemoveEditor = async (profileId) => {
     setRemovingEditor(profileId)
     try {
-      await supabase.from('project_editors').delete().eq('project_id', id).eq('profile_id', profileId)
+      const { error: delErr } = await supabase.from('project_editors').delete().eq('project_id', id).eq('profile_id', profileId)
+      if (delErr) throw delErr
       const remaining = editorProfiles.filter((p) => p.id !== profileId)
       setEditorProfiles(remaining)
       // Update editor_id to next remaining editor or null
@@ -762,7 +777,7 @@ export default function ProjectDetail() {
   // Inline field save handlers
   const handleSaveField = async (field, value) => {
     await updateProject(id, { [field]: value || null })
-    refetch()
+    await refetch()
   }
 
   const handleMediaUpload = async () => {

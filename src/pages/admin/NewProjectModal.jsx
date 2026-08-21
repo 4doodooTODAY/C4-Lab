@@ -92,9 +92,12 @@ export default function NewProjectModal({ onClose, onCreated }) {
       // Also register the editor in the project_editors junction table. The
       // project page's team list reads from there, so without this the admin
       // had to assign the same editor a second time after creating.
+      // Supabase calls don't throw on their own, so the error must be
+      // checked explicitly or a failed write here goes unnoticed.
       if (selectedEditor) {
-        await supabase.from('project_editors')
+        const { error: linkErr } = await supabase.from('project_editors')
           .upsert({ project_id: row.id, profile_id: selectedEditor })
+        if (linkErr) throw linkErr
       }
       onCreated(row.id)
     } catch (err) {

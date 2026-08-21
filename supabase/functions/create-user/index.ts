@@ -1,4 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { clientIp, withinLimits } from '../_shared/rateLimit.ts'
+import { requireRole, forbidden } from '../_shared/auth.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -88,29 +90,19 @@ Deno.serve(async (req) => {
     const { action } = body
 
     // ── Admin gate ─────────────────────────────────────────────────────────
-    // Every action except the public forgot-password requires an admin JWT
-    // (or the service-role key for backend calls). This function can delete
-    // users. It must never be callable by ordinary logged-in users.
+    // Every action except the public forgot-password requires an admin, or the
+    // service role key for backend calls. This function can set any user's
+    // password and delete any account, so the gate here is the whole ballgame.
+    //
+    // It used to read the role claim out of the JWT with atob() and trust it.
+    // A JWT payload is base64, not a signature: anyone could send
+    // Bearer <anything>.<base64 of {"role":"service_role"}>.<anything> and be
+    // treated as the backend, then call set_password on any account. Both
+    // checks now verify: the service role path compares the real key, and the
+    // admin path validates the token against the auth server.
     if (action !== 'forgot_password') {
-      const jwt = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '')
-      let allowed = false
-      try {
-        const payload = JSON.parse(atob(jwt.split('.')[1] || ''))
-        if (payload.role === 'service_role') allowed = true
-      } catch { /* not a service key */ }
-      if (!allowed) {
-        const { data: { user } } = await supabaseAdmin.auth.getUser(jwt)
-        if (user) {
-          const { data: prof } = await supabaseAdmin
-            .from('profiles').select('role').eq('id', user.id).maybeSingle()
-          allowed = prof?.role === 'admin'
-        }
-      }
-      if (!allowed) {
-        return new Response(JSON.stringify({ error: 'admin only' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403,
-        })
-      }
+      const caller = await requireRole(supabaseAdmin, req, ['admin'])
+      if (!caller) return forbidden(corsHeaders, 'admin only')
     }
 
     // --- INVITE USER (team members + standalone client accounts) ---
@@ -149,6 +141,28 @@ Deno.serve(async (req) => {
     // --- PUBLIC FORGOT PASSWORD (called from the login page) ---
     if (action === 'forgot_password') {
       const { email } = body
+
+      // The only action here with no admin gate, so it is the only one a bot
+      // can reach. Unlimited, it is a free mail bomb aimed at any address the
+      // attacker chooses, billed to our Resend account.
+      //   per IP    5/hour   nobody forgets their password five times an hour
+      //   per email 3/hour   caps what one victim can be sent
+      //   global  100/hour   ceiling on a distributed run
+      const ip = clientIp(req)
+      const allowed = await withinLimits(supabaseAdmin, [
+        { bucket: 'forgot:ip',     identifier: ip,               max: 5,   windowSeconds: 3600 },
+        { bucket: 'forgot:email',  identifier: String(email || ''), max: 3, windowSeconds: 3600 },
+        { bucket: 'forgot:global', identifier: 'all',            max: 100, windowSeconds: 3600 },
+      ])
+      // Still a 200 with the same shape as success. Telling a bot it hit a
+      // limit is a signal; the whole point of this endpoint is to reveal
+      // nothing about which addresses exist or what state they are in.
+      if (!allowed) {
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200,
+        })
+      }
+
       try {
         const { data, error } = await supabaseAdmin.auth.admin.generateLink({ type: 'recovery', email })
         if (!error && data?.properties?.hashed_token) {

@@ -294,6 +294,58 @@ a:focus-visible {
   box-shadow: 0 0 8px rgb(var(--amber-rgb) / 0.6);
 }
 
+/* ═══ Sparkle field — waitlist page ambient background ═══════════════════ */
+
+@keyframes sparkle-twinkle {
+  0%, 100% { opacity: 0;   transform: scale(0.3) rotate(0deg); }
+  50%      { opacity: 1;   transform: scale(1)   rotate(45deg); }
+}
+
+.sparkle {
+  position: absolute;
+  background: radial-gradient(circle, #fff 0%, rgb(var(--violet-bright-rgb) / 0.9) 55%, transparent 75%);
+  clip-path: polygon(50% 0%, 63% 37%, 100% 50%, 63% 63%, 50% 100%, 37% 63%, 0% 50%, 37% 37%);
+  animation: sparkle-twinkle ease-in-out infinite;
+  will-change: opacity, transform;
+}
+
+@keyframes glow-drift {
+  0%, 100% { transform: translate(0, 0)     scale(1); }
+  50%      { transform: translate(3%, -4%)  scale(1.08); }
+}
+
+.glow-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(60px);
+  animation: glow-drift ease-in-out infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sparkle  { animation: none; opacity: 0.6; }
+  .glow-orb { animation: none; }
+}
+
+/* Waitlist form fields: fixed dark-glass look, independent of light/dark
+   theme, since the whole page commits to one night-sky aesthetic. */
+.waitlist-input {
+  width: 100%;
+  background: rgb(255 255 255 / 0.06);
+  border: 1px solid rgb(255 255 255 / 0.14);
+  border-radius: var(--radius-md);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  color: #fff;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.waitlist-input::placeholder { color: rgb(255 255 255 / 0.32); }
+.waitlist-input:focus {
+  outline: none;
+  border-color: var(--violet-bright);
+  box-shadow: 0 0 0 3px rgb(var(--violet-bright-rgb) / 0.28);
+}
+
 /* ═══ Light surface scope (calendar) ═════════════════════════════════════
    The calendar renders on white by request. Redefining the ground / ink /
    line tokens on this wrapper flips every token-based class inside it to

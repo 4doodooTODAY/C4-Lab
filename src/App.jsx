@@ -103,6 +103,9 @@ const AdminOneOffShoots      = lazyWithRetry(() => import('./pages/admin/OneOffS
 const ShootGallery           = lazyWithRetry(() => import('./pages/public/ShootGallery'))
 const Privacy                = lazyWithRetry(() => import('./pages/public/Privacy'))
 const Support                = lazyWithRetry(() => import('./pages/public/Support'))
+const Terms                  = lazyWithRetry(() => import('./pages/public/Terms'))
+const Waitlist               = lazyWithRetry(() => import('./pages/public/Waitlist'))
+const Landing                = lazyWithRetry(() => import('./pages/public/Landing'))
 const Referrals              = lazyWithRetry(() => import('./pages/creative/Referrals'))
 const DraftsPage             = lazyWithRetry(() => import('./pages/DraftsPage'))
 const DraftVideoReview       = lazyWithRetry(() => import('./pages/DraftVideoReview'))
@@ -148,6 +151,15 @@ function RoleRedirect() {
   if (profile.role === 'editor') return <Navigate to="/dashboard" replace />
   if (profile.role === 'client') return <Navigate to="/client" replace />
   return <Navigate to="/login" replace />
+}
+
+// The root of c4clab.com: signed-out visitors get the public landing page;
+// signed-in users are routed straight into the app by role, as before.
+function RootGate() {
+  const { user, loading } = useAuth()
+  if (loading) return <PageLoader />
+  if (!user) return <Landing />
+  return <RoleRedirect />
 }
 
 function ProtectedRoute({ children, roles }) {
@@ -206,6 +218,12 @@ function AppRoutes() {
         {/* Public privacy policy for the App Store / Play Store listings */}
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/support" element={<Support />} />
+        {/* Public user agreement. Linked from the app stores and the apply form */}
+        <Route path="/terms" element={<Terms />} />
+        {/* Public waitlist signup, linked from the landing page and sign-in banner */}
+        <Route path="/waitlist" element={<Waitlist />} />
+        {/* Public landing page at the root for signed-out visitors */}
+        <Route path="/" element={<RootGate />} />
         {/* Public one-off shoot gallery. No auth, viewable by anyone with the link */}
         <Route path="/s/:slug" element={<ShootGallery />} />
         {/* Public: invite/recovery links land here with a token_hash and no
@@ -219,8 +237,6 @@ function AppRoutes() {
             </Suspense>
           </ProtectedRoute>
         }>
-          <Route path="/" element={<RoleRedirect />} />
-
           {/* Admin */}
           <Route path="/admin" element={
             <ProtectedRoute roles={['admin']}><AdminDashboard /></ProtectedRoute>

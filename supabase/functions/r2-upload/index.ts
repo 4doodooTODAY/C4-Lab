@@ -1,3 +1,5 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { requireRole, forbidden } from '../_shared/auth.ts'
 import {
   S3Client,
   PutObjectCommand,
@@ -71,6 +73,30 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json()
     const { action } = body
+
+    // ── Auth gate ──────────────────────────────────────────────────────────
+    // This function had no caller check at all. It mints presigned R2 URLs, so
+    // an unauthenticated caller could hand themselves a download link for any
+    // object in the bucket, which is every client's raw footage and finals.
+    //
+    // set-cors rewrites the bucket's CORS policy, so it is admins only.
+    // Everything else needs a verified signed-in user of any role, because
+    // clients upload footage too.
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { auth: { autoRefreshToken: false, persistSession: false } },
+    )
+    const caller = await requireRole(
+      supabaseAdmin, req, action === 'set-cors' ? ['admin'] : [],
+    )
+    if (!caller) return forbidden(corsHeaders, 'sign in required')
+
+    // NOTE (not fixed here): presign-download still takes an arbitrary object
+    // key, so a signed-in user of one client can mint a link for another
+    // client's object if they learn the key. Closing that needs the key mapped
+    // back to a project and checked against the caller's access, which is a
+    // real change to how keys are structured. Tracked in STATUS.md.
 
     // ── One-time: write the bucket CORS policy so browser PUTs are allowed ────
     // Browser uploads send a preflight (OPTIONS) before the presigned PUT;

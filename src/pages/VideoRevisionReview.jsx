@@ -597,11 +597,11 @@ export default function VideoRevisionReview() {
       )}
 
       {/* Main area */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-col lg:flex-row flex-1 overflow-y-auto lg:overflow-hidden">
         {/* Video area. 65% */}
-        <div className="flex-1 flex flex-col p-5 gap-4 min-w-0">
+        <div className="flex flex-col p-4 sm:p-5 gap-4 min-w-0 shrink-0 lg:flex-1 lg:overflow-hidden">
           {/* Video player */}
-          <div className="bg-black rounded-xl overflow-hidden flex-1 flex items-center justify-center relative">
+          <div className="bg-black rounded-xl overflow-hidden min-h-[40vh] lg:flex-1 lg:min-h-0 flex items-center justify-center relative">
             {videoLoading && (
               <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
                 <Loader2 size={36} className="text-white/50 animate-spin" />
@@ -684,7 +684,7 @@ export default function VideoRevisionReview() {
         </div>
 
         {/* Right panel. 35% */}
-        <div className="w-[380px] shrink-0 border-l border-white/5 flex flex-col bg-[#111]">
+        <div className="w-full lg:w-[380px] shrink-0 border-t lg:border-t-0 border-l border-white/5 flex flex-col bg-[#111]">
           {/* Panel header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
             <div className="flex items-center gap-2">

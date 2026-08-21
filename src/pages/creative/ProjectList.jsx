@@ -146,6 +146,7 @@ export default function CreativeProjectList() {
 
   const [shoots,       setShoots]       = useState([])
   const [edits,        setEdits]        = useState([])
+  const [myEditorProjectIds, setMyEditorProjectIds] = useState(new Set()) // project_editors junction, for projects where editor_id points to someone else
   const [revisions,    setRevisions]    = useState([])
   const [loading,      setLoading]      = useState(true)
   const [detailShoot, setDetailShoot] = useState(null)  // shoot detail modal
@@ -175,25 +176,52 @@ export default function CreativeProjectList() {
               .order('shoot_date', { ascending: true })
               .then(({ data }) => data || []),
 
-      // My Edits. Projects scoped to assigned clients (admin sees all)
+      // My Edits. Projects for clients I'm linked to, PLUS anything I'm
+      // directly assigned to (creative_id, editor_id, or the project_editors
+      // junction for multi-editor projects). An admin can assign an editor
+      // straight to a project without also adding them to that client's
+      // team, so client_creatives alone was hiding those assignments.
       isAdmin
         ? supabase
             .from('projects')
             .select('id, name, stage, due_date, editor_id, client_id, clients(name, contact_name)')
             .order('created_at', { ascending: false })
-        : supabase
-            .from('client_creatives')
-            .select('client_id')
-            .eq('profile_id', myId)
-            .then(async ({ data: ccRows }) => {
-              const clientIds = (ccRows || []).map((r) => r.client_id).filter(Boolean)
-              if (!clientIds.length) return { data: [] }
-              return supabase
-                .from('projects')
-                .select('id, name, stage, due_date, editor_id, client_id, clients(name, contact_name)')
-                .in('client_id', clientIds)
-                .order('created_at', { ascending: false })
-            }),
+        : Promise.all([
+            supabase
+              .from('client_creatives')
+              .select('client_id')
+              .eq('profile_id', myId)
+              .then(async ({ data: ccRows }) => {
+                const clientIds = (ccRows || []).map((r) => r.client_id).filter(Boolean)
+                if (!clientIds.length) return []
+                const { data } = await supabase
+                  .from('projects')
+                  .select('id, name, stage, due_date, editor_id, client_id, clients(name, contact_name), created_at')
+                  .in('client_id', clientIds)
+                return data || []
+              }),
+            supabase
+              .from('project_editors')
+              .select('project_id')
+              .eq('profile_id', myId)
+              .then(async ({ data: peRows }) => {
+                const orParts = [`creative_id.eq.${myId}`, `editor_id.eq.${myId}`]
+                const peIds = (peRows || []).map((r) => r.project_id)
+                setMyEditorProjectIds(new Set(peIds))
+                if (peIds.length) orParts.push(`id.in.(${peIds.join(',')})`)
+                const { data } = await supabase
+                  .from('projects')
+                  .select('id, name, stage, due_date, editor_id, client_id, clients(name, contact_name), created_at')
+                  .or(orParts.join(','))
+                return data || []
+              }),
+          ]).then(([clientScoped, directAssigned]) => {
+            const byId = new Map()
+            ;[...clientScoped, ...directAssigned].forEach((p) => byId.set(p.id, p))
+            const merged = Array.from(byId.values())
+            merged.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+            return { data: merged }
+          }),
 
       // Revisions for edit status badges
       supabase
@@ -218,9 +246,12 @@ export default function CreativeProjectList() {
   const activeEdits    = edits.filter((e) => e.stage !== 'delivered')
   const completedEdits = edits.filter((e) => e.stage === 'delivered')
 
-  // Projects I'm the editor on (my job to edit) vs. other projects for my clients
-  const myAssignedEdits = activeEdits.filter((e) => e.editor_id === myId)
-  const clientEdits     = activeEdits.filter((e) => e.editor_id !== myId)
+  // Projects I'm the editor on (my job to edit) vs. other projects for my clients.
+  // "Mine" includes the legacy single editor_id AND the project_editors
+  // junction, so a project with multiple editors shows up for all of them.
+  const isMyEdit = (e) => e.editor_id === myId || myEditorProjectIds.has(e.id)
+  const myAssignedEdits = activeEdits.filter(isMyEdit)
+  const clientEdits     = activeEdits.filter((e) => !isMyEdit(e))
 
   const onMarkShootDone = async (id) => {
     await supabase.from('shoots').update({ status: 'completed' }).eq('id', id)

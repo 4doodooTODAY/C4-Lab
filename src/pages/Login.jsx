@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import {
   Loader2, ArrowLeft, ArrowRight, Mail, Eye, EyeOff,
-  Camera, Scissors, Sparkles, Check, MessageSquareText, Clock,
+  Camera, Scissors, Sparkles, Check, MessageSquareText, Clock, Rocket,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -46,6 +46,8 @@ export default function Login() {
   const [resetError, setResetError] = useState('')
 
   const [applyRole, setApplyRole] = useState(null) // 'creative' | 'visionary'
+  // Honeypot. Stays empty for real people; bots fill every input they find.
+  const [applyCompany, setApplyCompany] = useState('')
   const [applyEmail, setApplyEmail] = useState('')
   const [applyName, setApplyName] = useState('')
   const [applyPhone, setApplyPhone] = useState('')
@@ -125,8 +127,10 @@ export default function Login() {
           role: applyRole,
           phone: applyPhone.trim(),
           notes: `[Applying as: ${roleNote} | Phone: ${applyPhone.trim() || 'not given'}] ${applyNotes.trim()}`.trim(),
+          company: applyCompany, // honeypot
         }),
       })
+      if (res.status === 429) { setApplyStatus('rate-limited'); return }
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'failed')
       setApplyStatus(data.status === 'already' ? 'already' : 'success')
@@ -145,7 +149,27 @@ export default function Login() {
       }}
     >
       <FallingDisks />
-      <div className="relative z-10 w-full max-w-4xl grid lg:grid-cols-[1.2fr_1fr] gap-10 lg:gap-16 items-center">
+
+      {/* App Store launch announcement, the first thing anyone signed out sees */}
+      <Link
+        to="/waitlist"
+        className="anim-rise absolute left-1/2 -translate-x-1/2 z-20 flex items-center justify-center gap-2 rounded-full pl-3 pr-1.5 py-1.5 text-xs font-semibold shadow-lg transition-transform hover:scale-[1.03] whitespace-nowrap max-w-[94vw] overflow-hidden"
+        style={{
+          top: 'max(1.25rem, env(safe-area-inset-top))',
+          background: 'linear-gradient(135deg, var(--violet), var(--violet-bright))',
+          color: '#fff',
+          boxShadow: '0 8px 24px rgb(var(--violet-rgb) / 0.45)',
+        }}
+      >
+        <Rocket size={13} />
+        <span className="hidden sm:inline">Going in the App Store September 4th!</span>
+        <span className="sm:hidden">In the App Store Sept 4th!</span>
+        <span className="flex items-center gap-1 rounded-full bg-white/20 px-2.5 py-1 whitespace-nowrap">
+          Join waitlist <ArrowRight size={11} />
+        </span>
+      </Link>
+
+      <div className="relative z-10 w-full max-w-4xl grid lg:grid-cols-[1.2fr_1fr] gap-10 lg:gap-16 items-center mt-14 sm:mt-10">
         {/* Brand + display moment */}
         <div className="space-y-6">
           <div className="anim-rise flex items-center gap-3">
@@ -377,6 +401,26 @@ export default function Login() {
                           rows={3} className="input resize-none" />
                       </div>
 
+                      {/* Honeypot. Hidden from people and from screen readers,
+                          invisible to autofill, but present in the DOM for bots. */}
+                      <div aria-hidden="true" className="absolute left-[-9999px] w-px h-px overflow-hidden">
+                        <label htmlFor="company-website">Company website</label>
+                        <input
+                          id="company-website"
+                          name="company-website"
+                          type="text"
+                          tabIndex={-1}
+                          autoComplete="off"
+                          value={applyCompany}
+                          onChange={(e) => setApplyCompany(e.target.value)}
+                        />
+                      </div>
+
+                      {applyStatus === 'rate-limited' && (
+                        <p className="text-xs text-status-overdue-text">
+                          Too many attempts. Please wait a bit and try again.
+                        </p>
+                      )}
                       {applyStatus === 'already' && (
                         <p className="text-xs text-text-muted">That email already applied. We'll be in touch.</p>
                       )}
@@ -389,6 +433,18 @@ export default function Login() {
                         {applyLoading && <Loader2 size={14} className="animate-spin" />}
                         Send application
                       </button>
+
+                      {/* Clickwrap. Consent sits at the point of submission,
+                          which is what makes the agreement enforceable. */}
+                      <p className="text-xs leading-relaxed text-text-secondary text-center">
+                        By sending an application you agree to our{' '}
+                        <a href="/terms" target="_blank" rel="noopener noreferrer"
+                          className="text-accent-hover underline underline-offset-2">User Agreement</a>{' '}
+                        and{' '}
+                        <a href="/privacy" target="_blank" rel="noopener noreferrer"
+                          className="text-accent-hover underline underline-offset-2">Privacy Policy</a>, including
+                        binding arbitration and a class action waiver.
+                      </p>
                     </form>
                   </>
                 )}

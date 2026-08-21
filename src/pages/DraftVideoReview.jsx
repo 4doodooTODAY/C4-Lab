@@ -355,11 +355,11 @@ export default function DraftVideoReview() {
         </span>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-col lg:flex-row flex-1 overflow-y-auto lg:overflow-hidden">
         {/* Video column */}
-        <div className="flex-1 flex flex-col bg-black overflow-hidden">
+        <div className="flex flex-col bg-black shrink-0 lg:flex-1 lg:overflow-hidden">
           {/* Video */}
-          <div className="flex-1 flex items-center justify-center relative overflow-hidden">
+          <div className="flex items-center justify-center relative min-h-[40vh] lg:flex-1 lg:min-h-0 lg:overflow-hidden">
             {version?.video_url ? (
               <video
                 ref={videoRef}
@@ -502,7 +502,7 @@ export default function DraftVideoReview() {
         </div>
 
         {/* Sidebar */}
-        <div className="w-80 bg-gray-900 border-l border-white/10 flex flex-col shrink-0 overflow-hidden">
+        <div className="w-full lg:w-80 bg-gray-900 border-t lg:border-t-0 lg:border-l border-white/10 flex flex-col shrink-0 lg:overflow-hidden">
           <div className="px-4 py-3 border-b border-white/10 shrink-0">
             <p className="text-xs font-semibold text-white/40 uppercase tracking-wide">
               Comments

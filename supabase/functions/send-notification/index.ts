@@ -1,3 +1,4 @@
+import { isServiceRole, forbidden } from '../_shared/auth.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import webpush from 'npm:web-push@3.6.7'
 
@@ -20,6 +21,15 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
+    // ── Caller gate ────────────────────────────────────────────────────────
+    // This is a database webhook, so the only legitimate caller is Postgres
+    // presenting the service role key. It had no check at all, which meant
+    // anyone who could reach it could post their own `record` and have us send
+    // an email from our verified c4clab.com domain, or a push notification, to
+    // any user we have on file. That is a ready-made phishing channel with our
+    // branding on it, aimed at exactly the people who trust it.
+    if (!isServiceRole(req)) return forbidden(corsHeaders, 'service role required')
+
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
@@ -44,9 +54,10 @@ Deno.serve(async (req) => {
       .select('*')
       .eq('profile_id', notification.profile_id)
 
-    // ── Send push notifications ────────────────────────────────────────────────
-    if (VAPID_PUBLIC_KEY && subs?.length) {
-      await Promise.all(subs.map(async (sub) => {
+    // ── Send web push notifications ─────────────────────────────────────────
+    const webSubs = (subs || []).filter((s) => s.platform === 'web')
+    if (VAPID_PUBLIC_KEY && webSubs.length) {
+      await Promise.all(webSubs.map(async (sub) => {
         try {
           await webpush.sendNotification(
             { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth_key } },
@@ -64,6 +75,16 @@ Deno.serve(async (req) => {
         }
       }))
     }
+
+    // ── Native push (iOS/Android) ───────────────────────────────────────────
+    // push_subscriptions rows with platform 'ios'/'android' carry a
+    // device_token instead of the web-push endpoint/keys (see the
+    // 20260820000003 migration). Sending to them needs either Firebase
+    // Cloud Messaging or direct APNs, neither of which is wired up yet —
+    // there's no Firebase project or APNs key in this environment. The app
+    // is not in the App Store either, so there's nothing to deliver to yet.
+    // The rows are collected here so wiring it later is a one-function change.
+    // const nativeSubs = (subs || []).filter((s) => s.platform !== 'web')
 
     // ── Send email via Resend ──────────────────────────────────────────────────
     if (RESEND_API_KEY && recipientEmail) {

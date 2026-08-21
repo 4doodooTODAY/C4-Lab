@@ -273,9 +273,9 @@ export default function DraftPhotoReview() {
         </span>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-col lg:flex-row flex-1 overflow-y-auto lg:overflow-hidden">
         {/* Photo area */}
-        <div className="flex-1 flex flex-col items-center justify-center p-6 overflow-hidden bg-surface-2">
+        <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 overflow-hidden bg-surface-2 min-h-[45vh] lg:min-h-0 shrink-0 lg:shrink">
           {photoUrls.length === 0 ? (
             <div className="text-center">
               <Image size={48} className="mx-auto text-text-muted/30 mb-3" />
@@ -283,7 +283,7 @@ export default function DraftPhotoReview() {
             </div>
           ) : (
             <>
-              <div className="relative max-w-full max-h-full" style={{ maxHeight: 'calc(100vh - 220px)' }}>
+              <div className="relative max-w-full max-h-full" style={{ maxHeight: 'min(60vh, calc(100vh - 220px))' }}>
                 <img
                   ref={imgRef}
                   src={currentUrl}
@@ -345,7 +345,7 @@ export default function DraftPhotoReview() {
         </div>
 
         {/* Sidebar */}
-        <div className="w-80 bg-surface border-l border-border flex flex-col shrink-0 overflow-hidden">
+        <div className="w-full lg:w-80 bg-surface border-t lg:border-t-0 lg:border-l border-border flex flex-col shrink-0 lg:overflow-hidden">
           <div className="px-4 py-3 border-b border-border shrink-0">
             <p className="text-xs font-semibold text-text-muted uppercase tracking-wide">
               Comments. Photo {photoIndex + 1}

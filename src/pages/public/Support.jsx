@@ -14,7 +14,7 @@ export default function Support() {
           <h2 className="font-display text-lg text-text-primary mb-2">Get in touch</h2>
           <p className="text-sm leading-relaxed mb-3">
             Email us at{' '}
-            <a href={`mailto:${CONTACT}`} className="text-accent hover:underline">{CONTACT}</a>{' '}
+            <a href={`mailto:${CONTACT}`} className="text-accent-hover underline underline-offset-2">{CONTACT}</a>{' '}
             and we'll get back to you. Tell us your name, what you were doing, and
             what went wrong, and we can sort it out faster.
           </p>
@@ -57,10 +57,19 @@ export default function Support() {
           <Section title="Delete my account or data">
             <p>
               Email{' '}
-              <a href={`mailto:${CONTACT}`} className="text-accent hover:underline">{CONTACT}</a>{' '}
-              and we'll remove your account and content. See our{' '}
-              <a href="/privacy" className="text-accent hover:underline">privacy policy</a>{' '}
-              for details on what we store.
+              <a href={`mailto:${CONTACT}`} className="text-accent-hover underline underline-offset-2">{CONTACT}</a>{' '}
+              from the address on your account, or ask any C4C Lab admin, and
+              we'll remove your account and content. Once the request is
+              confirmed we erase your data from our live systems and backups
+              within 30 days, except where the law requires us to keep a record.
+              Deletion is permanent, so export anything you want to keep first.
+            </p>
+            <p className="mt-2">
+              See our{' '}
+              <a href="/privacy" className="text-accent-hover underline underline-offset-2">privacy policy</a>{' '}
+              for what we store and our{' '}
+              <a href="/terms" className="text-accent-hover underline underline-offset-2">user agreement</a>{' '}
+              for the terms of service.
             </p>
           </Section>
         </div>

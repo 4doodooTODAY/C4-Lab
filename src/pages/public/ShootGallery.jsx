@@ -173,10 +173,14 @@ function Lightbox({
   const savePin = async () => {
     if (!pinBody.trim() || !pendingPin) return
     setSavingPin(true)
-    await onAddComment(img.image_id, pendingPin.x_pct, pendingPin.y_pct, pinBody.trim())
+    const ok = await onAddComment(img.image_id, pendingPin.x_pct, pendingPin.y_pct, pinBody.trim())
     setSavingPin(false)
-    setPendingPin(null)
-    setPinBody('')
+    // Keep the pin and typed text on failure so a bad connection doesn't
+    // silently throw away what the client wrote.
+    if (ok) {
+      setPendingPin(null)
+      setPinBody('')
+    }
   }
 
   return (
@@ -433,12 +437,13 @@ export default function ShootGallery() {
 
   const addComment = async (imageId, x, y, body, claimOverride) => {
     const c = claimOverride || claim
-    if (!c) return
+    if (!c) return false
     const { error } = await supabase.rpc('add_shoot_image_comment', {
       p_claim: c, p_image: imageId, p_x: x, p_y: y, p_body: body,
     })
-    if (error) { showToast('Could not save note'); return }
+    if (error) { showToast('Could not save note'); return false }
     setComments((prev) => [...prev, { image_id: imageId, kind: 'comment', x_pct: x, y_pct: y, body }])
+    return true
   }
 
   const downloadOne = async (imageId, claimOverride) => {
