@@ -150,24 +150,31 @@ export default function Login() {
     >
       <FallingDisks />
 
-      {/* App Store launch announcement, the first thing anyone signed out sees */}
-      <Link
-        to="/waitlist"
-        className="anim-rise absolute left-1/2 -translate-x-1/2 z-20 flex items-center justify-center gap-2 rounded-full pl-3 pr-1.5 py-1.5 text-xs font-semibold shadow-lg transition-transform hover:scale-[1.03] whitespace-nowrap max-w-[94vw] overflow-hidden"
-        style={{
-          top: 'max(1.25rem, env(safe-area-inset-top))',
-          background: 'linear-gradient(135deg, var(--violet), var(--violet-bright))',
-          color: '#fff',
-          boxShadow: '0 8px 24px rgb(var(--violet-rgb) / 0.45)',
-        }}
+      {/* App Store launch announcement, the first thing anyone signed out sees.
+          Centered by a flex wrapper, not -translate-x-1/2: the anim-rise
+          keyframes animate `transform` with fill-mode both, which overrode the
+          centering transform and pushed the pill off the right edge. */}
+      <div
+        className="absolute inset-x-0 z-20 flex justify-center px-3 pointer-events-none"
+        style={{ top: 'max(1.25rem, env(safe-area-inset-top))' }}
       >
-        <Rocket size={13} />
-        <span className="hidden sm:inline">Going in the App Store September 4th!</span>
-        <span className="sm:hidden">In the App Store Sept 4th!</span>
-        <span className="flex items-center gap-1 rounded-full bg-white/20 px-2.5 py-1 whitespace-nowrap">
-          Join waitlist <ArrowRight size={11} />
-        </span>
-      </Link>
+        <Link
+          to="/waitlist"
+          className="anim-rise pointer-events-auto flex items-center justify-center gap-2 rounded-full pl-3 pr-1.5 py-1.5 text-xs font-semibold shadow-lg transition-transform hover:scale-[1.03] max-w-full"
+          style={{
+            background: 'linear-gradient(135deg, var(--violet), var(--violet-bright))',
+            color: '#fff',
+            boxShadow: '0 8px 24px rgb(var(--violet-rgb) / 0.45)',
+          }}
+        >
+          <Rocket size={13} className="shrink-0" />
+          <span className="hidden sm:inline whitespace-nowrap">Going in the App Store September 4th!</span>
+          <span className="sm:hidden whitespace-nowrap">In the App Store Sept 4th!</span>
+          <span className="flex items-center gap-1 rounded-full bg-white/20 px-2.5 py-1 whitespace-nowrap shrink-0">
+            Join waitlist <ArrowRight size={11} />
+          </span>
+        </Link>
+      </div>
 
       <div className="relative z-10 w-full max-w-4xl grid lg:grid-cols-[1.2fr_1fr] gap-10 lg:gap-16 items-center mt-14 sm:mt-10">
         {/* Brand + display moment */}

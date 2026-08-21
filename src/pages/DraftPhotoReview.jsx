@@ -247,7 +247,7 @@ export default function DraftPhotoReview() {
   }[status] || { label: status, cls: 'bg-surface-2 text-text-secondary' }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden bg-surface-2">
+    <div className="flex flex-col min-h-full lg:min-h-0 lg:h-full lg:overflow-hidden bg-surface-2">
       {/* Header */}
       <div className="flex items-center gap-3 px-6 py-3.5 bg-surface border-b border-border shrink-0">
         <button
@@ -273,9 +273,11 @@ export default function DraftPhotoReview() {
         </span>
       </div>
 
-      <div className="flex flex-col lg:flex-row flex-1 overflow-y-auto lg:overflow-hidden">
+      {/* Mobile stacks and scrolls as one page; only the desktop split pane
+          scrolls internally. */}
+      <div className="flex flex-col lg:flex-row lg:flex-1 lg:overflow-hidden">
         {/* Photo area */}
-        <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 overflow-hidden bg-surface-2 min-h-[45vh] lg:min-h-0 shrink-0 lg:shrink">
+        <div className="flex flex-col items-center justify-center p-4 sm:p-6 bg-surface-2 lg:flex-1 lg:overflow-hidden">
           {photoUrls.length === 0 ? (
             <div className="text-center">
               <Image size={48} className="mx-auto text-text-muted/30 mb-3" />

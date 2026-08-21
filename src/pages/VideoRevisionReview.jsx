@@ -559,7 +559,7 @@ export default function VideoRevisionReview() {
   })()
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#0f0f0f] text-white">
+    <div className="flex flex-col min-h-full lg:min-h-0 lg:h-full lg:overflow-hidden bg-[#0f0f0f] text-white">
       {/* Top bar */}
       <div className="flex items-center justify-between px-5 py-3 border-b border-white/5 shrink-0">
         <div className="flex items-center gap-3">
@@ -597,11 +597,15 @@ export default function VideoRevisionReview() {
       )}
 
       {/* Main area */}
-      <div className="flex flex-col lg:flex-row flex-1 overflow-y-auto lg:overflow-hidden">
+      {/* On mobile this stacks and the page scrolls as one; only the desktop
+          split pane gets its own internal scrolling. A nested scroller here
+          trapped the video and comments in a second scroll region. */}
+      <div className="flex flex-col lg:flex-row lg:flex-1 lg:overflow-hidden">
         {/* Video area. 65% */}
-        <div className="flex flex-col p-4 sm:p-5 gap-4 min-w-0 shrink-0 lg:flex-1 lg:overflow-hidden">
-          {/* Video player */}
-          <div className="bg-black rounded-xl overflow-hidden min-h-[40vh] lg:flex-1 lg:min-h-0 flex items-center justify-center relative">
+        <div className="flex flex-col p-4 sm:p-5 gap-4 min-w-0 lg:flex-1 lg:overflow-hidden">
+          {/* Video player. Fixed height on mobile so a portrait clip can't
+              grow to fill the screen and push the timeline out of view. */}
+          <div className="bg-black rounded-xl overflow-hidden h-[45vh] lg:h-auto lg:flex-1 lg:min-h-0 flex items-center justify-center relative">
             {videoLoading && (
               <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
                 <Loader2 size={36} className="text-white/50 animate-spin" />
@@ -610,7 +614,7 @@ export default function VideoRevisionReview() {
             <video
               ref={videoRef}
               src={revision.video_url}
-              className="max-h-full max-w-full w-full"
+              className="max-h-full max-w-full object-contain"
               controls
               preload="metadata"
               playsInline
@@ -684,7 +688,7 @@ export default function VideoRevisionReview() {
         </div>
 
         {/* Right panel. 35% */}
-        <div className="w-full lg:w-[380px] shrink-0 border-t lg:border-t-0 border-l border-white/5 flex flex-col bg-[#111]">
+        <div className="w-full lg:w-[380px] shrink-0 border-t lg:border-t-0 lg:border-l border-white/5 flex flex-col bg-[#111]">
           {/* Panel header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
             <div className="flex items-center gap-2">

@@ -329,7 +329,7 @@ export default function DraftVideoReview() {
   }[status] || { label: status, cls: 'bg-white/10 text-white/50' }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden bg-gray-950 text-white">
+    <div className="flex flex-col min-h-full lg:min-h-0 lg:h-full lg:overflow-hidden bg-gray-950 text-white">
       {/* Header */}
       <div className="flex items-center gap-3 px-5 py-3.5 bg-gray-900/80 border-b border-white/10 shrink-0 backdrop-blur">
         <button
@@ -355,11 +355,13 @@ export default function DraftVideoReview() {
         </span>
       </div>
 
-      <div className="flex flex-col lg:flex-row flex-1 overflow-y-auto lg:overflow-hidden">
+      {/* Mobile stacks and scrolls as one page; only the desktop split pane
+          scrolls internally. */}
+      <div className="flex flex-col lg:flex-row lg:flex-1 lg:overflow-hidden">
         {/* Video column */}
-        <div className="flex flex-col bg-black shrink-0 lg:flex-1 lg:overflow-hidden">
-          {/* Video */}
-          <div className="flex items-center justify-center relative min-h-[40vh] lg:flex-1 lg:min-h-0 lg:overflow-hidden">
+        <div className="flex flex-col bg-black lg:flex-1 lg:overflow-hidden">
+          {/* Video. Fixed height on mobile so a portrait clip can't fill the screen. */}
+          <div className="flex items-center justify-center relative h-[45vh] lg:h-auto lg:flex-1 lg:min-h-0 lg:overflow-hidden">
             {version?.video_url ? (
               <video
                 ref={videoRef}
