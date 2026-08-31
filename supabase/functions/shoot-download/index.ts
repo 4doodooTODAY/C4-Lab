@@ -67,8 +67,14 @@ Deno.serve(async (req) => {
 
   // 3. Sign URLs to the untouched originals (10 min). Download disposition by
   //    default; stream mode omits it so the browser can play video inline.
+  // Files synced from project shoots store their R2 URL directly as original_path.
+  // Detect those by checking for a full URL and pass them through without signing.
   const signed: { url: string; fileName: string }[] = []
   for (const img of images) {
+    if (/^https?:\/\//.test(img.original_path)) {
+      signed.push({ url: img.original_path, fileName: img.file_name })
+      continue
+    }
     const { data, error } = await supabase.storage
       .from('shoot-originals')
       .createSignedUrl(img.original_path, 600, stream ? undefined : { download: img.file_name })

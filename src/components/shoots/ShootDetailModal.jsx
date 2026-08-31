@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   X, CalendarDays, MapPin, Camera, Upload, Send,
   Loader2, MessageSquare, ExternalLink, Film, Image,
@@ -413,11 +413,48 @@ function InspirationLinks({ shoot, canEdit }) {
 }
 
 // ── Gallery tab ───────────────────────────────────────────────────────────────
+const VIDEO_EXTS = new Set(['mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v'])
+
 function ShootGalleryTab({ shoot }) {
-  const [gallery,  setGallery]  = useState(undefined) // undefined = loading
-  const [creating, setCreating] = useState(false)
-  const [copied,   setCopied]   = useState(false)
-  const [error,    setError]    = useState('')
+  const [gallery,   setGallery]   = useState(undefined) // undefined = loading
+  const [creating,  setCreating]  = useState(false)
+  const [copied,    setCopied]    = useState(false)
+  const [error,     setError]     = useState('')
+  const [syncState, setSyncState] = useState(null) // null | 'syncing' | { added, total }
+
+  // Pull shoot_uploads and push any new ones into one_off_shoot_images.
+  const syncUploads = useCallback(async (gal) => {
+    setSyncState('syncing')
+    const [{ data: uploads }, { data: existing }] = await Promise.all([
+      supabase
+        .from('shoot_uploads')
+        .select('id, file_name, file_size, file_url, thumbnail_url')
+        .eq('shoot_id', shoot.id),
+      supabase
+        .from('one_off_shoot_images')
+        .select('original_path')
+        .eq('shoot_id', gal.id)
+        .is('deleted_at', null),
+    ])
+    const existingPaths = new Set((existing || []).map((r) => r.original_path))
+    const toAdd = (uploads || []).filter((u) => u.file_url && !existingPaths.has(u.file_url))
+    if (toAdd.length) {
+      const rows = toAdd.map((u) => {
+        const ext = u.file_name?.split('.').pop()?.toLowerCase() || ''
+        return {
+          shoot_id:      gal.id,
+          file_name:     u.file_name,
+          file_size:     u.file_size,
+          original_path: u.file_url,
+          preview_path:  u.file_url,
+          thumb_path:    u.thumbnail_url || u.file_url,
+          is_video:      VIDEO_EXTS.has(ext),
+        }
+      })
+      await supabase.from('one_off_shoot_images').insert(rows)
+    }
+    setSyncState({ added: toAdd.length, total: (uploads || []).length })
+  }, [shoot.id])
 
   useEffect(() => {
     supabase
@@ -429,8 +466,9 @@ function ShootGalleryTab({ shoot }) {
       .then(({ data, error: err }) => {
         if (err) { setGallery(null); return }
         setGallery(data || null)
+        if (data) syncUploads(data)
       })
-  }, [shoot.id])
+  }, [shoot.id, syncUploads])
 
   const createGallery = async () => {
     setCreating(true)
@@ -443,6 +481,7 @@ function ShootGalleryTab({ shoot }) {
     setCreating(false)
     if (err) { setError(err.message); return }
     setGallery(data)
+    syncUploads(data)
   }
 
   const link = gallery ? `${window.location.origin}/s/${gallery.slug}` : ''
@@ -466,8 +505,8 @@ function ShootGalleryTab({ shoot }) {
         <Share2 size={20} className="mx-auto mb-2 text-text-muted/40" />
         <p className="text-xs font-medium text-text-primary mb-1">No gallery link yet</p>
         <p className="text-xs text-text-muted mb-4 max-w-xs mx-auto">
-          Create a shareable link for this shoot. Clients open it with just their name and
-          number to view, favorite, comment, and download full-quality files.
+          Create a shareable link for this shoot. All uploaded files will be added
+          to the gallery automatically. Clients access it with just their name and number.
         </p>
         {error && (
           <p className="text-xs text-status-overdue-text bg-status-overdue-bg border border-status-overdue/30 rounded-lg px-3 py-2 mb-3">
@@ -504,10 +543,26 @@ function ShootGalleryTab({ shoot }) {
           {copied ? 'Copied' : 'Copy'}
         </button>
       </div>
+
+      {syncState === 'syncing' ? (
+        <p className="text-[11px] text-text-muted flex items-center gap-1.5">
+          <Loader2 size={11} className="animate-spin" /> Syncing files to gallery…
+        </p>
+      ) : syncState ? (
+        <p className="text-[11px] text-text-muted flex items-center gap-1.5">
+          <Check size={11} className="text-green-500 shrink-0" />
+          {syncState.added > 0
+            ? `${syncState.added} new file${syncState.added !== 1 ? 's' : ''} added · `
+            : `${syncState.total} file${syncState.total !== 1 ? 's' : ''} in gallery · `
+          }
+          <button onClick={() => syncUploads(gallery)} className="text-accent hover:underline">
+            Sync again
+          </button>
+        </p>
+      ) : null}
+
       <p className="text-[11px] text-text-muted">
-        Upload photos to this gallery from{' '}
-        <a href="/admin/shoots" className="text-accent hover:underline">Gallery Links</a>.
-        Clients only need their name and phone to access it — no account required.
+        Clients only need their name and phone to access — no account required.
       </p>
     </div>
   )

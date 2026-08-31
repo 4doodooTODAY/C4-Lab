@@ -9,7 +9,9 @@ import { zip } from 'fflate'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const previewUrl = (path) =>
-  supabase.storage.from('shoot-previews').getPublicUrl(path).data.publicUrl
+  /^https?:\/\//.test(path)
+    ? path
+    : supabase.storage.from('shoot-previews').getPublicUrl(path).data.publicUrl
 
 const claimKey = (slug) => `shoot-claim-${slug}`
 
