@@ -107,18 +107,18 @@ export default function ClientDashboard() {
 
   if (loading) return (
     <div className="flex justify-center py-24">
-      <Loader2 size={22} className="animate-spin text-gray-200" />
+      <Loader2 size={22} className="animate-spin text-text-muted" />
     </div>
   )
 
   return (
-    <div className="min-h-screen bg-surface-2/30">
-      <div className="max-w-[580px] mx-auto px-6 py-12">
+    <div className="min-h-full">
+      <div className="max-w-[580px] mx-auto px-4 sm:px-6 py-8 sm:py-12">
 
         {/* Greeting */}
         <div className="anim-rise mb-8">
           <p className="text-sm text-text-muted mb-0.5">{format(new Date(), 'EEEE, MMMM d')}</p>
-          <h1 className="display">Hey, {firstName} 👋</h1>
+          <h1 className="display">Hey, {firstName}</h1>
           <p className="text-text-muted mt-1.5">
             {activeProjects.length > 0
               ? `${activeProjects.length} active project${activeProjects.length !== 1 ? 's' : ''}`
@@ -130,24 +130,24 @@ export default function ClientDashboard() {
         {actions.length > 0 && (
           <div className="mb-6">
             <div className="flex items-center gap-2 mb-3">
-              <div className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center">
+              <div className="w-5 h-5 rounded-full bg-status-overdue flex items-center justify-center">
                 <Bell size={11} className="text-white" />
               </div>
               <h2 className="text-sm font-bold text-text-primary">
-                Action Required
-                <span className="ml-2 inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold">
+                Action required
+                <span className="ml-2 inline-flex items-center justify-center w-5 h-5 rounded-full bg-status-overdue text-white text-[10px] font-bold">
                   {actions.length}
                 </span>
               </h2>
             </div>
 
-            <div className="rounded-2xl border border-status-overdue/30 bg-surface shadow-sm overflow-hidden">
+            <div className="card rounded-2xl border border-status-overdue/30 overflow-hidden">
               {actions.map((action, i) => (
                 <button
                   key={action.id}
                   onClick={() => navigate(action.href)}
                   className={`w-full flex items-center gap-4 px-5 py-4 hover:bg-status-overdue-bg/60 transition-colors text-left ${
-                    i < actions.length - 1 ? 'border-b border-red-50' : ''
+                    i < actions.length - 1 ? 'border-b border-status-overdue/20' : ''
                   }`}
                 >
                   {/* Icon */}
@@ -186,8 +186,8 @@ export default function ClientDashboard() {
                 const shootDate   = parseISO(shoot.shoot_date)
                 const isShootToday = isToday(shootDate)
                 return (
-                  <div key={shoot.id} className={`flex items-start gap-3 p-4 rounded-2xl border shadow-sm ${
-                    isShootToday ? 'border-status-due-soon/30 bg-status-due-soon-bg' : 'border-border bg-surface'
+                  <div key={shoot.id} className={`card flex items-start gap-3 p-4 ${
+                    isShootToday ? 'border-status-due-soon/40 bg-status-due-soon-bg/20' : ''
                   }`}>
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
                       isShootToday ? 'bg-status-due-soon-bg' : 'bg-accent/10'
@@ -230,7 +230,7 @@ export default function ClientDashboard() {
                 const stage = STAGE_MAP[proj.stage] || { label: proj.stage, color: 'bg-surface-2 text-text-secondary' }
                 return (
                   <Link key={proj.id} to="/my-projects"
-                    className="flex items-center gap-3 p-4 rounded-2xl border border-border bg-surface hover:border-accent/30 hover:bg-accent/5 transition-all group shadow-sm">
+                    className="card flex items-center gap-3 p-4 hover:border-accent/40 hover:bg-surface-2/60 transition-all group">
                     <div className="w-8 h-8 rounded-xl bg-accent/10 flex items-center justify-center shrink-0">
                       <FolderKanban size={15} className="text-accent" />
                     </div>
@@ -254,8 +254,8 @@ export default function ClientDashboard() {
         )}
 
         {projects.length === 0 && actions.length === 0 && !loading && (
-          <div className="mb-5 p-6 rounded-2xl border border-dashed border-border text-center">
-            <CheckCircle2 size={28} className="mx-auto text-gray-200 mb-2" />
+          <div className="mb-5 card p-6 border-dashed text-center">
+            <CheckCircle2 size={28} className="mx-auto text-text-muted/30 mb-2" />
             <p className="text-sm font-medium text-text-muted">You're all caught up!</p>
             <p className="text-xs text-text-muted mt-1">We'll let you know when something needs your attention.</p>
           </div>
@@ -265,7 +265,7 @@ export default function ClientDashboard() {
         <div className="space-y-2.5">
           <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2">Quick Access</h2>
 
-          <Link to="/my-projects" className="flex items-center gap-4 p-4 rounded-2xl border border-border bg-surface hover:border-accent/30 hover:bg-accent/5 transition-all group shadow-sm">
+          <Link to="/my-projects" className="card flex items-center gap-4 p-4 hover:border-accent/40 hover:bg-surface-2/60 transition-all group">
             <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center shrink-0">
               <FolderKanban size={18} className="text-accent" />
             </div>
@@ -278,7 +278,7 @@ export default function ClientDashboard() {
             <ArrowRight size={15} className="text-text-muted group-hover:text-accent transition-colors" />
           </Link>
 
-          <Link to="/client/calendar" className="flex items-center gap-4 p-4 rounded-2xl border border-border bg-surface hover:border-accent/30 hover:bg-accent/5 transition-all group shadow-sm">
+          <Link to="/client/calendar" className="card flex items-center gap-4 p-4 hover:border-accent/40 hover:bg-surface-2/60 transition-all group">
             <div className="w-10 h-10 rounded-xl bg-status-approved-bg flex items-center justify-center shrink-0">
               <CalendarDays size={18} className="text-status-approved-text" />
             </div>

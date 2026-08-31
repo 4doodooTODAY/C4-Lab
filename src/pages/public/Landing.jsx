@@ -37,7 +37,7 @@ export default function Landing() {
         {/* Launch pill */}
         <div className="anim-rise d1 inline-flex items-center gap-1.5 mb-5 px-4 py-1.5 rounded-full text-[11px] sm:text-xs font-semibold tracking-wide"
           style={{ background: 'rgb(var(--violet-bright-rgb) / 0.18)', color: '#E7D6FF', border: '1px solid rgb(var(--violet-bright-rgb) / 0.4)' }}>
-          <Rocket size={13} /> GOING IN THE APP STORE SEPTEMBER 4TH!
+          <Rocket size={13} /> In the App Store — September 4
         </div>
 
         {/* Hero */}
@@ -71,11 +71,13 @@ export default function Landing() {
           {PILLARS.map((p) => {
             const Icon = p.icon
             return (
-              <div key={p.title} className="rounded-2xl p-4"
+              <div key={p.title} className="p-4"
                 style={{
-                  background: 'linear-gradient(180deg, rgb(255 255 255 / 0.07), rgb(255 255 255 / 0.02))',
-                  border: '1px solid rgb(255 255 255 / 0.12)',
+                  background: 'linear-gradient(180deg, rgb(255 255 255 / 0.08), rgb(255 255 255 / 0.025))',
+                  border: '1px solid rgb(255 255 255 / 0.14)',
+                  borderRadius: 'var(--radius-lg)',
                   backdropFilter: 'blur(12px)',
+                  boxShadow: '0 8px 32px rgb(22 5 48 / 0.5), 0 1px 0 rgb(255 255 255 / 0.08) inset',
                 }}>
                 <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-2.5"
                   style={{ background: 'rgb(var(--violet-bright-rgb) / 0.22)' }}>

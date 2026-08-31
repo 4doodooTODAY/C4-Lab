@@ -530,14 +530,14 @@ export default function AdminDashboard() {
   ]
 
   return (
-    <div className="p-8 max-w-5xl">
+    <div className="px-4 py-6 sm:px-8 sm:py-8 max-w-5xl mx-auto w-full">
       {/* Header */}
-      <div className="anim-rise mb-8">
-        <p className="text-sm text-text-muted">{format(new Date(), 'EEEE, MMMM d')}</p>
-        <h1 className="display">
+      <div className="mb-6 sm:mb-8">
+        <p className="anim-rise text-sm text-text-muted">{format(new Date(), 'EEEE, MMMM d')}</p>
+        <h1 className="anim-rise d1 display">
           Good {greeting}, {profile?.full_name?.split(' ')[0] || 'Admin'}
         </h1>
-        <p className="text-text-secondary mt-1">Here's what's happening across C4C Lab.</p>
+        <p className="anim-rise d2 text-text-secondary mt-1">Here's what's happening across C4C Lab.</p>
       </div>
 
       {loading ? (
@@ -547,16 +547,15 @@ export default function AdminDashboard() {
       ) : (
         <div className="space-y-6">
           {/* Stat cards */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 xs:grid-cols-3 gap-4">
             {statCards.map(({ label, value, icon: Icon, color, to }) => (
               <Link key={label} to={to}
-                className="card p-5 hover:shadow-md transition-shadow flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                  style={{ backgroundColor: `color-mix(in srgb, ${color} 10%, transparent)` }}>
+                className="card p-5 hover:border-accent/40 transition-all flex items-center gap-4 group">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-accent/10">
                   <Icon size={20} style={{ color }} />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-text-primary">{value}</p>
+                  <p className="text-2xl font-bold text-text-primary tabular-nums">{value}</p>
                   <p className="text-sm text-text-muted">{label}</p>
                 </div>
               </Link>

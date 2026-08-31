@@ -55,9 +55,9 @@ export default {
         lg: 'var(--radius-lg)',
       },
       boxShadow: {
-        'elevation-1': '0 1px 2px rgba(0, 0, 0, 0.2)',
-        'elevation-2': '0 4px 14px rgba(0, 0, 0, 0.25)',
-        'elevation-3': '0 14px 36px rgba(0, 0, 0, 0.35)',
+        'elevation-1': '0 1px 3px rgb(22 5 48 / 0.35)',
+        'elevation-2': '0 4px 16px rgb(22 5 48 / 0.55), 0 0 0 1px rgb(116 0 249 / 0.04) inset',
+        'elevation-3': '0 16px 48px rgb(22 5 48 / 0.7), 0 4px 8px rgb(116 0 249 / 0.06)',
       },
     },
   },

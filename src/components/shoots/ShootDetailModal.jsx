@@ -3,7 +3,7 @@ import {
   X, CalendarDays, MapPin, Camera, Upload, Send,
   Loader2, MessageSquare, ExternalLink, Film, Image,
   File, HardDrive, Link2, Plus, Pencil, Check, Users,
-  AlertCircle, FolderKanban, CheckSquare, Square,
+  AlertCircle, FolderKanban, CheckSquare, Square, Copy, Share2,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -412,6 +412,107 @@ function InspirationLinks({ shoot, canEdit }) {
   )
 }
 
+// ── Gallery tab ───────────────────────────────────────────────────────────────
+function ShootGalleryTab({ shoot }) {
+  const [gallery,  setGallery]  = useState(undefined) // undefined = loading
+  const [creating, setCreating] = useState(false)
+  const [copied,   setCopied]   = useState(false)
+  const [error,    setError]    = useState('')
+
+  useEffect(() => {
+    supabase
+      .from('one_off_shoots')
+      .select('id, slug, title, active')
+      .eq('source_shoot_id', shoot.id)
+      .limit(1)
+      .maybeSingle()
+      .then(({ data, error: err }) => {
+        if (err) { setGallery(null); return }
+        setGallery(data || null)
+      })
+  }, [shoot.id])
+
+  const createGallery = async () => {
+    setCreating(true)
+    setError('')
+    const { data, error: err } = await supabase
+      .from('one_off_shoots')
+      .insert({ title: shoot.title, gallery_type: 'gallery', source_shoot_id: shoot.id })
+      .select('id, slug, title, active')
+      .single()
+    setCreating(false)
+    if (err) { setError(err.message); return }
+    setGallery(data)
+  }
+
+  const link = gallery ? `${window.location.origin}/s/${gallery.slug}` : ''
+
+  const copy = () => {
+    navigator.clipboard.writeText(link).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
+  if (gallery === undefined) return (
+    <div className="flex justify-center py-6">
+      <Loader2 size={14} className="animate-spin text-text-muted" />
+    </div>
+  )
+
+  if (!gallery) return (
+    <div className="space-y-3">
+      <div className="text-center py-6 bg-surface-2/40 rounded-xl">
+        <Share2 size={20} className="mx-auto mb-2 text-text-muted/40" />
+        <p className="text-xs font-medium text-text-primary mb-1">No gallery link yet</p>
+        <p className="text-xs text-text-muted mb-4 max-w-xs mx-auto">
+          Create a shareable link for this shoot. Clients open it with just their name and
+          number to view, favorite, comment, and download full-quality files.
+        </p>
+        {error && (
+          <p className="text-xs text-status-overdue-text bg-status-overdue-bg border border-status-overdue/30 rounded-lg px-3 py-2 mb-3">
+            {error}
+          </p>
+        )}
+        <button
+          onClick={createGallery}
+          disabled={creating}
+          className="btn-primary flex items-center gap-2 mx-auto disabled:opacity-50"
+        >
+          {creating ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
+          Create Gallery Link
+        </button>
+      </div>
+    </div>
+  )
+
+  return (
+    <div className="space-y-3">
+      {!gallery.active && (
+        <p className="text-xs text-status-overdue-text bg-status-overdue-bg border border-status-overdue/30 rounded-lg px-3 py-2 flex items-center gap-1.5">
+          <AlertCircle size={12} /> This gallery is currently inactive. Activate it from Gallery Links.
+        </p>
+      )}
+      <div className="flex items-center gap-2 bg-surface-2 border border-border rounded-xl px-3 py-2.5">
+        <Share2 size={12} className="text-text-muted shrink-0" />
+        <span className="text-xs text-text-secondary font-mono truncate flex-1">{link}</span>
+        <button
+          onClick={copy}
+          className="flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-lg border border-border hover:bg-surface-3 transition-colors text-text-muted shrink-0"
+        >
+          {copied ? <Check size={10} className="text-green-500" /> : <Copy size={10} />}
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+      </div>
+      <p className="text-[11px] text-text-muted">
+        Upload photos to this gallery from{' '}
+        <a href="/admin/shoots" className="text-accent hover:underline">Gallery Links</a>.
+        Clients only need their name and phone to access it — no account required.
+      </p>
+    </div>
+  )
+}
+
 // ── Main modal ────────────────────────────────────────────────────────────────
 export default function ShootDetailModal({ shoot: initialShoot, clientId, clientName, onClose, onUpdated }) {
   const { profile } = useAuth()
@@ -749,6 +850,7 @@ export default function ShootDetailModal({ shoot: initialShoot, clientId, client
                       { id: 'inspiration', label: 'Inspiration', icon: Link2 },
                       { id: 'notes', label: 'Notes', icon: MessageSquare },
                     ]),
+                    ...(canEdit ? [{ id: 'gallery', label: 'Gallery Link', icon: Share2 }] : []),
                   ].map(({ id, label, icon: Icon }) => (
                     <button
                       key={id}
@@ -769,6 +871,7 @@ export default function ShootDetailModal({ shoot: initialShoot, clientId, client
                   <InspirationLinks shoot={shoot} canEdit={canSeeCreativeNotes} />
                 )}
                 {!isClient && activeSection === 'notes' && <NotesThread shootId={shoot.id} />}
+                {canEdit && activeSection === 'gallery' && <ShootGalleryTab shoot={shoot} />}
               </div>
             )}
           </div>

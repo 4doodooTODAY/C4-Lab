@@ -113,10 +113,13 @@
 }
 :root[data-theme="light"] .app-ground::after { opacity: 0.02; }
 
-/* Cards read as clean white with a soft shadow instead of the plum treatment. */
+/* Cards read as clean white with a soft violet-tinted shadow instead of the plum treatment. */
 :root[data-theme="light"] .card {
   background: #ffffff;
-  box-shadow: 0 8px 28px rgb(15 17 23 / 0.08);
+  box-shadow:
+    0 8px 28px rgb(116 0 249 / 0.06),
+    0 1px 3px rgb(15 17 23 / 0.08),
+    0 1px 0 rgb(255 255 255 / 0.9) inset;
 }
 
 /* ═══ Ground treatment — gradient mesh + grain, never a flat fill ════════ */
@@ -153,10 +156,11 @@
                              Horizon-style face runs wide, so sizes step down */
   line-height: 1.12;
   color: var(--ink-hi);
+  text-wrap: balance;
 }
 
 @media (min-width: 768px) {
-  .display { font-size: 2.25rem; }
+  .display { font-size: 2.375rem; }
 }
 
 /* ═══ Components ═════════════════════════════════════════════════════════ */
@@ -167,7 +171,10 @@
     var(--ground-2);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
-  box-shadow: 0 8px 28px rgb(0 0 0 / 0.28);
+  box-shadow:
+    0 8px 32px rgb(var(--ground-0-rgb) / 0.75),
+    0 1px 0 rgb(var(--ink-hi-rgb) / 0.06) inset,
+    0 0 0 1px rgb(var(--violet-rgb) / 0.04) inset;
 }
 
 .btn-primary {
@@ -178,10 +185,13 @@
   font-size: 0.8125rem;
   padding: 0.5rem 1rem;
   border-radius: var(--radius-md);
-  transition: background-color 150ms ease, transform 150ms ease;
+  transition: background-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
 }
-.btn-primary:hover { background: var(--violet-bright); }
-.btn-primary:active { transform: translateY(1px); }
+.btn-primary:hover {
+  background: var(--violet-bright);
+  box-shadow: 0 4px 20px rgb(var(--violet-rgb) / 0.45);
+}
+.btn-primary:active { transform: translateY(1px); box-shadow: none; }
 
 .btn-secondary {
   background: rgb(var(--ink-hi-rgb) / 0.06);

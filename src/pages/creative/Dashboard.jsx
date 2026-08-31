@@ -258,7 +258,7 @@ export default function CreativeDashboard() {
   )
 
   if (loadError) return (
-    <div className="p-8 max-w-4xl">
+    <div className="px-4 py-6 sm:px-8 sm:py-8 max-w-4xl mx-auto w-full">
       <div className="card px-6 py-8 flex flex-col items-center text-center gap-3">
         <div className="w-10 h-10 rounded-full bg-status-overdue-bg flex items-center justify-center">
           <AlertCircle size={18} className="text-status-overdue-text" />
@@ -278,7 +278,7 @@ export default function CreativeDashboard() {
   )
 
   return (
-    <div className="p-8 max-w-4xl space-y-9">
+    <div className="px-4 py-6 sm:px-8 sm:py-8 max-w-4xl mx-auto w-full space-y-9">
 
       {/* Greeting */}
       <div className="anim-rise">
@@ -289,7 +289,7 @@ export default function CreativeDashboard() {
       </div>
 
       {/* Stats row */}
-      <div className="anim-rise d1 grid grid-cols-3 gap-4">
+      <div className="anim-rise d1 grid grid-cols-1 xs:grid-cols-3 gap-4">
         <Stat label="Active projects"   value={activeProjs.length}   icon={FolderKanban} accent="var(--violet)" />
         <Stat label="Need your action"  value={actionItems.length}   icon={AlertCircle}  accent={actionItems.length ? '#f59e0b' : '#94a3b8'} />
         <Stat label="Next 14 days"       value={shootsThisWeek}       icon={CalendarDays} accent="#10b981" />

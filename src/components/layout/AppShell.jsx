@@ -61,7 +61,7 @@ export default function AppShell() {
   return (
     <NotificationProvider>
       <UploadProgressBar />
-      <div className="app-ground flex h-screen overflow-hidden">
+      <div className="app-ground flex h-dvh overflow-hidden">
         <Sidebar open={navOpen} onClose={() => setNavOpen(false)} />
         <NotificationPanel />
         {/* min-w-0 lets wide content (tables, media) shrink instead of forcing

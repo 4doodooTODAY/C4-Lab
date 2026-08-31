@@ -156,7 +156,7 @@ export default function Login() {
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-x-2.5 gap-y-1 px-4 py-2.5">
           <Rocket size={13} className="shrink-0 text-[#C9A6FF]" />
           <span className="text-xs text-text-secondary">
-            In the App Store <span className="font-semibold text-text-primary">September 4th</span>
+            In the App Store — <span className="font-semibold text-text-primary">September 4</span>
           </span>
           <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#C9A6FF] transition-colors group-hover:text-text-primary">
             Join the waitlist

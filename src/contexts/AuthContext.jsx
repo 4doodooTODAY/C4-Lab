@@ -4,14 +4,17 @@ import { supabase } from '../lib/supabase'
 const AuthContext = createContext(null)
 const PROFILE_CACHE_KEY = 'c4lab_profile'
 
+// Use localStorage so the profile cache survives page reloads and browser restarts.
+// sessionStorage was cleared on every fresh tab/browser-open, forcing a DB round-trip
+// on every page load even when the Supabase session was still valid.
 const getCachedProfile = () => {
-  try { return JSON.parse(sessionStorage.getItem(PROFILE_CACHE_KEY)) } catch { return null }
+  try { return JSON.parse(localStorage.getItem(PROFILE_CACHE_KEY)) } catch { return null }
 }
 const setCachedProfile = (p) => {
-  try { sessionStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(p)) } catch {}
+  try { localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(p)) } catch {}
 }
 const clearCachedProfile = () => {
-  try { sessionStorage.removeItem(PROFILE_CACHE_KEY) } catch {}
+  try { localStorage.removeItem(PROFILE_CACHE_KEY) } catch {}
 }
 
 const fetchProfile = (userId) =>
