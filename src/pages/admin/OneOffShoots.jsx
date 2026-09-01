@@ -17,7 +17,9 @@ function publicLink(slug) {
 }
 
 const previewUrl = (path) =>
-  supabase.storage.from('shoot-previews').getPublicUrl(path).data.publicUrl
+  /^https?:\/\//.test(path)
+    ? path
+    : supabase.storage.from('shoot-previews').getPublicUrl(path).data.publicUrl
 
 // ── Copy button ────────────────────────────────────────────────────────────────
 function CopyButton({ text }) {

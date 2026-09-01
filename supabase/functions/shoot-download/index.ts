@@ -8,6 +8,8 @@
 // Deploy: supabase functions deploy shoot-download --no-verify-jwt
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { S3Client, GetObjectCommand } from 'npm:@aws-sdk/client-s3@3'
+import { getSignedUrl } from 'npm:@aws-sdk/s3-request-presigner@3'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -20,6 +22,42 @@ const json = (body: unknown, status = 200) =>
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   })
+
+function makeR2Client() {
+  const accountId = Deno.env.get('R2_ACCOUNT_ID')!
+  return new S3Client({
+    region: 'auto',
+    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+    credentials: {
+      accessKeyId: Deno.env.get('R2_ACCESS_KEY_ID')!,
+      secretAccessKey: Deno.env.get('R2_SECRET_ACCESS_KEY')!,
+    },
+  })
+}
+
+// Extract the R2 object key from a public R2 URL.
+function extractR2Key(url: string): string | null {
+  const base = Deno.env.get('R2_PUBLIC_URL')?.replace(/\/$/, '')
+  if (base && url.startsWith(base)) {
+    return url.slice(base.length).replace(/^\//, '')
+  }
+  try {
+    return new URL(url).pathname.replace(/^\//, '')
+  } catch {
+    return null
+  }
+}
+
+async function presignR2Download(key: string, fileName: string): Promise<string> {
+  const client = makeR2Client()
+  const safeName = fileName.replace(/"/g, '\\"')
+  const cmd = new GetObjectCommand({
+    Bucket: Deno.env.get('R2_BUCKET_NAME') || 'c4-lab-files',
+    Key: key,
+    ResponseContentDisposition: `attachment; filename="${safeName}"`,
+  })
+  return getSignedUrl(client, cmd, { expiresIn: 600 })
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -65,16 +103,31 @@ Deno.serve(async (req) => {
   if (imgErr) return json({ error: 'image lookup failed' }, 500)
   if (!images?.length) return json({ error: 'image not found' }, 404)
 
-  // 3. Sign URLs to the untouched originals (10 min). Download disposition by
-  //    default; stream mode omits it so the browser can play video inline.
-  // Files synced from project shoots store their R2 URL directly as original_path.
-  // Detect those by checking for a full URL and pass them through without signing.
+  // 3. Sign URLs (10 min). Download disposition by default; stream omits it.
+  // R2-hosted files (synced from project shoots) are presigned here so the
+  // server sets Content-Disposition — this is what makes iOS trigger "Save to
+  // Photos" when the client uses the Web Share API or a.download fallback.
+  // Stream mode returns the raw public URL so the browser can play inline.
   const signed: { url: string; fileName: string }[] = []
   for (const img of images) {
     if (/^https?:\/\//.test(img.original_path)) {
+      if (!stream) {
+        const key = extractR2Key(img.original_path)
+        if (key) {
+          try {
+            const url = await presignR2Download(key, img.file_name)
+            signed.push({ url, fileName: img.file_name })
+            continue
+          } catch (e) {
+            console.error('R2 presign failed, falling back to raw URL', e)
+          }
+        }
+      }
+      // Stream mode or presign failure: raw public URL
       signed.push({ url: img.original_path, fileName: img.file_name })
       continue
     }
+    // Supabase storage path
     const { data, error } = await supabase.storage
       .from('shoot-originals')
       .createSignedUrl(img.original_path, 600, stream ? undefined : { download: img.file_name })

@@ -33,13 +33,36 @@ async function callDownload(body) {
   return data
 }
 
-function triggerBrowserDownload(url) {
-  const a = document.createElement('a')
-  a.href = url
-  a.rel = 'noopener'
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
+async function triggerBrowserDownload(url, fileName) {
+  try {
+    const res = await fetch(url)
+    if (!res.ok) throw new Error('fetch failed')
+    const blob = await res.blob()
+    const file = new File([blob], fileName || 'download', { type: blob.type })
+    // iOS: Web Share API lets user save directly to Photos / Files
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file], title: fileName })
+      return
+    }
+    // Desktop / Android: blob URL with download attribute carries the filename
+    const blobUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = blobUrl
+    a.download = fileName || 'download'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 30_000)
+  } catch {
+    // Last resort: navigate; Content-Disposition from server handles save behaviour
+    const a = document.createElement('a')
+    a.href = url
+    a.download = fileName || 'download'
+    a.rel = 'noopener'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+  }
 }
 
 // ── Phone gate modal ──────────────────────────────────────────────────────────
@@ -456,8 +479,8 @@ export default function ShootGallery() {
     }
     setDownloading(true)
     try {
-      const { url } = await callDownload({ claim: c, imageId })
-      triggerBrowserDownload(url)
+      const { url, fileName } = await callDownload({ claim: c, imageId })
+      await triggerBrowserDownload(url, fileName)
     } catch (err) {
       if (/claim/i.test(err.message)) {
         sessionStorage.removeItem(claimKey(slug))
