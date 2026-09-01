@@ -48,9 +48,9 @@ function extractR2Key(url: string): string | null {
   }
 }
 
-async function presignR2Download(key: string, fileName: string): Promise<string> {
+async function presignR2Download(key: string, fileName: string | null): Promise<string> {
   const client = makeR2Client()
-  const safeName = fileName.replace(/"/g, '\\"')
+  const safeName = (fileName ?? 'download').replace(/"/g, '\\"')
   const cmd = new GetObjectCommand({
     Bucket: Deno.env.get('R2_BUCKET_NAME') || 'c4-lab-files',
     Key: key,

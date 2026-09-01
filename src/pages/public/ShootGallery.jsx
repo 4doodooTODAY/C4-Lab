@@ -34,34 +34,33 @@ async function callDownload(body) {
 }
 
 async function triggerBrowserDownload(url, fileName) {
+  const name = fileName || 'download'
   try {
     const res = await fetch(url)
-    if (!res.ok) throw new Error('fetch failed')
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const blob = await res.blob()
-    const file = new File([blob], fileName || 'download', { type: blob.type })
-    // iOS: Web Share API lets user save directly to Photos / Files
-    if (navigator.canShare?.({ files: [file] })) {
-      await navigator.share({ files: [file], title: fileName })
+    // Web Share API with files: only on real touch devices (iOS/Android).
+    // Desktop Chrome also supports canShare but shows an OS share sheet instead
+    // of a file save — we don't want that on desktop.
+    const isTouch = navigator.maxTouchPoints > 1
+    if (isTouch && navigator.canShare?.({ files: [new File([blob], name, { type: blob.type })] })) {
+      await navigator.share({ files: [new File([blob], name, { type: blob.type })] })
       return
     }
-    // Desktop / Android: blob URL with download attribute carries the filename
+    // Desktop / Android fallback: blob URL so a.download works same-origin
     const blobUrl = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = blobUrl
-    a.download = fileName || 'download'
+    a.download = name
     document.body.appendChild(a)
     a.click()
     a.remove()
     setTimeout(() => URL.revokeObjectURL(blobUrl), 30_000)
   } catch {
-    // Last resort: navigate; Content-Disposition from server handles save behaviour
-    const a = document.createElement('a')
-    a.href = url
-    a.download = fileName || 'download'
-    a.rel = 'noopener'
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
+    // fetch blocked (CORS) or share API rejected.
+    // Open in new tab — server Content-Disposition: attachment triggers download
+    // without navigating away from the gallery.
+    window.open(url, '_blank', 'noopener,noreferrer')
   }
 }
 
