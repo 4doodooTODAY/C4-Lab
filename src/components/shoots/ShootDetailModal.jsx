@@ -440,15 +440,17 @@ function ShootGalleryTab({ shoot }) {
     const toAdd = (uploads || []).filter((u) => u.file_url && !existingPaths.has(u.file_url))
     if (toAdd.length) {
       const rows = toAdd.map((u) => {
-        const ext = u.file_name?.split('.').pop()?.toLowerCase() || ''
+        const ext    = u.file_name?.split('.').pop()?.toLowerCase() || ''
+        const isVid  = VIDEO_EXTS.has(ext)
+        const poster = u.thumbnail_url || u.file_url
         return {
           shoot_id:      gal.id,
           file_name:     u.file_name,
           file_size:     u.file_size,
           original_path: u.file_url,
-          preview_path:  u.file_url,
-          thumb_path:    u.thumbnail_url || u.file_url,
-          is_video:      VIDEO_EXTS.has(ext),
+          preview_path:  isVid ? poster : u.file_url,
+          thumb_path:    poster,
+          is_video:      isVid,
         }
       })
       await supabase.from('one_off_shoot_images').insert(rows)
