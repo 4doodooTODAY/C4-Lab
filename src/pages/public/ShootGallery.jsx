@@ -33,35 +33,26 @@ async function callDownload(body) {
   return data
 }
 
-async function triggerBrowserDownload(url, fileName) {
+// blob comes pre-fetched from the edge function (no separate R2 fetch needed).
+async function triggerBrowserDownload(blob, fileName) {
   const name = fileName || 'download'
-  try {
-    const res = await fetch(url)
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const blob = await res.blob()
-    // Web Share API with files: only on real touch devices (iOS/Android).
-    // Desktop Chrome also supports canShare but shows an OS share sheet instead
-    // of a file save — we don't want that on desktop.
-    const isTouch = navigator.maxTouchPoints > 1
-    if (isTouch && navigator.canShare?.({ files: [new File([blob], name, { type: blob.type })] })) {
-      await navigator.share({ files: [new File([blob], name, { type: blob.type })] })
+  // Touch devices (iOS/Android): Web Share API → native "Save to Photos" sheet.
+  // Desktop Chrome also supports canShare but opens an OS share sheet — skip it.
+  if (navigator.maxTouchPoints > 1) {
+    const file = new File([blob], name, { type: blob.type })
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file] })
       return
     }
-    // Desktop / Android fallback: blob URL so a.download works same-origin
-    const blobUrl = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = blobUrl
-    a.download = name
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 30_000)
-  } catch {
-    // fetch blocked (CORS) or share API rejected.
-    // Open in new tab — server Content-Disposition: attachment triggers download
-    // without navigating away from the gallery.
-    window.open(url, '_blank', 'noopener,noreferrer')
   }
+  const blobUrl = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = blobUrl
+  a.download = name
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 30_000)
 }
 
 // ── Phone gate modal ──────────────────────────────────────────────────────────
@@ -478,10 +469,28 @@ export default function ShootGallery() {
     }
     setDownloading(true)
     try {
-      const { url, fileName } = await callDownload({ claim: c, imageId })
-      await triggerBrowserDownload(url, fileName)
+      // Edge function proxies the file directly — no cross-origin R2 fetch needed.
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/shoot-download`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({ claim: c, imageId }),
+        }
+      )
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'download failed')
+      }
+      const blob = await res.blob()
+      const fileName = res.headers.get('x-filename') || 'download'
+      await triggerBrowserDownload(blob, fileName)
     } catch (err) {
-      if (/claim/i.test(err.message)) {
+      if (/claim/i.test(String(err.message))) {
         sessionStorage.removeItem(claimKey(slug))
         setClaim(null)
         requireClaim((newClaim) => downloadOne(imageId, newClaim))
