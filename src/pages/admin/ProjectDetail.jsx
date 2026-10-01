@@ -8,6 +8,7 @@ import {
   Sparkles, ThumbsUp, ThumbsDown, Link2 as LinkIcon, CheckSquare, Square,
 } from 'lucide-react'
 import { useProject, updateProject } from '../../hooks/useProjects'
+import EditableProjectName from '../../components/projects/EditableProjectName'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { clientProfileIds } from '../../lib/myClient'
@@ -381,7 +382,7 @@ export default function ProjectDetail() {
   const navigate = useNavigate()
   const { profile, isAdmin } = useAuth()
 
-  const { project, loading, error: loadError, refetch } = useProject(id)
+  const { project, loading, error: loadError, refetch, setProject } = useProject(id)
 
   // Notes
   const [notes, setNotes]               = useState('')
@@ -943,7 +944,7 @@ export default function ProjectDetail() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4 mb-6">
         <div className="flex-1 min-w-0">
-          <h1 className="display">{project.name}</h1>
+          <EditableProjectName projectId={project.id} name={project.name} onRenamed={(n) => setProject((p) => ({ ...p, name: n }))} />
           <div className="flex items-center gap-2 flex-wrap mt-2">
             {project.type && (
               <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${TYPE_COLORS[project.type] || 'bg-surface-2 text-text-muted'}`}>

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
+import EditableProjectName from '../../components/projects/EditableProjectName'
 import {
   ArrowLeft, Loader2, Upload, Check, Film, StickyNote, Send,
   Download, FileVideo, Eye,
@@ -2486,7 +2487,7 @@ export default function ProjectWorkflow() {
       <div className="mb-6">
         <div className="flex items-start gap-3 flex-wrap">
           <div className="flex-1 min-w-0">
-            <h1 className="display">{project.name}</h1>
+            <EditableProjectName projectId={project.id} name={project.name} canEdit={isCreative || isEditor} onRenamed={(n) => setProject((p) => ({ ...p, name: n }))} />
             {project.clients && (
               <p className="text-sm text-text-muted mt-0.5">
                 {project.clients.contact_name || project.clients.name}

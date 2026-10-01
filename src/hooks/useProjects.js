@@ -76,7 +76,7 @@ export function useProject(id) {
 
   useEffect(() => { fetchProject() }, [fetchProject])
 
-  return { project, loading, error, refetch: fetchProject }
+  return { project, loading, error, refetch: fetchProject, setProject }
 }
 
 export async function createProject(data) {
