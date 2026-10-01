@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import EditableProjectName from '../../components/projects/EditableProjectName'
 import { Loader2, Camera, Scissors, CalendarDays, MapPin, ArrowRight, Upload, MessageSquare, Check, Send } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
@@ -81,7 +82,7 @@ function ShootCard({ shoot, onOpen, onMarkDone }) {
 }
 
 // ── Edit Card ─────────────────────────────────────────────────────────────────
-function EditCard({ project, revisions, myId, onClick, onMarkDone, isPinned, onTogglePin }) {
+function EditCard({ project, revisions, myId, onClick, onMarkDone, isPinned, onTogglePin, onRenamed }) {
   const latest = latestRevisionFor(project.id, revisions)
   const status = computeProjectStatus(project, latest)
 
@@ -92,7 +93,7 @@ function EditCard({ project, revisions, myId, onClick, onMarkDone, isPinned, onT
     <div className="card border border-border p-5 hover:shadow-md hover:border-border-strong transition-all">
       <div className="flex items-start justify-between gap-2 mb-2 cursor-pointer" onClick={onClick}>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-text-primary truncate">{project.name}</p>
+          <EditableProjectName variant="inline" projectId={project.id} name={project.name} onRenamed={onRenamed} />
           <p className="text-xs text-text-muted mt-0.5 truncate">
             {project.clients?.contact_name || project.clients?.name || 'Not set'}
           </p>
@@ -321,6 +322,7 @@ export default function CreativeProjectList() {
               <EditCard
                 key={p.id}
                 project={p}
+                onRenamed={(n) => setEdits((prev) => prev.map((x) => (x.id === p.id ? { ...x, name: n } : x)))}
                 revisions={revisions}
                 myId={myId}
                 isPinned={pinned.has(p.id)}
@@ -350,6 +352,7 @@ export default function CreativeProjectList() {
               <EditCard
                 key={p.id}
                 project={p}
+                onRenamed={(n) => setEdits((prev) => prev.map((x) => (x.id === p.id ? { ...x, name: n } : x)))}
                 revisions={revisions}
                 myId={myId}
                 isPinned={pinned.has(p.id)}
@@ -381,6 +384,7 @@ export default function CreativeProjectList() {
               <EditCard
                 key={p.id}
                 project={p}
+                onRenamed={(n) => setEdits((prev) => prev.map((x) => (x.id === p.id ? { ...x, name: n } : x)))}
                 revisions={revisions}
                 myId={myId}
                 onClick={() => navigate(`/projects/${p.id}/creative`)}

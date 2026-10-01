@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import EditableProjectName from '../../components/projects/EditableProjectName'
 import {
   ArrowLeft, Camera, FolderKanban, HardDrive, Loader2,
   CalendarDays, MapPin, Film, ExternalLink,
@@ -212,7 +213,8 @@ function ProjectsTab({ clientId }) {
           onClick={() => navigate(`/projects/${p.id}`)}
           className="card p-4 hover:shadow-md transition-shadow cursor-pointer flex items-center gap-4">
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-text-primary">{p.name}</p>
+            <EditableProjectName variant="inline" projectId={p.id} name={p.name}
+              onRenamed={(n) => setProjects((prev) => prev.map((x) => (x.id === p.id ? { ...x, name: n } : x)))} />
             {p.due_date && (
               <p className="text-xs text-text-muted mt-0.5 flex items-center gap-1">
                 <CalendarDays size={10} /> Due {format(parseISO(p.due_date), 'MMM d, yyyy')}

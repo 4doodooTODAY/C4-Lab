@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import EditableProjectName from '../../components/projects/EditableProjectName'
 import {
   Plus, X, Loader2, FolderKanban, Search, ChevronRight,
   CalendarDays, AlertCircle, Users, Film, Camera
@@ -72,7 +73,7 @@ const IN_CONTROL = {
 }
 
 // ── Project Card ──────────────────────────────────────────────────────────────
-function ProjectCard({ project, onClick, status, isPinned, onTogglePin }) {
+function ProjectCard({ project, onClick, status, isPinned, onTogglePin, onRenamed }) {
   const due = project.due_date ? startOfDay(parseISO(project.due_date)) : null
 
   // Build team from the actual assignment fields (creative + editor join profiles)
@@ -93,7 +94,7 @@ function ProjectCard({ project, onClick, status, isPinned, onTogglePin }) {
       {/* Top row */}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-text-primary truncate">{project.name}</p>
+          <EditableProjectName variant="inline" projectId={project.id} name={project.name} onRenamed={onRenamed} />
           <p className="text-xs text-text-muted mt-0.5 truncate">{clientName}</p>
         </div>
         <PinButton pinned={isPinned} onToggle={onTogglePin} />
@@ -156,7 +157,7 @@ function ProjectCard({ project, onClick, status, isPinned, onTogglePin }) {
 export default function Projects() {
   const navigate = useNavigate()
   const { user, isAdmin } = useAuth()
-  const { projects, loading } = useProjects({ userId: user?.id, isAdmin })
+  const { projects, loading, setProjects } = useProjects({ userId: user?.id, isAdmin })
   const [showNew, setShowNew]   = useState(false)
   const [search, setSearch]     = useState('')
   const [filterType, setFT]     = useState('')
@@ -288,6 +289,7 @@ export default function Projects() {
               isPinned={pinned.has(p.id)}
               onTogglePin={() => togglePin(p.id)}
               onClick={() => navigate(`/projects/${p.id}`)}
+              onRenamed={(n) => setProjects((prev) => prev.map((x) => (x.id === p.id ? { ...x, name: n } : x)))}
             />
           ))}
         </div>

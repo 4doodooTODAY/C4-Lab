@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
+import EditableProjectName from '../../components/projects/EditableProjectName'
 import {
   ArrowLeft, Building2, Users2, CalendarDays, FolderKanban,
   Inbox, Plus, X, Loader2, Edit2, MapPin, Clock, Check, Pencil,
@@ -1232,8 +1233,8 @@ function ProjectsTab({ clientId, projects, onRefetch }) {
               className="flex items-center gap-4 cursor-pointer hover:opacity-80 transition-opacity"
             >
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-semibold text-text-primary">{p.name}</p>
+                <div className="flex items-center gap-2 min-w-0">
+                  <EditableProjectName variant="inline" projectId={p.id} name={p.name} onRenamed={() => onRefetch?.()} />
                   {!editorName && (
                     <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-status-due-soon-bg text-status-due-soon-text border border-status-due-soon/30">
                       <AlertCircle size={9} /> Waiting for editor

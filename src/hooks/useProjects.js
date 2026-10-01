@@ -53,7 +53,7 @@ export function useProjects({ userId, isAdmin } = {}) {
 
   useEffect(() => { fetchProjects() }, [fetchProjects])
 
-  return { projects, loading, error, refetch: fetchProjects }
+  return { projects, loading, error, refetch: fetchProjects, setProjects }
 }
 
 export function useProject(id) {
