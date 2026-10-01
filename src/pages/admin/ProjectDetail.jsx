@@ -224,7 +224,7 @@ function PitchApprovalPanel({ project, profile, onApproved }) {
       await updateProject(project.id, { stage: 'pre_production' })
       // Notify client
       if (project.client_id) {
-        // Notify every login account on this client (up to 2)
+        // Notify every login account on this client
         const ids = await clientProfileIds(project.client_id)
         await Promise.all(ids.map((pid) => notify({
           profileId: pid, actorId: profile.id, type: 'pitch_approved',

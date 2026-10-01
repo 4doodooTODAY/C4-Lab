@@ -357,7 +357,7 @@ export default function VideoRevisionReview() {
       // Notify the client
       const projectLink = `/projects/${project.id}`
       if (project.client_id) {
-        // Notify every login account on this client (up to 2)
+        // Notify every login account on this client
         const ids = await clientProfileIds(project.client_id)
         await Promise.all(ids.map((pid) => notify({
           profileId: pid, actorId: myId,

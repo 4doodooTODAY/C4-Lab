@@ -18,6 +18,7 @@ import { useContentDrafts, createDraft, updateDraft } from '../../hooks/useConte
 import { fmtTime } from '../../lib/time'
 import { forceDownload } from '../../lib/r2'
 import ShootDetailModal from '../../components/shoots/ShootDetailModal'
+import ClientPeople from '../../components/clients/ClientPeople'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 const DRAFT_TYPE_LABELS = {
@@ -318,6 +319,18 @@ function OverviewTab({ client, shoots, projects, requests, onClientUpdated }) {
     notes:        client.notes        || '',
   })
 
+  // Making someone primary in People rewrites the contact name and email
+  useEffect(() => {
+    if (editing) return
+    setForm({
+      name:         client.name         || '',
+      contact_name: client.contact_name || '',
+      email:        client.email        || '',
+      phone:        client.phone        || '',
+      notes:        client.notes        || '',
+    })
+  }, [client, editing])
+
   const handleSaveClient = async () => {
     setSavingClient(true)
     setEditErr('')
@@ -468,6 +481,9 @@ function OverviewTab({ client, shoots, projects, requests, onClientUpdated }) {
           </div>
         )}
       </div>
+
+      {/* People who can sign in to this client */}
+      <ClientPeople client={client} onChanged={onClientUpdated} />
 
       {/* Assigned Creatives */}
       <div className="card p-5">

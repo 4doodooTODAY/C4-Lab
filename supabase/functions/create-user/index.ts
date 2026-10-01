@@ -262,6 +262,13 @@ Deno.serve(async (req) => {
       const { userId: profileId, kind, link } = await makeSetupLink(supabaseAdmin, email, {
         full_name: contact_name, role: 'client', must_change_password: true,
       })
+      if (kind !== 'invite') {
+        const { data: prior } = await supabaseAdmin
+          .from('profiles').select('role').eq('id', profileId).maybeSingle()
+        if (prior?.role && prior.role !== 'client') {
+          throw new Error('That email belongs to a team account. Use a different email for the client login.')
+        }
+      }
 
       // Upsert profile, then force-update role in case a DB trigger set a default
       const { error: profileError } = await supabaseAdmin.from('profiles').upsert({
@@ -298,6 +305,168 @@ Deno.serve(async (req) => {
       catch (e) { emailed = false; console.error('invite email failed:', e) }
 
       return new Response(JSON.stringify({ user: { id: profileId, email }, client: clientData, invite_link: link, emailed }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200,
+      })
+    }
+
+    // ── CLIENT PEOPLE (multiple logins on one client account) ───────────────
+    // Done here rather than with createUser + a client_members insert from the
+    // browser, because the plain invite action upserts the profile's role. Adding
+    // a teammate's email to a client that way would quietly demote them to a
+    // client. These actions refuse any email that belongs to a team account.
+
+    // --- LIST CLIENT PEOPLE (with emails + sign-in state from auth) ---
+    if (action === 'list_client_members') {
+      const { client_id } = body
+      const [{ data: client }, { data: rows, error }] = await Promise.all([
+        supabaseAdmin.from('clients').select('profile_id').eq('id', client_id).single(),
+        supabaseAdmin.from('client_members')
+          .select('profile_id, created_at, profiles(full_name, avatar_url, must_change_password)')
+          .eq('client_id', client_id)
+          .order('created_at'),
+      ])
+      if (error) throw error
+      const members = await Promise.all((rows || []).map(async (r: any) => {
+        const { data } = await supabaseAdmin.auth.admin.getUserById(r.profile_id)
+        const u = data?.user
+        return {
+          profile_id:      r.profile_id,
+          full_name:       r.profiles?.full_name ?? '',
+          avatar_url:      r.profiles?.avatar_url ?? null,
+          email:           u?.email ?? '',
+          pending:         !!r.profiles?.must_change_password || !u?.last_sign_in_at,
+          locked:          !!u?.banned_until && new Date(u.banned_until) > new Date(),
+          last_sign_in_at: u?.last_sign_in_at ?? null,
+          is_primary:      r.profile_id === client?.profile_id,
+          added_at:        r.created_at,
+        }
+      }))
+      return new Response(JSON.stringify({ members }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200,
+      })
+    }
+
+    // --- ADD A PERSON TO AN EXISTING CLIENT ---
+    if (action === 'add_client_member') {
+      const { client_id } = body
+      const email = String(body.email || '').trim().toLowerCase()
+      const full_name = String(body.full_name || '').trim()
+      if (!client_id || !email || !full_name) throw new Error('Name and email are required.')
+
+      const { data: client, error: clientErr } = await supabaseAdmin
+        .from('clients').select('id, name, profile_id').eq('id', client_id).single()
+      if (clientErr || !client) throw new Error('Client not found.')
+
+      // Resolves to the existing account when the email is already registered
+      const { userId, kind, link } = await makeSetupLink(supabaseAdmin, email, {
+        full_name, role: 'client', must_change_password: true,
+      })
+
+      // kind === 'invite' means the auth user was just created. Don't read the
+      // profile role in that case: a DB trigger may have stamped a default.
+      const isNew = kind === 'invite'
+      const { data: existing } = isNew ? { data: null } : await supabaseAdmin
+        .from('profiles').select('role, must_change_password').eq('id', userId).maybeSingle()
+      if (existing?.role && existing.role !== 'client') {
+        throw new Error('That email belongs to a team account. Use a different email for the client login.')
+      }
+
+      // One person, one client: the portal resolves a single client per login
+      const { data: other } = await supabaseAdmin
+        .from('client_members').select('client_id, clients(name)')
+        .eq('profile_id', userId).neq('client_id', client_id).limit(1).maybeSingle()
+      if (other) {
+        throw new Error(`${email} already signs in to ${other.clients?.name || 'another client'}. Remove them there first.`)
+      }
+
+      const needsSetup = isNew || !existing || !!existing.must_change_password
+      if (isNew || !existing) {
+        const { error: pErr } = await supabaseAdmin.from('profiles').upsert({
+          id: userId, full_name, role: 'client', must_change_password: true,
+        }, { onConflict: 'id' })
+        if (pErr) throw new Error('Profile error: ' + pErr.message)
+      }
+      // A DB trigger can create the profile with a default role first
+      await supabaseAdmin.from('profiles').update({ role: 'client' }).eq('id', userId)
+
+      const { error: mErr } = await supabaseAdmin.from('client_members')
+        .upsert({ client_id, profile_id: userId }, { onConflict: 'client_id,profile_id' })
+      if (mErr) throw new Error('Membership error: ' + mErr.message)
+
+      // A client with no primary login (contact-only record) adopts this person
+      if (!client.profile_id) {
+        await supabaseAdmin.from('clients').update({ profile_id: userId }).eq('id', client_id)
+      }
+
+      // Re-adding someone who was removed earlier lifts the lock from that removal
+      await supabaseAdmin.auth.admin.updateUserById(userId, { ban_duration: 'none' })
+
+      // People who already have a password just gain access; no email needed
+      let emailed = false
+      if (needsSetup) {
+        emailed = true
+        try { await sendAuthEmail(email, full_name, link, kind) }
+        catch (e) { emailed = false; console.error('member invite email failed:', e) }
+      }
+
+      return new Response(JSON.stringify({
+        user: { id: userId, email },
+        invited: needsSetup,
+        emailed,
+        invite_link: needsSetup ? link : null,
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 })
+    }
+
+    // --- REMOVE A PERSON FROM A CLIENT ---
+    // Their account is locked, not deleted, so comments and approvals they left
+    // keep their author. Adding them back unlocks it.
+    if (action === 'remove_client_member') {
+      const { client_id, profile_id } = body
+      const { data: client } = await supabaseAdmin
+        .from('clients').select('profile_id').eq('id', client_id).single()
+
+      const { error } = await supabaseAdmin.from('client_members')
+        .delete().eq('client_id', client_id).eq('profile_id', profile_id)
+      if (error) throw error
+
+      // Removing the primary login hands primary to whoever was added next
+      if (client?.profile_id === profile_id) {
+        const { data: next } = await supabaseAdmin.from('client_members')
+          .select('profile_id').eq('client_id', client_id)
+          .order('created_at').limit(1).maybeSingle()
+        await supabaseAdmin.from('clients')
+          .update({ profile_id: next?.profile_id ?? null }).eq('id', client_id)
+      }
+
+      const [{ count }, { data: prof }] = await Promise.all([
+        supabaseAdmin.from('client_members')
+          .select('client_id', { count: 'exact', head: true }).eq('profile_id', profile_id),
+        supabaseAdmin.from('profiles').select('role').eq('id', profile_id).maybeSingle(),
+      ])
+      if (!count && prof?.role === 'client') {
+        await supabaseAdmin.auth.admin.updateUserById(profile_id, { ban_duration: '876600h' })
+      }
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200,
+      })
+    }
+
+    // --- MAKE A PERSON THE CLIENT'S PRIMARY CONTACT ---
+    if (action === 'set_client_primary') {
+      const { client_id, profile_id } = body
+      const { data: m } = await supabaseAdmin.from('client_members')
+        .select('profile_id').eq('client_id', client_id).eq('profile_id', profile_id).maybeSingle()
+      if (!m) throw new Error('That person is not on this client.')
+      const [{ data: prof }, { data: authData }] = await Promise.all([
+        supabaseAdmin.from('profiles').select('full_name').eq('id', profile_id).maybeSingle(),
+        supabaseAdmin.auth.admin.getUserById(profile_id),
+      ])
+      const updates: Record<string, unknown> = { profile_id }
+      if (prof?.full_name) updates.contact_name = prof.full_name
+      if (authData?.user?.email) updates.email = authData.user.email
+      const { error } = await supabaseAdmin.from('clients').update(updates).eq('id', client_id)
+      if (error) throw error
+      return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200,
       })
     }

@@ -1,7 +1,7 @@
 import { supabase } from './supabase'
 
 // ── Multi-account client resolution ──────────────────────────────────────────
-// A client can have up to 2 login accounts (client_members). Primary accounts
+// A client can have any number of login accounts (client_members). Primary accounts
 // are also members (backfilled), so membership is the single source of truth —
 // with a profile_id fallback for anything not yet backfilled.
 
@@ -28,7 +28,7 @@ export async function getMyClient(userId, select = 'id, name') {
 
 /**
  * clientProfileIds(clientId) → every login account's profile id for a client
- * (primary + members, deduped). Use for notifications so BOTH accounts hear
+ * (primary + members, deduped). Use for notifications so EVERY account hears
  * about reviews, uploads, etc.
  */
 export async function clientProfileIds(clientId) {

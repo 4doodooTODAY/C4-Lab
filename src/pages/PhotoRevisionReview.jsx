@@ -345,7 +345,7 @@ export default function PhotoRevisionReview() {
 
       const { notify, notifyAdmins } = await import('../lib/notify')
       if (project?.client_id) {
-        // Notify every login account on this client (up to 2)
+        // Notify every login account on this client
         const ids = await clientProfileIds(project.client_id)
         await Promise.all(ids.map((pid) => notify({
           profileId: pid, actorId: myId,

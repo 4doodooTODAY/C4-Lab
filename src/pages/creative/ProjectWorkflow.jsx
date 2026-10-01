@@ -1609,7 +1609,7 @@ function DraftCutPanel({ project, draftRev, onReplace, onRefresh }) {
         link:    `/projects/${project.id}`,
       })
       if (toClient) {
-        // Notify every login account on this client (up to 2)
+        // Notify every login account on this client
         const ids = await clientProfileIds(project.client_id)
         await Promise.all(ids.map((pid) => notifyFn({
           profileId: pid,

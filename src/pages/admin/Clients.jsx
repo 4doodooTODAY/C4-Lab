@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, X, Loader2, Building2, Check, Mail, Phone, ChevronRight, Trash2, AlertTriangle } from 'lucide-react'
+import { Plus, X, Loader2, Building2, Check, Mail, Phone, ChevronRight, Trash2, AlertTriangle, UserPlus, Users } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { useClients } from '../../hooks/useClients'
 import Avatar from '../../components/ui/Avatar'
+import { addClientPerson } from '../../lib/clientPeople'
 
 // ── Delete Confirm Modal ───────────────────────────────────────────────────────
 function DeleteClientModal({ client, onClose, onDeleted }) {
@@ -63,6 +64,12 @@ function InviteClientModal({ onClose, onCreated }) {
   const [saving, setSaving]           = useState(false)
   const [error, setError]             = useState('')
   const [sent, setSent]               = useState(false)
+  // Extra people who sign in to the same client account
+  const [extras, setExtras]           = useState([])   // [{ full_name, email }]
+  const [results, setResults]         = useState([])   // [{ email, ok, error?, link? }]
+
+  const setExtra = (i, key, value) =>
+    setExtras((prev) => prev.map((p, j) => (j === i ? { ...p, [key]: value } : p)))
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -88,10 +95,16 @@ function InviteClientModal({ onClose, onCreated }) {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Request failed')
-      if (data?.emailed === false && data?.invite_link) {
-        try { await navigator.clipboard.writeText(data.invite_link) } catch { /* ignore */ }
-        window.alert('Client created. The invite email could not send yet, so the setup link was copied to your clipboard. Send it to them directly.')
+      const out = [{ email: email.trim(), ok: true, link: data?.emailed === false ? data.invite_link : null }]
+      for (const p of extras.filter((x) => x.full_name.trim() && x.email.trim())) {
+        try {
+          const r = await addClientPerson(data.client.id, { full_name: p.full_name.trim(), email: p.email.trim() })
+          out.push({ email: p.email.trim(), ok: true, link: r.invited && !r.emailed ? r.invite_link : null })
+        } catch (err) {
+          out.push({ email: p.email.trim(), ok: false, error: err.message })
+        }
       }
+      setResults(out)
       setSent(true)
       onCreated()
     } catch (err) {
@@ -107,10 +120,33 @@ function InviteClientModal({ onClose, onCreated }) {
         <div className="w-12 h-12 rounded-full bg-status-approved-bg flex items-center justify-center mx-auto mb-4">
           <Check size={22} className="text-status-approved-text" />
         </div>
-        <h2 className="text-base font-semibold text-text-primary mb-1">Invite sent!</h2>
-        <p className="text-sm text-text-secondary mb-5">
-          {email} will receive an email to set their password and access their client portal.
+        <h2 className="text-base font-semibold text-text-primary mb-1">
+          {results.length > 1 ? 'Invites sent' : 'Invite sent'}
+        </h2>
+        <p className="text-sm text-text-secondary mb-4">
+          Each person gets an email to set their password, then lands in the {business.trim() || 'client'} portal.
         </p>
+        <div className="space-y-1.5 mb-5 text-left">
+          {results.map((r) => (
+            <div key={r.email} className="text-xs flex items-start gap-2">
+              {r.ok
+                ? <Check size={12} className="text-status-approved-text shrink-0 mt-0.5" />
+                : <AlertTriangle size={12} className="text-status-overdue-text shrink-0 mt-0.5" />}
+              <div className="min-w-0">
+                <p className="text-text-primary truncate">{r.email}</p>
+                {r.error && <p className="text-status-overdue-text">{r.error}</p>}
+                {r.link && (
+                  <button
+                    onClick={() => navigator.clipboard.writeText(r.link).catch(() => {})}
+                    className="text-status-review-text hover:underline"
+                  >
+                    Email did not send. Copy setup link
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
         <button onClick={onClose} className="btn-primary w-full">Done</button>
       </div>
     </div>
@@ -119,7 +155,7 @@ function InviteClientModal({ onClose, onCreated }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative card shadow-2xl w-full max-w-md p-6 z-10">
+      <div className="relative card shadow-2xl w-full max-w-md p-6 z-10 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-5">
           <div>
             <h2 className="text-base font-semibold text-text-primary">Invite Client</h2>
@@ -150,12 +186,42 @@ function InviteClientModal({ onClose, onCreated }) {
             <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
               placeholder="(555) 000-0000" className="input" />
           </div>
+          <div className="pt-1">
+            <div className="flex items-center justify-between">
+              <label className="label mb-0">More people on this account</label>
+              <button
+                type="button"
+                onClick={() => setExtras((prev) => [...prev, { full_name: '', email: '' }])}
+                className="text-xs text-accent hover:underline font-medium flex items-center gap-1"
+              >
+                <UserPlus size={12} /> Add person
+              </button>
+            </div>
+            {extras.length === 0 ? (
+              <p className="text-[11px] text-text-muted mt-1">Optional. Each person gets their own login to the same client portal.</p>
+            ) : (
+              <div className="space-y-2 mt-2">
+                {extras.map((p, i) => (
+                  <div key={i} className="flex gap-2">
+                    <input type="text" value={p.full_name} onChange={(e) => setExtra(i, 'full_name', e.target.value)}
+                      placeholder="Full name" className="input flex-1 min-w-0" required />
+                    <input type="email" value={p.email} onChange={(e) => setExtra(i, 'email', e.target.value)}
+                      placeholder="their@email.com" className="input flex-1 min-w-0" required />
+                    <button type="button" onClick={() => setExtras((prev) => prev.filter((_, j) => j !== i))}
+                      className="btn-ghost p-2 shrink-0" title="Remove">
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           {error && <p className="text-xs text-status-overdue-text bg-status-overdue-bg border border-status-overdue/30 rounded-lg px-3 py-2">{error}</p>}
           <div className="flex gap-2 justify-end pt-1">
             <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
             <button type="submit" disabled={saving} className="btn-primary disabled:opacity-50 flex items-center gap-1.5">
               {saving ? <Loader2 size={14} className="animate-spin" /> : <Mail size={14} />}
-              Send Invite
+              {extras.length ? `Send ${extras.length + 1} Invites` : 'Send Invite'}
             </button>
           </div>
         </form>
@@ -171,6 +237,7 @@ function ClientCard({ client, onClick, onDelete }) {
     assignedRole: a.role,
   })).filter((a) => a.id)
   const isPending  = !client.profile_id || client._profile?.must_change_password
+  const peopleCount = (client.client_members || []).length
   const [resending, setResending] = useState(false)
   const [resent, setResent]       = useState(false)
   const [resendErr, setResendErr] = useState('')
@@ -250,6 +317,12 @@ function ClientCard({ client, onClick, onDelete }) {
           <div className="flex items-center gap-2 text-xs text-text-muted">
             <Phone size={11} className="shrink-0" />
             <span>{client.contact_phone || client.phone}</span>
+          </div>
+        )}
+        {peopleCount > 1 && (
+          <div className="flex items-center gap-2 text-xs text-text-muted">
+            <Users size={11} className="shrink-0" />
+            <span>{peopleCount} people can sign in</span>
           </div>
         )}
         {!client.contact_email && !client.email && !client.contact_phone && !client.phone && (
