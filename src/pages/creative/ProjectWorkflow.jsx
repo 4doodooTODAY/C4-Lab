@@ -1268,7 +1268,6 @@ function ProjectMediaSection({ project, uploads, onRefresh }) {
   }
 
   const totalSize = uploads.reduce((acc, f) => acc + (f.file_size || 0), 0)
-  const visible   = showAll ? uploads : uploads.slice(0, 3)
 
   return (
     <div className="card border border-border p-5 space-y-4">
@@ -1359,15 +1358,26 @@ function ProjectMediaSection({ project, uploads, onRefresh }) {
       )}
       {uploads.length > 0 && (
         <div>
-          <div className="flex items-center gap-3 mb-2">
-            {uploads.length > 3 && (
-              <button
-                onClick={() => setShowAll((v) => !v)}
-                className="text-xs text-accent hover:text-accent/80 font-medium transition-colors"
-              >
-                {showAll ? 'Show less' : `Show all ${uploads.length} files`}
-              </button>
-            )}
+          {/* Collapsed by default so the page stays short; expand on demand */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-text-primary">
+                {uploads.length} file{uploads.length !== 1 ? 's' : ''}
+              </p>
+              <p className="text-xs text-text-muted">{fmtBytes(totalSize)} total</p>
+            </div>
+            <button
+              onClick={() => setShowAll((v) => !v)}
+              aria-expanded={showAll}
+              className="btn-secondary text-xs flex items-center gap-1"
+            >
+              {showAll ? 'Hide files' : 'Show files'}
+              <ChevronRight size={12} className={`transition-transform ${showAll ? '-rotate-90' : 'rotate-90'}`} />
+            </button>
+          </div>
+          {showAll && (
+          <>
+          <div className="flex items-center gap-3 mt-3 mb-2">
             <button
               onClick={() => {
                 const allSel = uploads.every((f) => selectedIds.has(f.id))
@@ -1390,7 +1400,7 @@ function ProjectMediaSection({ project, uploads, onRefresh }) {
             )}
           </div>
           <div className="rounded-xl border border-border divide-y divide-border">
-            {visible.map((f) => (
+            {uploads.map((f) => (
               <div key={f.id} className="flex items-center gap-3 px-3 py-2.5">
                 <button onClick={() => toggleSelected(f.id)} className="shrink-0" title="Select">
                   {selectedIds.has(f.id) ? <CheckSquare size={15} className="text-accent" /> : <Square size={15} className="text-text-muted" />}
@@ -1423,6 +1433,8 @@ function ProjectMediaSection({ project, uploads, onRefresh }) {
               </div>
             ))}
           </div>
+          </>
+          )}
         </div>
       )}
     </div>
@@ -2273,6 +2285,75 @@ function RevisionsCard({ project, revisions, commentCounts, navigate }) {
   )
 }
 
+// ── Ready to Review (top of the page) ─────────────────────────────────────────
+// Any cut or photo set sitting in a review state is pulled to the very top so
+// nobody has to scroll past the project info and media lists to find it.
+const IN_REVIEW = ['draft', 'pending_photographer_review', 'pending_creative_review', 'pending_admin_review', 'pending_client_review']
+
+export function ReviewQueueCard({ project, revisions, isAdmin, isCreative, isEditor, navigate }) {
+  const items = revisions
+    .filter((r) => IN_REVIEW.includes(r.status))
+    // Admins get the full approval panel for this one, right below
+    .filter((r) => !(isAdmin && r.status === 'pending_admin_review'))
+    // Unsent drafts only matter to whoever is editing
+    .filter((r) => r.status !== 'draft' || isEditor)
+    .sort((a, b) => b.revision_number - a.revision_number)
+  if (!items.length) return null
+
+  const isPhoto = project.media_type === 'photo'
+  const mine = (r) =>
+    (r.status === 'draft' && isEditor) ||
+    (['pending_photographer_review', 'pending_creative_review'].includes(r.status) && isCreative)
+
+  const open = (r) => {
+    if (r.status === 'draft') {
+      document.getElementById('upload-revision')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      return
+    }
+    navigate(isPhoto ? `/projects/${project.id}/photo-revision/${r.id}` : `/projects/${project.id}/revision/${r.id}`)
+  }
+
+  return (
+    <div className="card border border-accent/40 p-5">
+      <h2 className="text-sm font-semibold text-text-primary mb-4 flex items-center gap-2">
+        <Eye size={14} className="text-accent" /> Ready to review
+      </h2>
+      <div className="space-y-3">
+        {items.map((r) => (
+          <div key={r.id} className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
+            <button onClick={() => open(r)} className="shrink-0 rounded-lg overflow-hidden" title="Open">
+              <MediaThumb videoUrl={r.video_url} photoUrl={r.photo_urls?.[0]} size="w-24 h-16" />
+            </button>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="text-sm font-bold text-text-primary">
+                  {r.status === 'draft' ? `${revisionLabel(r.revision_number)} (draft)` : revisionLabel(r.revision_number)}
+                </p>
+                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                  REVISION_STATUS_COLORS[r.status] || 'bg-surface-2 text-text-muted border-border'
+                }`}>
+                  {r.status === 'draft' ? 'Not sent yet' : (REVISION_STATUS_LABELS[r.status] || r.status)}
+                </span>
+              </div>
+              <p className="text-xs text-text-muted mt-0.5">
+                {r.uploader?.full_name ? `Uploaded by ${r.uploader.full_name}` : 'Uploaded'}
+                {r.created_at && ` · ${format(new Date(r.created_at), 'MMM d')}`}
+              </p>
+            </div>
+            <button
+              onClick={() => open(r)}
+              className={`${mine(r) ? 'btn-primary' : 'btn-secondary'} text-xs flex items-center gap-1 shrink-0 w-full sm:w-auto justify-center`}
+            >
+              {r.status === 'draft' ? 'Review and send' : mine(r) ? 'Review now' : `View ${isPhoto ? 'photos' : 'cut'}`}
+              <ChevronRight size={12} />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── Quick Actions Card (Right column) ─────────────────────────────────────────
 
 function QuickActionsCard({ projectId, isAdmin }) {
@@ -2539,11 +2620,14 @@ export default function ProjectWorkflow() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* LEFT COLUMN. 2/3 width */}
         <div className="lg:col-span-2 space-y-6">
-          {/* 1. Project Overview */}
-          <ProjectOverviewCard
+          {/* Cuts and drafts waiting on review come first, above details and media */}
+          <ReviewQueueCard
             project={project}
-            creativeProfile={creativeProfile}
-            editorProfile={editorProfile}
+            revisions={revisions}
+            isAdmin={isAdmin}
+            isCreative={isCreative}
+            isEditor={isEditor}
+            navigate={navigate}
           />
 
           {/* Admin Review Gate. Shown to admin when first edit is pending their approval */}
@@ -2557,6 +2641,13 @@ export default function ProjectWorkflow() {
               />
             ) : null
           })()}
+
+          {/* 1. Project Overview */}
+          <ProjectOverviewCard
+            project={project}
+            creativeProfile={creativeProfile}
+            editorProfile={editorProfile}
+          />
 
           {/* Project Media. Upload any videos/photos directly to the project */}
           {isCreative && (
@@ -2582,6 +2673,7 @@ export default function ProjectWorkflow() {
           )}
 
           {/* 3b. Upload Revision. Visible to any editor role */}
+          <div id="upload-revision" className="scroll-mt-6">
           {isEditor && project?.media_type === 'photo' ? (
             <UploadPhotoRevisionSection
               project={project}
@@ -2595,6 +2687,7 @@ export default function ProjectWorkflow() {
               onRefresh={fetchAll}
             />
           ) : null}
+          </div>
         </div>
 
         {/* RIGHT COLUMN. 1/3 width */}
