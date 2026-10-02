@@ -11,6 +11,7 @@ import { notify, notifyMany, notifyAdmins } from '../lib/notify'
 import Avatar from '../components/ui/Avatar'
 import DownloadButton from '../components/ui/DownloadButton'
 import CaptionConcept from '../components/projects/CaptionConcept'
+import ThumbnailReview from '../components/projects/ThumbnailReview'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -198,7 +199,7 @@ export default function VideoRevisionReview() {
       const [revRes, commRes] = await Promise.all([
         supabase
           .from('project_revisions')
-          .select('*, projects(id, name, creative_id, editor_id, client_id, revision_count, caption_concept)')
+          .select('*, projects(id, name, creative_id, editor_id, client_id, revision_count, caption_concept, clients(name))')
           .eq('id', revisionId)
           .single(),
         supabase
@@ -720,7 +721,7 @@ export default function VideoRevisionReview() {
           )}
 
           {/* Comments list */}
-          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+          <div className="flex-1 lg:min-h-[180px] overflow-y-auto px-4 py-3 space-y-3">
             {comments.length === 0 ? (
               <div className="text-center py-10">
                 <MessageSquare size={28} className="mx-auto text-white/20 mb-2" />
@@ -742,8 +743,9 @@ export default function VideoRevisionReview() {
             )}
           </div>
 
-          {/* Panel footer actions */}
-          <div className="px-4 py-4 border-t border-white/5 space-y-2">
+          {/* Panel footer actions. Scrolls on its own on desktop so the
+              thumbnail and captions never push the comments out of view */}
+          <div className="px-4 py-4 border-t border-white/5 space-y-2 lg:max-h-[60%] lg:overflow-y-auto shrink-0">
             {actionError && (
               <p className="text-xs text-red-400 mb-2">{actionError}</p>
             )}
@@ -830,6 +832,18 @@ export default function VideoRevisionReview() {
                   />
                 )}
               </div>
+            )}
+
+            {/* Thumbnail for this cut. Editors upload, everyone can pin notes */}
+            {project && (
+              <ThumbnailReview
+                revision={revision}
+                project={project}
+                clientName={project.clients?.name}
+                myId={myId}
+                canUpload={isEditor || isAdmin}
+                canReview={isClient || isAdmin || isPhotographer}
+              />
             )}
 
             {/* Caption concept. Directly under the download */}
