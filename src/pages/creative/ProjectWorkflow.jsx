@@ -16,6 +16,7 @@ import { updateProject } from '../../hooks/useProjects'
 import Avatar from '../../components/ui/Avatar'
 import MediaThumb from '../../components/ui/MediaThumb'
 import CaptionConcept from '../../components/projects/CaptionConcept'
+import { isFeedbackToAddress } from '../../lib/revisionFeedback'
 import { format, parseISO } from 'date-fns'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -423,20 +424,22 @@ function DropZone({ onFiles }) {
 
 // ── Revision Comments List (for editor) ───────────────────────────────────────
 
-function RevisionCommentsList({ revisionId }) {
-  const [comments, setComments] = useState([])
+function RevisionCommentsList({ revisionId, isPhoto = false }) {
+  const [comments, setComments] = useState(null)
 
   useEffect(() => {
-    supabase
-      .from('revision_comments')
-      .select('*, profiles(full_name)')
-      .eq('revision_id', revisionId)
-      .eq('status', 'accepted')
-      .order('timestamp_seconds')
-      .then(({ data }) => setComments(data || []))
-  }, [revisionId])
+    // Video notes are timestamped; photo notes are pins on a numbered photo
+    const q = isPhoto
+      ? supabase.from('photo_revision_comments')
+          .select('id, body, status, photo_index, created_at, profiles(full_name, role)')
+          .eq('revision_id', revisionId).order('photo_index').order('created_at')
+      : supabase.from('revision_comments')
+          .select('id, content, status, timestamp_seconds, profiles:author_id(full_name, role)')
+          .eq('revision_id', revisionId).order('timestamp_seconds')
+    q.then(({ data }) => setComments((data || []).filter(isFeedbackToAddress)))
+  }, [revisionId, isPhoto])
 
-  if (comments.length === 0) return null
+  if (!comments?.length) return null
 
   const fmtTime = (s) => {
     const m = Math.floor(s / 60)
@@ -445,17 +448,24 @@ function RevisionCommentsList({ revisionId }) {
   }
 
   return (
-    <div className="bg-status-due-soon-bg border border-status-due-soon/30 rounded-xl p-4 mb-4">
+    <div className="bg-status-due-soon-bg border border-status-due-soon/30 rounded-xl p-4 mb-4 text-left">
       <p className="text-xs font-semibold text-status-due-soon-text mb-3">
-        Accepted comments to address ({comments.length})
+        Feedback to address ({comments.length})
       </p>
       <div className="space-y-2">
         {comments.map((c) => (
           <div key={c.id} className="flex gap-2">
-            <span className="text-xs font-semibold text-status-due-soon-text bg-status-due-soon-bg px-1.5 py-0.5 rounded shrink-0">
-              {fmtTime(c.timestamp_seconds)}
+            <span className="text-xs font-semibold text-status-due-soon-text bg-status-due-soon-bg px-1.5 py-0.5 rounded shrink-0 tabular-nums">
+              {isPhoto ? `Photo ${(c.photo_index ?? 0) + 1}` : fmtTime(c.timestamp_seconds)}
             </span>
-            <p className="text-xs text-status-due-soon-text">{c.content}</p>
+            <div className="min-w-0">
+              <p className="text-xs text-status-due-soon-text whitespace-pre-wrap">{isPhoto ? c.body : c.content}</p>
+              {c.profiles?.full_name && (
+                <p className="text-[10px] text-status-due-soon-text/70">
+                  {c.profiles.full_name}{c.profiles.role === 'client' ? ' (client)' : ''}
+                </p>
+              )}
+            </div>
           </div>
         ))}
       </div>
@@ -1834,6 +1844,9 @@ function UploadPhotoRevisionSection({ project, revisions, onRefresh }) {
           {nextRevNum === 1 ? 'Ready to submit your photos?' : `Ready to upload Revision ${nextRevNum}?`}
         </h2>
         <p className="text-xs text-text-muted mb-4">Upload your edited photos. Nothing goes to the client until you press Send.</p>
+        {latestRev && latestRev.status === 'pending_editor' && (
+          <RevisionCommentsList revisionId={latestRev.id} isPhoto />
+        )}
         <button onClick={() => setOpen(true)} className="btn-primary">
           {nextRevNum === 1 ? 'Upload Initial Photos' : `Upload Revision ${nextRevNum}`}
         </button>
@@ -1847,6 +1860,10 @@ function UploadPhotoRevisionSection({ project, revisions, onRefresh }) {
         <Camera size={14} className="text-text-muted" />
         Upload Photos. {nextRevNum === 1 ? 'Initial Set' : `Revision ${nextRevNum}`}
       </h2>
+
+      {latestRev && latestRev.status === 'pending_editor' && (
+        <RevisionCommentsList revisionId={latestRev.id} isPhoto />
+      )}
 
       {/* File picker. Hidden while uploading */}
       {!uploading && (
@@ -2098,7 +2115,7 @@ function UploadRevisionSection({ project, revisions, onRefresh }) {
         <FileVideo size={14} className="text-text-muted" /> Upload {revisionLabel(nextRevNum)}
       </h2>
 
-      {/* Accepted comments */}
+      {/* Feedback to address */}
       {latestRev && latestRev.status === 'pending_editor' && (
         <RevisionCommentsList revisionId={latestRev.id} />
       )}
@@ -2491,8 +2508,9 @@ export default function ProjectWorkflow() {
       if (revData.length) {
         await Promise.all(
           revData.map(async (rev) => {
+            const isPhotoRev = (rev.media_type || projData?.media_type) === 'photo'
             const { count } = await supabase
-              .from('revision_comments')
+              .from(isPhotoRev ? 'photo_revision_comments' : 'revision_comments')
               .select('id', { count: 'exact', head: true })
               .eq('revision_id', rev.id)
             counts[rev.id] = count ?? 0

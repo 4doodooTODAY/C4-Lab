@@ -307,9 +307,10 @@ export default function PhotoRevisionReview() {
   const handleSendFeedback = async () => {
     setSending(true)
     try {
-      await supabase.from('project_revisions')
+      const { error: upErr } = await supabase.from('project_revisions')
         .update({ status: 'pending_editor' })
         .eq('id', revisionId)
+      if (upErr) throw upErr
       setRevision((r) => ({ ...r, status: 'pending_editor' }))
       const editorIds = projectEditorIds.length ? projectEditorIds : [project?.editor_id].filter(Boolean)
       if (editorIds.length) {
@@ -326,6 +327,7 @@ export default function PhotoRevisionReview() {
       }
     } catch (err) {
       console.error(err)
+      window.alert(err.message || 'Could not send your feedback. Please try again.')
     } finally {
       setSending(false)
     }

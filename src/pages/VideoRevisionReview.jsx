@@ -12,6 +12,7 @@ import Avatar from '../components/ui/Avatar'
 import DownloadButton from '../components/ui/DownloadButton'
 import CaptionConcept from '../components/projects/CaptionConcept'
 import ThumbnailReview from '../components/projects/ThumbnailReview'
+import { feedbackCount } from '../lib/revisionFeedback'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -388,6 +389,11 @@ export default function VideoRevisionReview() {
 
   // ── Client: send feedback to editor ──────────────────────────────────────
   const handleSendToEditor = async () => {
+    // Sending with no notes left editors with nothing to act on
+    if (!feedbackCount(comments)) {
+      setActionError('Add at least one comment first: click the timeline, or use Add comment above.')
+      return
+    }
     setSubmittingAction(true)
     setActionError('')
     try {
@@ -408,7 +414,7 @@ export default function VideoRevisionReview() {
         profileId: eid, actorId: myId,
         type: 'client_feedback_sent',
         title: `Client sent feedback on "${project.name}"`,
-        body: `Review the comments and upload a revised cut.`,
+        body: `${feedbackCount(comments)} note${feedbackCount(comments) !== 1 ? 's' : ''} to address. Review them and upload a revised cut.`,
         link: `/projects/${project.id}/revision/${revisionId}`,
       })))
       await notifyAdmins({
@@ -789,10 +795,15 @@ export default function VideoRevisionReview() {
                     <p className="text-xs text-white/40">You've used all 3 revision rounds. Please approve to finalize this project.</p>
                   </div>
                 )}
+                {canRevise && feedbackCount(comments) === 0 && (
+                  <p className="text-xs text-white/50 text-center">
+                    Want changes? Click the timeline or use Add comment to leave notes, then send them to the editor.
+                  </p>
+                )}
                 {canRevise && (
                   <button
                     onClick={handleSendToEditor}
-                    disabled={submittingAction}
+                    disabled={submittingAction || feedbackCount(comments) === 0}
                     className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold transition-all disabled:opacity-50"
                   >
                     {submittingAction ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
@@ -815,7 +826,7 @@ export default function VideoRevisionReview() {
               <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3">
                 <p className="text-xs text-amber-300 font-medium mb-1">Upload the next revision</p>
                 <p className="text-xs text-white/40">
-                  {comments.filter((c) => c.status === 'accepted').length} accepted note{comments.filter((c) => c.status === 'accepted').length !== 1 ? 's' : ''} to address. Go to the project page to upload your revised cut.
+                  {feedbackCount(comments)} note{feedbackCount(comments) !== 1 ? 's' : ''} to address. Go to the project page to upload your revised cut.
                 </p>
               </div>
             )}
